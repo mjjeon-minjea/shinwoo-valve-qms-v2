@@ -1923,6 +1923,30 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
                                 )}
                             </div>
                         )}
+
+                        <div className="pt-4 mt-4 border-t border-slate-200">
+                            <h3 className="px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
+                                업무 관리
+                            </h3>
+                            <button
+                                onClick={() => navigate('/weekly-report')}
+                                className="w-full flex items-center px-3 py-2.5 text-sm font-medium rounded-lg text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors"
+                            >
+                                <div className="flex items-center">
+                                    <FileText className="mr-3 h-5 w-5 text-slate-400" />
+                                    주간업무보고
+                                </div>
+                            </button>
+                            <button
+                                onClick={() => navigate('/schedule')}
+                                className="w-full flex items-center px-3 py-2.5 text-sm font-medium rounded-lg text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors"
+                            >
+                                <div className="flex items-center">
+                                    <Activity className="mr-3 h-5 w-5 text-slate-400" />
+                                    일정 (Calendar)
+                                </div>
+                            </button>
+                        </div>
                     </nav>
 
                     {/* Additional Menu Section Mockup */}

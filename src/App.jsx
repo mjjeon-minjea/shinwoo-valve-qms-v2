@@ -9,6 +9,30 @@ import { Routes, Route } from 'react-router-dom';
 import InspectionAnalysisDashboard from './components/InspectionAnalysisDashboard';
 import QualificationExam from './components/QualificationExam';
 
+import { UserProvider, useUser } from './contexts/UserContext';
+import WeeklyReport from './components/WeeklyReport';
+import CalendarView from './components/CalendarView';
+
+// User Switcher Component (Temporary for testing)
+const UserSwitcher = () => {
+    const { user, users, login } = useUser();
+    if (!user) return null;
+    return (
+        <div className="fixed bottom-4 right-4 bg-white p-3 rounded-lg shadow-xl border border-gray-200 z-50 flex flex-col gap-2">
+            <span className="text-xs font-bold text-gray-500">테스트용 사용자 전환</span>
+            <select 
+                value={user.id} 
+                onChange={(e) => login(e.target.value)}
+                className="text-sm border rounded p-1"
+            >
+                {users.map(u => (
+                    <option key={u.id} value={u.id}>{u.name} ({u.role || '사원'})</option>
+                ))}
+            </select>
+        </div>
+    );
+};
+
 function App() {
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [isAdmin, setIsAdmin] = useState(false);
@@ -161,43 +185,62 @@ function App() {
     };
 
     return (
-        <div className="min-h-screen flex flex-col">
-            <Routes>
-                <Route path="/exam" element={<QualificationExam />} />
-                <Route path="/" element={
-                    <>
-                        <Header isLoggedIn={isLoggedIn} onLogout={handleLogout} currentUser={currentUser} onUpdateProfile={handleUpdateProfile} />
-                        <main className="flex-grow">
-                            {isLoggedIn ? (
-                                <Dashboard
-                                    user={currentUser}
-                                    isAdmin={isAdmin}
-                                    members={users}
-                                    onDeleteMember={handleDeleteUser}
-                                    onEditMember={handleEditUser}
-                                    onAddMember={handleAddMember}
-                                    onRefresh={fetchUsers}
-                                />
-                            ) : (
-                                <Hero onLogin={handleLogin} onSignup={handleSignup} />
-                            )}
-                            <Chatbot />
-                        </main>
-                        <footer className="bg-slate-50 border-t border-slate-200 py-6 text-center text-sm text-slate-500">
-                            © {new Date().getFullYear()} (주)신우밸브. All rights reserved.
-                        </footer>
-                    </>
-                } />
-                <Route path="/inspection-analysis" element={
-                     <>
-                        <Header isLoggedIn={isLoggedIn} onLogout={handleLogout} currentUser={currentUser} onUpdateProfile={handleUpdateProfile} />
-                        <div className="p-8 bg-slate-50 min-h-screen">
-                            <InspectionAnalysisDashboard />
-                        </div>
-                     </>
-                } />
-            </Routes>
-        </div>
+        <UserProvider>
+            <div className="min-h-screen flex flex-col">
+                <UserSwitcher />
+                <Routes>
+                    <Route path="/exam" element={<QualificationExam />} />
+                    <Route path="/weekly-report" element={
+                        <>
+                            <Header isLoggedIn={isLoggedIn} onLogout={handleLogout} currentUser={currentUser} onUpdateProfile={handleUpdateProfile} />
+                            <div className="pt-16">
+                                <WeeklyReport />
+                            </div>
+                        </>
+                    } />
+                    <Route path="/schedule" element={
+                        <>
+                            <Header isLoggedIn={isLoggedIn} onLogout={handleLogout} currentUser={currentUser} onUpdateProfile={handleUpdateProfile} />
+                            <div className="pt-16">
+                                <CalendarView />
+                            </div>
+                        </>
+                    } />
+                    <Route path="/" element={
+                        <>
+                            <Header isLoggedIn={isLoggedIn} onLogout={handleLogout} currentUser={currentUser} onUpdateProfile={handleUpdateProfile} />
+                            <main className="flex-grow">
+                                {isLoggedIn ? (
+                                    <Dashboard
+                                        user={currentUser}
+                                        isAdmin={isAdmin}
+                                        members={users}
+                                        onDeleteMember={handleDeleteUser}
+                                        onEditMember={handleEditUser}
+                                        onAddMember={handleAddMember}
+                                        onRefresh={fetchUsers}
+                                    />
+                                ) : (
+                                    <Hero onLogin={handleLogin} onSignup={handleSignup} />
+                                )}
+                                <Chatbot />
+                            </main>
+                            <footer className="bg-slate-50 border-t border-slate-200 py-6 text-center text-sm text-slate-500">
+                                © {new Date().getFullYear()} (주)신우밸브. All rights reserved.
+                            </footer>
+                        </>
+                    } />
+                    <Route path="/inspection-analysis" element={
+                         <>
+                            <Header isLoggedIn={isLoggedIn} onLogout={handleLogout} currentUser={currentUser} onUpdateProfile={handleUpdateProfile} />
+                            <div className="p-8 bg-slate-50 min-h-screen">
+                                <InspectionAnalysisDashboard />
+                            </div>
+                         </>
+                    } />
+                </Routes>
+            </div>
+        </UserProvider>
     );
 }
 

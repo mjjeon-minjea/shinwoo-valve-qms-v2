@@ -1,0 +1,464 @@
+
+import React, { useState, useEffect } from 'react';
+import { useUser } from '../contexts/UserContext';
+import { format, startOfWeek, endOfWeek, addWeeks, subWeeks } from 'date-fns';
+import { Save, Send, CheckCircle, AlertCircle, Plus, Trash2, Calendar as CalendarIcon, FileText, CheckSquare, Package, AlertTriangle } from 'lucide-react';
+
+const WeeklyReport = () => {
+    const { user } = useUser();
+    const [currentDate, setCurrentDate] = useState(new Date());
+    const [activeTab, setActiveTab] = useState('schedule');
+    const [report, setReport] = useState(null);
+    const [reports, setReports] = useState([]);
+    const [loading, setLoading] = useState(false);
+
+    // Calculate week range
+    const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 }); // Monday start
+    const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
+    const weekKey = format(weekStart, 'yyyy-MM-dd');
+
+    useEffect(() => {
+        fetchReports();
+    }, [user, weekKey]);
+
+    const fetchReports = async () => {
+        if (!user) return;
+        setLoading(true);
+        try {
+            const response = await fetch('http://localhost:3001/weekly_reports');
+            if (response.ok) {
+                const data = await response.json();
+                setReports(data);
+                
+                // Find current user's report for this week
+                const myReport = data.find(r => 
+                    r.authorId === user.id && r.weekStartDate === weekKey
+                );
+
+                if (myReport) {
+                    setReport(myReport);
+                } else {
+                    // Initialize blank report
+                    setReport({
+                        authorId: user.id,
+                        authorName: user.name,
+                        weekStartDate: weekKey,
+                        status: 'draft',
+                        schedule: [],
+                        projects: [],
+                        issues: [],
+                        samples: []
+                    });
+                }
+            }
+        } catch (error) {
+            console.error('Error fetching reports:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleSave = async (submit = false) => {
+        if (!report) return;
+
+        const updatedReport = {
+            ...report,
+            status: submit ? 'submitted' : 'draft',
+            createdDate: new Date().toISOString()
+        };
+
+        try {
+            let url = 'http://localhost:3001/weekly_reports';
+            let method = 'POST';
+
+            if (report.id) {
+                url = `http://localhost:3001/weekly_reports/${report.id}`;
+                method = 'PUT';
+            }
+
+            const response = await fetch(url, {
+                method: method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updatedReport)
+            });
+
+            if (response.ok) {
+                const savedData = await response.json();
+                setReport(savedData);
+                alert(submit ? '보고서가 제출되었습니다.' : '임시 저장되었습니다.');
+                fetchReports(); // Refresh
+            }
+        } catch (error) {
+            console.error('Error saving report:', error);
+            alert('저장 중 오류가 발생했습니다.');
+        }
+    };
+
+    const handleApproval = async (status, comment) => {
+         if (!report || !report.id) return;
+
+         const updatedReport = {
+             ...report,
+             status: status,
+             [user.role === 'manager' ? 'reviewerComment' : 'approverComment']: comment
+         };
+
+         try {
+             const response = await fetch(`http://localhost:3001/weekly_reports/${report.id}`, {
+                 method: 'PUT',
+                 headers: { 'Content-Type': 'application/json' },
+                 body: JSON.stringify(updatedReport)
+             });
+
+             if (response.ok) {
+                 alert(status === 'approved' ? '승인되었습니다.' : '검토 완료되었습니다.');
+                 fetchReports();
+             }
+         } catch (error) {
+             console.error('Error updating status:', error);
+         }
+    };
+
+    // Helper to update arrays in report
+    const updateSection = (section, items) => {
+        setReport(prev => ({ ...prev, [section]: items }));
+    };
+
+    const addRow = (section, template) => {
+        setReport(prev => ({
+            ...prev,
+            [section]: [...(prev[section] || []), template]
+        }));
+    };
+
+    const removeRow = (section, index) => {
+        setReport(prev => ({
+            ...prev,
+            [section]: prev[section].filter((_, i) => i !== index)
+        }));
+    };
+
+    const updateRow = (section, index, field, value) => {
+        setReport(prev => {
+            const newItems = [...(prev[section] || [])];
+            newItems[index] = { ...newItems[index], [field]: value };
+            return { ...prev, [section]: newItems };
+        });
+    };
+
+    // Render logic based on Role
+    // Manager/Director View
+    if (user && (user.role === 'manager' || user.role === 'director')) {
+        // Simple list view for managers to select report
+        // For now, let's keep it simple: If looking at own report -> Edit mode
+        // If clicking on team member report -> Review mode
+        // TO-DO: Implement a "Team Reports" list here. 
+        // For this MVP, we will stick to the basic "My Report" view first, adding a "View Team" toggle later if requested.
+        // Actually, the requirement implies flow. Let's add a "Team Status" block at the top.
+    }
+
+    const renderTeamStatus = () => {
+        if (!user || user.role === 'employee') return null;
+
+        const teamReports = reports.filter(r => r.weekStartDate === weekKey && r.authorId !== user.id);
+
+        return (
+            <div className="mb-8 bg-white p-6 rounded-lg shadow-sm border border-indigo-100">
+                <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
+                    <CheckCircle className="w-5 h-5 mr-2 text-indigo-600" />
+                    팀원 보고 현황 ({format(weekStart, 'MM/dd')} ~ {format(weekEnd, 'MM/dd')})
+                </h3>
+                {teamReports.length === 0 ? (
+                    <p className="text-gray-500">제출된 보고서가 없습니다.</p>
+                ) : (
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                        {teamReports.map(r => (
+                            <div key={r.id} className="border p-4 rounded-lg bg-gray-50 hover:bg-white hover:shadow-md transition cursor-pointer" onClick={() => setReport(r)}>
+                                <div className="flex justify-between items-start mb-2">
+                                    <span className="font-bold text-gray-700">{r.authorName}</span>
+                                    <span className={`px-2 py-1 text-xs rounded-full 
+                                        ${r.status === 'submitted' ? 'bg-blue-100 text-blue-700' : 
+                                          r.status === 'reviewed' ? 'bg-purple-100 text-purple-700' :
+                                          r.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-gray-200'}`}>
+                                        {r.status === 'submitted' ? '제출됨' : 
+                                         r.status === 'reviewed' ? '검토완료' :
+                                         r.status === 'approved' ? '승인됨' : '작성중'}
+                                    </span>
+                                </div>
+                                <p className="text-xs text-gray-500">제출: {new Date(r.createdDate).toLocaleDateString()}</p>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        );
+    };
+
+    if (!user) return <div className="p-8">로그인이 필요합니다. (사용자 전환을 이용해주세요)</div>;
+    if (loading) return <div className="p-8">로딩 중...</div>;
+
+    const isReadOnly = report && report.status !== 'draft' && report.status !== 'rejected' && report.authorId === user.id;
+    const isReviewMode = report && report.authorId !== user.id;
+    const canReview = isReviewMode && user.role === 'manager' && report.status === 'submitted';
+    const canApprove = isReviewMode && user.role === 'director' && report.status === 'reviewed';
+
+    return (
+        <div className="p-6 max-w-7xl mx-auto bg-gray-50 min-h-screen">
+            <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-gray-800 flex items-center">
+                    <FileText className="w-8 h-8 mr-3 text-blue-600" />
+                    주간 업무 보고
+                </h2>
+                <div className="flex items-center space-x-4">
+                    <button onClick={() => setCurrentDate(subWeeks(currentDate, 1))} className="p-2 hover:bg-gray-200 rounded"><ChevronLeft/></button>
+                    <span className="text-lg font-medium">{format(weekStart, 'yyyy-MM-dd')} ~ {format(weekEnd, 'MM/dd')}</span>
+                    <button onClick={() => setCurrentDate(addWeeks(currentDate, 1))} className="p-2 hover:bg-gray-200 rounded"><ChevronRight/></button>
+                </div>
+            </div>
+
+            {renderTeamStatus()}
+
+            {report && (
+                <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
+                    {/* Header */}
+                    <div className="bg-gray-50 px-6 py-4 border-b flex justify-between items-center">
+                        <div className="flex items-center space-x-3">
+                            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold">
+                                {report.authorName[0]}
+                            </div>
+                            <div>
+                                <h3 className="font-bold text-gray-800">{report.authorName} 주간보고</h3>
+                                <p className="text-xs text-gray-500">상태: {report.status}</p>
+                            </div>
+                        </div>
+                        <div className="space-x-2">
+                            {!isReadOnly && !isReviewMode && (
+                                <>
+                                    <button onClick={() => handleSave(false)} className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center transition-colors">
+                                        <Save className="w-4 h-4 mr-2" /> 임시저장
+                                    </button>
+                                    <button onClick={() => handleSave(true)} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center shadow-sm transition-colors">
+                                        <Send className="w-4 h-4 mr-2" /> 제출하기
+                                    </button>
+                                </>
+                            )}
+                            {canReview && (
+                                <button onClick={() => handleApproval('reviewed', '수고했습니다.')} className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+                                    검토 완료
+                                </button>
+                            )}
+                            {canApprove && (
+                                <button onClick={() => handleApproval('approved', '승인합니다.')} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                                    승인
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Tabs */}
+                    <div className="flex border-b">
+                        <TabButton id="schedule" current={activeTab} set={setActiveTab} icon={CalendarIcon} label="근태 및 일정" />
+                        <TabButton id="projects" current={activeTab} set={setActiveTab} icon={CheckSquare} label="인증 및 프로젝트" />
+                        <TabButton id="issues" current={activeTab} set={setActiveTab} icon={AlertTriangle} label="공정 이슈" />
+                        <TabButton id="samples" current={activeTab} set={setActiveTab} icon={Package} label="초도품 관리" />
+                    </div>
+
+                    {/* Content Area */}
+                    <div className="p-6 min-h-[400px]">
+                        {activeTab === 'schedule' && (
+                            <SectionTable 
+                                title="근태 및 일정 관리"
+                                headers={['날짜', '구분', '내용', '비고']}
+                                data={report.schedule || []}
+                                readOnly={isReadOnly || isReviewMode}
+                                onAdd={() => addRow('schedule', { date: format(new Date(), 'yyyy-MM-dd'), type: '미팅', content: '', note: '' })}
+                                onRemove={(i) => removeRow('schedule', i)}
+                                renderRow={(item, i) => (
+                                    <>
+                                        <td>
+                                            <input type="date" value={item.date} onChange={(e) => updateRow('schedule', i, 'date', e.target.value)} disabled={isReadOnly || isReviewMode} className="w-full bg-transparent p-1"/>
+                                        </td>
+                                        <td>
+                                            <select value={item.type} onChange={(e) => updateRow('schedule', i, 'type', e.target.value)} disabled={isReadOnly || isReviewMode} className="w-full bg-transparent p-1">
+                                                <option>미팅</option>
+                                                <option>외근</option>
+                                                <option>휴가</option>
+                                                <option>조퇴</option>
+                                                <option>교육</option>
+                                                <option>기타</option>
+                                            </select>
+                                        </td>
+                                        <td>
+                                            <input type="text" value={item.content} onChange={(e) => updateRow('schedule', i, 'content', e.target.value)} disabled={isReadOnly || isReviewMode} className="w-full bg-transparent p-1" placeholder="일정 내용"/>
+                                        </td>
+                                        <td>
+                                            <input type="text" value={item.note} onChange={(e) => updateRow('schedule', i, 'note', e.target.value)} disabled={isReadOnly || isReviewMode} className="w-full bg-transparent p-1" placeholder="비고"/>
+                                        </td>
+                                    </>
+                                )}
+                            />
+                        )}
+
+                        {activeTab === 'projects' && (
+                            <SectionTable 
+                                title="인증 및 프로젝트 진행 현황"
+                                headers={['항목명', '진행상태', '세부내용', '비고']}
+                                data={report.projects || []}
+                                readOnly={isReadOnly || isReviewMode}
+                                onAdd={() => addRow('projects', { title: '', status: '진행중', content: '', note: '' })}
+                                onRemove={(i) => removeRow('projects', i)}
+                                renderRow={(item, i) => (
+                                    <>
+                                        <td><input type="text" value={item.title} onChange={(e) => updateRow('projects', i, 'title', e.target.value)} disabled={isReadOnly || isReviewMode} className="w-full bg-transparent p-1" placeholder="프로젝트명"/></td>
+                                        <td><input type="text" value={item.status} onChange={(e) => updateRow('projects', i, 'status', e.target.value)} disabled={isReadOnly || isReviewMode} className="w-full bg-transparent p-1"/></td>
+                                        <td><input type="text" value={item.content} onChange={(e) => updateRow('projects', i, 'content', e.target.value)} disabled={isReadOnly || isReviewMode} className="w-full bg-transparent p-1"/></td>
+                                        <td><input type="text" value={item.note} onChange={(e) => updateRow('projects', i, 'note', e.target.value)} disabled={isReadOnly || isReviewMode} className="w-full bg-transparent p-1"/></td>
+                                    </>
+                                )}
+                            />
+                        )}
+
+                        {activeTab === 'issues' && (
+                             <SectionTable 
+                                title="공정 이슈 및 불량 현황"
+                                headers={['이슈명', '진행상태', '원인 및 대책', '비고']}
+                                data={report.issues || []}
+                                readOnly={isReadOnly || isReviewMode}
+                                onAdd={() => addRow('issues', { title: '', status: '조치중', content: '', note: '' })}
+                                onRemove={(i) => removeRow('issues', i)}
+                                renderRow={(item, i) => (
+                                    <>
+                                        <td><input type="text" value={item.title} onChange={(e) => updateRow('issues', i, 'title', e.target.value)} disabled={isReadOnly || isReviewMode} className="w-full bg-transparent p-1" placeholder="이슈 내용"/></td>
+                                        <td>
+                                            <select value={item.status} onChange={(e) => updateRow('issues', i, 'status', e.target.value)} disabled={isReadOnly || isReviewMode} className="w-full bg-transparent p-1">
+                                                <option>발생</option>
+                                                <option>조치중</option>
+                                                <option>완료</option>
+                                                <option>모니터링</option>
+                                            </select>
+                                        </td>
+                                        <td><input type="text" value={item.content} onChange={(e) => updateRow('issues', i, 'content', e.target.value)} disabled={isReadOnly || isReviewMode} className="w-full bg-transparent p-1"/></td>
+                                        <td><input type="text" value={item.note} onChange={(e) => updateRow('issues', i, 'note', e.target.value)} disabled={isReadOnly || isReviewMode} className="w-full bg-transparent p-1"/></td>
+                                    </>
+                                )}
+                            />
+                        )}
+
+                        {activeTab === 'samples' && (
+                            <SectionTable 
+                                title="초도품 및 Sample 관리"
+                                headers={['품목명', '공급사', '승인상태', '비고']}
+                                data={report.samples || []}
+                                readOnly={isReadOnly || isReviewMode}
+                                onAdd={() => addRow('samples', { itemName: '', supplier: '', status: '검토중', note: '' })}
+                                onRemove={(i) => removeRow('samples', i)}
+                                renderRow={(item, i) => (
+                                    <>
+                                        <td><input type="text" value={item.itemName} onChange={(e) => updateRow('samples', i, 'itemName', e.target.value)} disabled={isReadOnly || isReviewMode} className="w-full bg-transparent p-1"/></td>
+                                        <td><input type="text" value={item.supplier} onChange={(e) => updateRow('samples', i, 'supplier', e.target.value)} disabled={isReadOnly || isReviewMode} className="w-full bg-transparent p-1"/></td>
+                                        <td><input type="text" value={item.status} onChange={(e) => updateRow('samples', i, 'status', e.target.value)} disabled={isReadOnly || isReviewMode} className="w-full bg-transparent p-1"/></td>
+                                        <td><input type="text" value={item.note} onChange={(e) => updateRow('samples', i, 'note', e.target.value)} disabled={isReadOnly || isReviewMode} className="w-full bg-transparent p-1"/></td>
+                                    </>
+                                )}
+                            />
+                        )}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+const TabButton = ({ id, current, set, icon: Icon, label }) => (
+    <button 
+        onClick={() => set(id)}
+        className={`flex-1 py-4 flex items-center justify-center font-medium transition-colors
+            ${current === id ? 'border-b-2 border-blue-600 text-blue-600 bg-blue-50' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}
+        `}
+    >
+        <Icon className="w-4 h-4 mr-2" />
+        {label}
+    </button>
+);
+
+const SectionTable = ({ title, headers, data, readOnly, onAdd, onRemove, renderRow }) => (
+    <div>
+        <div className="flex justify-between items-center mb-4">
+            <h4 className="text-lg font-bold text-gray-700">{title}</h4>
+            {!readOnly && (
+                <button onClick={onAdd} className="flex items-center px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded text-sm transition-colors">
+                    <Plus className="w-3 h-3 mr-1" /> 추가
+                </button>
+            )}
+        </div>
+        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+            <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                        {headers.map((h, i) => <th key={i} className="px-4 py-3 text-left font-medium text-gray-500">{h}</th>)}
+                        {!readOnly && <th className="w-10"></th>}
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                    {data.length === 0 ? (
+                        <tr><td colSpan={headers.length + 1} className="px-4 py-8 text-center text-gray-400">등록된 데이터가 없습니다.</td></tr>
+                    ) : (
+                        data.map((item, i) => (
+                            <tr key={i} className="hover:bg-gray-50">
+                                {renderRow(item, i)}
+                                {!readOnly && (
+                                    <td className="px-4 text-center">
+                                        <button onClick={() => onRemove(i)} className="text-gray-400 hover:text-red-500 p-1">
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                    </td>
+                                )}
+                            </tr>
+                        ))
+                    )}
+                </tbody>
+            </table>
+        </div>
+    </div>
+);
+
+// Lucide icon imports needs to be handled if not using lucide-react in App.jsx (already using it in Sidebar)
+function ChevronLeft(props) {
+  return (
+    <svg
+      {...props}
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="m15 18-6-6 6-6" />
+    </svg>
+  )
+}
+
+function ChevronRight(props) {
+  return (
+    <svg
+      {...props}
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="m9 18 6-6-6-6" />
+    </svg>
+  )
+}
+
+export default WeeklyReport;
