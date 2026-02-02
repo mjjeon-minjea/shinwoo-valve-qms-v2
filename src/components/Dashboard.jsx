@@ -18,6 +18,7 @@ import popupImage from '../assets/popup.png';
 import NoticeBoard from './NoticeBoard';
 import ResourceRoom from './ResourceRoom';
 import WeeklyReport from './WeeklyReport';
+import WeeklyStatus from './WeeklyStatus';
 import CalendarView from './CalendarView';
 import { api } from '../lib/api';
 import NonConformanceStatus from './NonConformanceStatus';
@@ -1788,6 +1789,7 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
             case 'inquiries': return <InquiryManagement isAdmin={isAdmin} user={user} />;
             case 'members': return <MemberManagement members={members} onDeleteMember={onDeleteMember} onEditMember={onEditMember} onAddMember={onAddMember} onRefresh={onRefresh} />;
             case 'weekly_report': return <WeeklyReport user={user} />;
+            case 'weekly_status': return <WeeklyStatus />;
             case 'schedule': return <CalendarView user={user} />;
             default: return <InboundAnalysis />;
         }
@@ -1984,6 +1986,18 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
                                 <div className="flex items-center">
                                     <FileText className={`mr-3 h-5 w-5 ${activeTab === 'weekly_report' ? 'text-primary-500' : 'text-slate-400'}`} />
                                     주간업무보고
+                                </div>
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('weekly_status')}
+                                className={`w-full flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-colors ${activeTab === 'weekly_status'
+                                    ? 'bg-primary-50 text-primary-700'
+                                    : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                                    }`}
+                            >
+                                <div className="flex items-center">
+                                    <LayoutDashboard className={`mr-3 h-5 w-5 ${activeTab === 'weekly_status' ? 'text-primary-500' : 'text-slate-400'}`} />
+                                    주간업무현황
                                 </div>
                             </button>
                             <button
