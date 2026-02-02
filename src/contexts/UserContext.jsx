@@ -14,11 +14,11 @@ export const UserProvider = ({ children }) => {
             const data = await response.json();
             setUsers(data);
             // Default to first user (Employee)
-            if (data.length > 1) {
-                setUser(data[1]); 
-            } else if (data.length > 0) {
-                setUser(data[0]);
-            }
+            // if (data.length > 1) {
+            //     setUser(data[1]); 
+            // } else if (data.length > 0) {
+            //     setUser(data[0]);
+            // }
         } catch (error) {
             console.error('Failed to fetch users:', error);
         } finally {

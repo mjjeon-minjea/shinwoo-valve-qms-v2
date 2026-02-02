@@ -192,6 +192,8 @@ const Hero = ({ onLogin, onSignup }) => {
                                 const formData = {
                                     name: e.target.name.value,
                                     company: e.target.company.value,
+                                    rank: e.target.rank.value,
+                                    role: 'employee', // Default role for new signups
                                     email: e.target.email.value + '@shinwoovalve.com',
                                     password: password
                                 };
@@ -217,6 +219,15 @@ const Hero = ({ onLogin, onSignup }) => {
                                             <Building className="h-5 w-5 text-slate-400" />
                                         </div>
                                         <input name="company" type="text" required className="block w-full pl-10 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500" placeholder="소속된 부서명을 명기하시오" />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">직급</label>
+                                    <div className="relative">
+                                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                            <Award className="h-5 w-5 text-slate-400" />
+                                        </div>
+                                        <input name="rank" type="text" required className="block w-full pl-10 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500" placeholder="직급 (예: 대리, 과장)" />
                                     </div>
                                 </div>
                                 <div>

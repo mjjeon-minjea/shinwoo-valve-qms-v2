@@ -10,8 +10,7 @@ import InspectionAnalysisDashboard from './components/InspectionAnalysisDashboar
 import QualificationExam from './components/QualificationExam';
 
 import { UserProvider, useUser } from './contexts/UserContext';
-import WeeklyReport from './components/WeeklyReport';
-import CalendarView from './components/CalendarView';
+
 
 // User Switcher Component (Temporary for testing)
 const UserSwitcher = () => {
@@ -42,9 +41,9 @@ function App() {
     const [users, setUsers] = useState(() => {
         const savedUsers = localStorage.getItem('app_users');
         return savedUsers ? JSON.parse(savedUsers) : [
-            { id: 1, name: '전민재', company: '품질보증부', email: 'mjjeon@shinwoovalve.com', password: '1', date: '2025-12-30', status: 'Active' },
-            { id: 2, name: '손양수', company: '품질보증부', email: 'ysson@shinwoovalve.com', password: '11', date: '2025-12-30', status: 'Active' },
-            { id: 3, name: '오민석', company: '품질보증부', email: 'msoh@shinwoovalve.com', password: '111', date: '2025-12-30', status: 'Active' },
+            { id: 1, name: '전민재', company: '품질보증부', rank: '대리', role: 'employee', email: 'mjjeon@shinwoovalve.com', password: '1', date: '2025-12-30', status: 'Active' },
+            { id: 2, name: '손양수', company: '품질보증부', rank: '부장', role: 'manager', email: 'ysson@shinwoovalve.com', password: '11', date: '2025-12-30', status: 'Active' },
+            { id: 3, name: '오민석', company: '품질보증부', rank: '이사', role: 'director', email: 'msoh@shinwoovalve.com', password: '111', date: '2025-12-30', status: 'Active' },
         ];
     });
 
@@ -190,22 +189,7 @@ function App() {
                 <UserSwitcher />
                 <Routes>
                     <Route path="/exam" element={<QualificationExam />} />
-                    <Route path="/weekly-report" element={
-                        <>
-                            <Header isLoggedIn={isLoggedIn} onLogout={handleLogout} currentUser={currentUser} onUpdateProfile={handleUpdateProfile} />
-                            <div className="pt-16">
-                                <WeeklyReport />
-                            </div>
-                        </>
-                    } />
-                    <Route path="/schedule" element={
-                        <>
-                            <Header isLoggedIn={isLoggedIn} onLogout={handleLogout} currentUser={currentUser} onUpdateProfile={handleUpdateProfile} />
-                            <div className="pt-16">
-                                <CalendarView />
-                            </div>
-                        </>
-                    } />
+
                     <Route path="/" element={
                         <>
                             <Header isLoggedIn={isLoggedIn} onLogout={handleLogout} currentUser={currentUser} onUpdateProfile={handleUpdateProfile} />

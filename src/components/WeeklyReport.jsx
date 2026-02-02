@@ -4,8 +4,9 @@ import { useUser } from '../contexts/UserContext';
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks } from 'date-fns';
 import { Save, Send, CheckCircle, AlertCircle, Plus, Trash2, Calendar as CalendarIcon, FileText, CheckSquare, Package, AlertTriangle } from 'lucide-react';
 
-const WeeklyReport = () => {
-    const { user } = useUser();
+const WeeklyReport = ({ user: propUser }) => {
+    const { user: contextUser } = useUser();
+    const user = propUser || contextUser;
     const [currentDate, setCurrentDate] = useState(new Date());
     const [activeTab, setActiveTab] = useState('schedule');
     const [report, setReport] = useState(null);
@@ -118,6 +119,65 @@ const WeeklyReport = () => {
              console.error('Error updating status:', error);
          }
     };
+    const handleResubmit = async () => {
+        if (!report || !report.id) return;
+        
+        if (!window.confirm('승인이 취소되고 작성중 상태로 돌아갑니다. 진행하시겠습니까?')) return;
+
+        const updatedReport = {
+            ...report,
+            status: 'draft',
+            reviewerComment: '',
+            approverComment: ''
+        };
+
+        try {
+            const response = await fetch(`http://localhost:3001/weekly_reports/${report.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updatedReport)
+            });
+
+            if (response.ok) {
+                alert('재상신 처리가 완료되었습니다. 내용을 수정할 수 있습니다.');
+                fetchReports();
+            }
+        } catch (error) {
+            console.error('Error resubmitting:', error);
+            alert('처리 중 오류가 발생했습니다.');
+        }
+    };
+
+    const handleDelete = async () => {
+        if (!report || !report.id) return;
+
+        if (!window.confirm('정말 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) return;
+
+        try {
+            const response = await fetch(`http://localhost:3001/weekly_reports/${report.id}`, {
+                method: 'DELETE'
+            });
+
+            if (response.ok) {
+                alert('보고서가 삭제되었습니다.');
+                // Refresh to blank state
+                setReport({
+                    authorId: user.id,
+                    authorName: user.name,
+                    weekStartDate: weekKey,
+                    status: 'draft',
+                    schedule: [],
+                    projects: [],
+                    issues: [],
+                    samples: []
+                });
+                fetchReports();
+            }
+        } catch (error) {
+            console.error('Error deleting report:', error);
+            alert('삭제 중 오류가 발생했습니다.');
+        }
+    };
 
     // Helper to update arrays in report
     const updateSection = (section, items) => {
@@ -200,7 +260,7 @@ const WeeklyReport = () => {
     const isReadOnly = report && report.status !== 'draft' && report.status !== 'rejected' && report.authorId === user.id;
     const isReviewMode = report && report.authorId !== user.id;
     const canReview = isReviewMode && user.role === 'manager' && report.status === 'submitted';
-    const canApprove = isReviewMode && user.role === 'director' && report.status === 'reviewed';
+    const canApprove = isReviewMode && user.role === 'director' && (report.status === 'reviewed' || report.status === 'submitted');
 
     return (
         <div className="p-6 max-w-7xl mx-auto bg-gray-50 min-h-screen">
@@ -231,9 +291,14 @@ const WeeklyReport = () => {
                                 <p className="text-xs text-gray-500">상태: {report.status}</p>
                             </div>
                         </div>
-                        <div className="space-x-2">
+                        <div className="flex items-center space-x-2">
+                            
+                            {/* Draft Author Actions */}
                             {!isReadOnly && !isReviewMode && (
                                 <>
+                                    <button onClick={() => handleDelete()} className="px-4 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 flex items-center transition-colors">
+                                        <Trash2 className="w-4 h-4 mr-2" /> 삭제
+                                    </button>
                                     <button onClick={() => handleSave(false)} className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center transition-colors">
                                         <Save className="w-4 h-4 mr-2" /> 임시저장
                                     </button>
@@ -242,6 +307,15 @@ const WeeklyReport = () => {
                                     </button>
                                 </>
                             )}
+
+                            {/* Author Resubmit Action (Approved -> Draft) */}
+                            {report.status === 'approved' && report.authorId === user.id && (
+                                <button onClick={handleResubmit} className="px-4 py-2 bg-orange-100 text-orange-700 border border-orange-200 rounded-lg hover:bg-orange-200 flex items-center transition-colors">
+                                    <AlertCircle className="w-4 h-4 mr-2" /> 재상신(승인취소)
+                                </button>
+                            )}
+
+                            {/* Manager/Director Actions */}
                             {canReview && (
                                 <button onClick={() => handleApproval('reviewed', '수고했습니다.')} className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
                                     검토 완료
@@ -250,6 +324,13 @@ const WeeklyReport = () => {
                             {canApprove && (
                                 <button onClick={() => handleApproval('approved', '승인합니다.')} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
                                     승인
+                                </button>
+                            )}
+
+                            {/* Admin Force Delete */}
+                            {(user.role === 'director' || user.role === 'admin') && report.id && (
+                                <button onClick={handleDelete} className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center shadow-sm ml-2" title="관리자 강제 삭제">
+                                    <Trash2 className="w-4 h-4 mr-2" /> 강제 삭제
                                 </button>
                             )}
                         </div>
@@ -347,15 +428,15 @@ const WeeklyReport = () => {
                         {activeTab === 'samples' && (
                             <SectionTable 
                                 title="초도품 및 Sample 관리"
-                                headers={['품목명', '공급사', '승인상태', '비고']}
+                                headers={['품목명', '진행률', '승인상태', '비고']}
                                 data={report.samples || []}
                                 readOnly={isReadOnly || isReviewMode}
-                                onAdd={() => addRow('samples', { itemName: '', supplier: '', status: '검토중', note: '' })}
+                                onAdd={() => addRow('samples', { itemName: '', progress: '', status: '검토중', note: '' })}
                                 onRemove={(i) => removeRow('samples', i)}
                                 renderRow={(item, i) => (
                                     <>
-                                        <td><input type="text" value={item.itemName} onChange={(e) => updateRow('samples', i, 'itemName', e.target.value)} disabled={isReadOnly || isReviewMode} className="w-full bg-transparent p-1"/></td>
-                                        <td><input type="text" value={item.supplier} onChange={(e) => updateRow('samples', i, 'supplier', e.target.value)} disabled={isReadOnly || isReviewMode} className="w-full bg-transparent p-1"/></td>
+                                        <td><input type="text" value={item.itemName} onChange={(e) => updateRow('samples', i, 'itemName', e.target.value)} disabled={isReadOnly || isReviewMode} className="w-full bg-transparent p-1" placeholder="품목명"/></td>
+                                        <td><input type="text" value={item.progress} onChange={(e) => updateRow('samples', i, 'progress', e.target.value)} disabled={isReadOnly || isReviewMode} className="w-full bg-transparent p-1" placeholder="예: 50%"/></td>
                                         <td><input type="text" value={item.status} onChange={(e) => updateRow('samples', i, 'status', e.target.value)} disabled={isReadOnly || isReviewMode} className="w-full bg-transparent p-1"/></td>
                                         <td><input type="text" value={item.note} onChange={(e) => updateRow('samples', i, 'note', e.target.value)} disabled={isReadOnly || isReviewMode} className="w-full bg-transparent p-1"/></td>
                                     </>

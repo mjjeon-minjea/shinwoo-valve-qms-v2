@@ -2,8 +2,11 @@
 import React, { useState, useEffect } from 'react';
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths } from 'date-fns';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon } from 'lucide-react';
+import { useUser } from '../contexts/UserContext';
 
-const CalendarView = () => {
+const CalendarView = ({ user: propUser }) => {
+    const { user: contextUser } = useUser();
+    const user = propUser || contextUser;
     const [currentMonth, setCurrentMonth] = useState(new Date());
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [events, setEvents] = useState([]);

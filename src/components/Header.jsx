@@ -11,6 +11,7 @@ const Header = ({ isLoggedIn, onLogout, currentUser, onUpdateProfile }) => {
         const updatedData = {
             name: formData.get('name'),
             company: formData.get('company'),
+            rank: formData.get('rank'),
             password: formData.get('password'),
         };
         onUpdateProfile(updatedData);
@@ -73,6 +74,10 @@ const Header = ({ isLoggedIn, onLogout, currentUser, onUpdateProfile }) => {
                                                 <div>
                                                     <label className="block text-xs font-medium text-slate-700 mb-1">부서명</label>
                                                     <input name="company" defaultValue={currentUser?.company || ''} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 text-sm" />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-medium text-slate-700 mb-1">직급</label>
+                                                    <input name="rank" defaultValue={currentUser?.rank || ''} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 text-sm" placeholder="직급을 입력하세요" />
                                                 </div>
                                                 <div>
                                                     <label className="block text-xs font-medium text-slate-700 mb-1">비밀번호 변경</label>

@@ -1194,6 +1194,8 @@ const MemberManagement = ({ members, onDeleteMember, onEditMember, onAddMember, 
         const newUser = {
             name: formData.get('name'),
             company: formData.get('company'),
+            rank: formData.get('rank'),
+            role: formData.get('role'),
             email: formData.get('email'),
             status: 'Active'
         };
@@ -1219,6 +1221,8 @@ const MemberManagement = ({ members, onDeleteMember, onEditMember, onAddMember, 
             ...editingUser,
             name: formData.get('name'),
             company: formData.get('company'),
+            rank: formData.get('rank'),
+            role: formData.get('role'),
             email: formData.get('email'),
             password: formData.get('password'),
             status: formData.get('status'),
@@ -1258,6 +1262,8 @@ const MemberManagement = ({ members, onDeleteMember, onEditMember, onAddMember, 
                         <tr>
                             <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">이름</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">부서명</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">직급</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">권한</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">이메일</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">비밀번호</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">가입일</th>
@@ -1280,6 +1286,19 @@ const MemberManagement = ({ members, onDeleteMember, onEditMember, onAddMember, 
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap">
                                     <div className="text-sm text-slate-600">{member.company}</div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                    <div className="text-sm text-slate-600">{member.rank}</div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                        member.role === 'director' ? 'bg-purple-100 text-purple-800' :
+                                        member.role === 'manager' ? 'bg-blue-100 text-blue-800' :
+                                        'bg-slate-100 text-slate-800'
+                                    }`}>
+                                        {member.role === 'director' ? '작성+검토+승인' : 
+                                         member.role === 'manager' ? '작성+검토' : '작성'}
+                                    </span>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap">
                                     <div className="text-sm text-slate-500">{member.email}</div>
@@ -1346,6 +1365,18 @@ const MemberManagement = ({ members, onDeleteMember, onEditMember, onAddMember, 
                                 <input name="company" defaultValue={editingUser.company} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500" />
                             </div>
                             <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">직급</label>
+                                <input name="rank" defaultValue={editingUser.rank} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">권한 (Role)</label>
+                                <select name="role" defaultValue={editingUser.role || 'employee'} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500">
+                                    <option value="employee">작성</option>
+                                    <option value="manager">작성+검토</option>
+                                    <option value="director">작성+검토+승인</option>
+                                </select>
+                            </div>
+                            <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1">이메일</label>
                                 <input name="email" defaultValue={editingUser.email} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500" />
                             </div>
@@ -1383,6 +1414,18 @@ const MemberManagement = ({ members, onDeleteMember, onEditMember, onAddMember, 
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1">부서명</label>
                                 <input name="company" required className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500" placeholder="품질보증부" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">직급</label>
+                                <input name="rank" required className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500" placeholder="대리" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">권한 (Role)</label>
+                                <select name="role" className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500">
+                                    <option value="employee">작성</option>
+                                    <option value="manager">작성+검토</option>
+                                    <option value="director">작성+검토+승인</option>
+                                </select>
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1">이메일</label>
@@ -1744,9 +1787,8 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
             case 'final': return <PlaceholderView title="최종검사 현황" icon={CheckCircle} />;
             case 'inquiries': return <InquiryManagement isAdmin={isAdmin} user={user} />;
             case 'members': return <MemberManagement members={members} onDeleteMember={onDeleteMember} onEditMember={onEditMember} onAddMember={onAddMember} onRefresh={onRefresh} />;
-            case 'settings_home': return <HomepageSettings />;
-            case 'weekly_report': return <WeeklyReport />;
-            case 'schedule': return <CalendarView />;
+            case 'weekly_report': return <WeeklyReport user={user} />;
+            case 'schedule': return <CalendarView user={user} />;
             default: return <InboundAnalysis />;
         }
     };
