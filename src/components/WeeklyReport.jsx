@@ -131,22 +131,30 @@ const WeeklyReport = ({ user: propUser }) => {
     };
 
     const handleApproval = async (status, comment) => {
-         if (!report || !report.id) return;
+        if (!report || !report.id) return;
 
-         try {
-             // ... existing approval logic ...
-             // Note: In a real replacement, we wouldn't use this comment, but for partial replacement context
-             // we are replacing functions. Since I can't see the entire file in this context block,
-             // I'm assuming the target block is `handleSave` and `fetchReports` area.
-             // Wait, I need to check where to insert the button.
-             // The button should be in the returned JSX, and the function definition above.
-             // Let's replace up to handleSave to include the new function.
-         } catch (e) {}
+        const updatedReport = {
+            ...report,
+            status: status,
+            [user.role === 'manager' ? 'reviewerComment' : 'approverComment']: comment
+        };
+
+        try {
+            const response = await fetch(`http://localhost:3001/weekly_reports/${report.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updatedReport)
+            });
+
+            if (response.ok) {
+                alert(status === 'approved' ? '승인되었습니다.' : '검토 완료되었습니다.');
+                fetchReports();
+            }
+        } catch (error) {
+            console.error('Error updating status:', error);
+            alert('처리 중 오류가 발생했습니다.');
+        }
     };
-
-    // ... (rest of code)
-    // Wait, the ReplacementContent must match TargetContent exactly to be replaced.
-    // I will replace `const handleSave ...` block to insert `handleLoadPreviousReport` before it.
 
 
 
