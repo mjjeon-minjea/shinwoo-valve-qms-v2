@@ -1788,6 +1788,7 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
             case 'final': return <PlaceholderView title="최종검사 현황" icon={CheckCircle} />;
             case 'inquiries': return <InquiryManagement isAdmin={isAdmin} user={user} />;
             case 'members': return <MemberManagement members={members} onDeleteMember={onDeleteMember} onEditMember={onEditMember} onAddMember={onAddMember} onRefresh={onRefresh} />;
+            case 'settings_home': return <HomepageSettings />;
             case 'weekly_report': return <WeeklyReport user={user} />;
             case 'weekly_status': return <WeeklyStatus />;
             case 'schedule': return <CalendarView user={user} />;
