@@ -11,7 +11,10 @@ const InspectionAnalysisDashboard = () => {
         byCategory: [],
         supplierQty: [],
         supplierFreq: [],
-        worstSuppliers: [],
+
+        worstSuppliers: [], // Using this for top 5 defect count
+        supplierDefectCount: [], // New Top 10
+        defectTypeCount: [],     // New Top 10
         defectReasons: []
     });
 
@@ -137,14 +140,57 @@ const InspectionAnalysisDashboard = () => {
             }
         });
 
+
         const getTop5 = (map) => Object.entries(map)
             .map(([name, value]) => ({ name, value }))
             .sort((a, b) => b.value - a.value)
             .slice(0, 5);
+        
+        // Helper for Top 10
+        const getTop10 = (map) => Object.entries(map)
+             .map(([name, value]) => ({ name, value }))
+             .sort((a, b) => b.value - a.value)
+             .slice(0, 10);
 
         const supplierQty = getTop5(supplierQtyMap);
         const supplierFreq = getTop5(supplierFreqMap);
         const worstSuppliers = getTop5(defectCountMap);
+
+        // 5. New Charts Data (Top 10)
+        // Re-calculate robust maps for detailed charts
+        const fullSupplierDefectMap = {};
+        const fullDefectTypeMap = {};
+        
+        filteredInspections.forEach(insp => {
+             // Supplier Defect Details
+             const supplier = insp.supplier || '알수없음';
+             if (!fullSupplierDefectMap[supplier]) fullSupplierDefectMap[supplier] = { value: 0, details: {} };
+             
+             if (insp.result === '불합격') {
+                 fullSupplierDefectMap[supplier].value += 1;
+                 const dType = insp.defectType || '미지정';
+                 fullSupplierDefectMap[supplier].details[dType] = (fullSupplierDefectMap[supplier].details[dType] || 0) + 1;
+             }
+             
+             // Defect Type Details
+             const type = insp.defectType;
+             if (type && type !== '-' && type !== '') {
+                 if (!fullDefectTypeMap[type]) fullDefectTypeMap[type] = { value: 0, details: {} };
+                 fullDefectTypeMap[type].value += 1;
+                 fullDefectTypeMap[type].details[supplier] = (fullDefectTypeMap[type].details[supplier] || 0) + 1;
+             }
+        });
+
+        const supplierDefectCount = Object.entries(fullSupplierDefectMap)
+            .map(([name, data]) => ({ name, value: data.value, details: data.details }))
+            .filter(i => i.value > 0)
+            .sort((a, b) => b.value - a.value)
+            .slice(0, 10);
+
+        const defectTypeCount = Object.entries(fullDefectTypeMap)
+            .map(([name, data]) => ({ name, value: data.value, details: data.details }))
+            .sort((a, b) => b.value - a.value)
+            .slice(0, 10);
 
         // Process Defect Reasons for the top 5 worst suppliers
         const defectReasons = worstSuppliers.map(ws => {
@@ -158,7 +204,35 @@ const InspectionAnalysisDashboard = () => {
             };
         });
 
-        setStats({ byCategory, supplierQty, supplierFreq, worstSuppliers, defectReasons });
+        setStats({ byCategory, supplierQty, supplierFreq, worstSuppliers, supplierDefectCount, defectTypeCount, defectReasons });
+    };
+
+    // Custom Tooltip Component (Copied from Dashboard.jsx)
+    const CustomTooltip = ({ active, payload, label }) => {
+        if (active && payload && payload.length) {
+            const data = payload[0].payload;
+            const details = data.details || {};
+            const detailKeys = Object.keys(details).sort((a, b) => details[b] - details[a]); // Sort desc
+
+            return (
+                <div className="bg-slate-800 text-white p-3 rounded-lg shadow-xl text-xs z-50 border border-slate-700 opacity-95">
+                    <p className="font-bold mb-2 border-b border-slate-600 pb-1 text-sm">{label}</p>
+                    <p className="font-bold text-lg mb-2 text-yellow-400">Total: {data.value}건</p>
+
+                    {detailKeys.length > 0 && (
+                        <div className="space-y-1 max-h-[200px] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
+                            {detailKeys.map((key) => (
+                                <div key={key} className="flex justify-between gap-6 items-center hover:bg-slate-700/50 p-1 rounded">
+                                    <span className="text-slate-300 truncate max-w-[150px]" title={key}>{key}</span>
+                                    <span className="font-mono text-white flex-shrink-0">{details[key]}</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            );
+        }
+        return null;
     };
 
     const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
@@ -169,11 +243,29 @@ const InspectionAnalysisDashboard = () => {
         <div className="space-y-8 animate-fade-in p-6">
             <div className="flex justify-between items-center mb-6">
                 <div>
-                     <h1 className="text-2xl font-bold text-slate-900">종합분석현황</h1>
+                     <h1 className="text-2xl font-bold text-slate-900">대시보드(인수검사)</h1>
                      <p className="text-slate-500">품목, 공급업체, 불량 현황 심층 분석</p>
                 </div>
-                <div className="bg-blue-50 text-blue-700 px-4 py-2 rounded-lg text-sm font-medium">
-                    종합 분석
+                <div className="flex gap-2">
+                    <select
+                        value={selectedYear}
+                        onChange={(e) => setSelectedYear(Number(e.target.value))}
+                        className="bg-white border border-slate-300 text-slate-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 shadow-sm"
+                    >
+                        <option value={2024}>2024년</option>
+                        <option value={2025}>2025년</option>
+                        <option value={2026}>2026년</option>
+                    </select>
+                    <select
+                        value={selectedMonth}
+                        onChange={(e) => setSelectedMonth(e.target.value)}
+                        className="bg-white border border-slate-300 text-slate-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 shadow-sm"
+                    >
+                        <option value="all">전체 월</option>
+                        {[...Array(12)].map((_, i) => (
+                            <option key={i + 1} value={i + 1}>{i + 1}월</option>
+                        ))}
+                    </select>
                 </div>
             </div>
 
@@ -261,27 +353,47 @@ const InspectionAnalysisDashboard = () => {
                  </div>
             </div>
 
-            {/* Section 3: Worst Supplier Analysis */}
-            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                <div className="flex justify-between items-center mb-6">
-                    <h3 className="font-bold text-lg text-slate-800 border-l-4 border-red-500 pl-3">
-                        불량 건수 기준 워스트 Top 5
-                    </h3>
-                    <div className="px-3 py-1 bg-red-50 text-red-600 text-xs rounded-full font-medium">
-                        집중 관리 대상
+
+
+            {/* Section 3: Defect Analysis Charts (Top 10) */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-2">
+                {/* Supplier Defect Count Top 10 */}
+                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                    <div className="mb-6">
+                        <h3 className="font-bold text-slate-800 border-l-4 border-red-500 pl-3">공급사별 불량건수 Top 10</h3>
+                    </div>
+                    <div className="h-[300px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={stats.supplierDefectCount} layout="vertical" margin={{ left: 40 }}>
+                                <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
+                                <XAxis type="number" />
+                                <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 11 }} />
+                                <Tooltip content={<CustomTooltip />} cursor={{ fill: '#f1f5f9' }} />
+                                <Bar dataKey="value" fill="#ef4444" radius={[0, 4, 4, 0]} barSize={20} />
+                            </BarChart>
+                        </ResponsiveContainer>
                     </div>
                 </div>
-                <div className="h-[300px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={stats.worstSuppliers} layout="vertical" margin={{ left: 40 }}>
-                            <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
-                            <XAxis type="number" />
-                            <YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 12, fontWeight: 500 }} />
-                            <Bar dataKey="value" fill="#ef4444" radius={[0, 4, 4, 0]} barSize={30} name="불량 건수" isAnimationActive={false} />
-                        </BarChart>
-                    </ResponsiveContainer>
+                {/* Defect Type Count Top 10 */}
+                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                    <div className="mb-6">
+                        <h3 className="font-bold text-slate-800 border-l-4 border-orange-500 pl-3">불량유형별 건수 Top 10</h3>
+                    </div>
+                    <div className="h-[300px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={stats.defectTypeCount} layout="vertical" margin={{ left: 40 }}>
+                                <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
+                                <XAxis type="number" />
+                                <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 11 }} />
+                                <Tooltip content={<CustomTooltip />} cursor={{ fill: '#f1f5f9' }} />
+                                <Bar dataKey="value" fill="#f97316" radius={[0, 4, 4, 0]} barSize={20} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
                 </div>
             </div>
+
+
 
             {/* Section 4: Defect Reason Analysis */}
             <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">

@@ -433,45 +433,7 @@ const InboundAnalysis = () => {
                     </div>
                 </div>
             </div>
-            {/* Charts Row 2 */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Left: Supplier Defect Count Top 10 */}
-                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                    <div className="mb-6">
-                        <h3 className="font-bold text-slate-800">공급사별 불량건수 Top 10</h3>
-                    </div>
-                    <div className="h-[300px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={supplierDefectCount} layout="vertical" margin={{ left: 40 }}>
-                                <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
-                                <XAxis type="number" />
-                                <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 11 }} />
-                                {/* Custom Tooltip for Breakdown */}
-                                <Tooltip content={<CustomTooltip />} cursor={{ fill: '#f1f5f9' }} />
-                                <Bar dataKey="value" fill="#ef4444" radius={[0, 4, 4, 0]} barSize={20} />
-                            </BarChart>
-                        </ResponsiveContainer>
-                    </div>
-                </div>
-                {/* Right: Defect Type Count Top 10 */}
-                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                    <div className="mb-6">
-                        <h3 className="font-bold text-slate-800">불량유형별 건수 Top 10</h3>
-                    </div>
-                    <div className="h-[300px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={defectTypeCount} layout="vertical" margin={{ left: 40 }}>
-                                <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
-                                <XAxis type="number" />
-                                <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 11 }} />
-                                {/* Custom Tooltip for Breakdown */}
-                                <Tooltip content={<CustomTooltip />} cursor={{ fill: '#f1f5f9' }} />
-                                <Bar dataKey="value" fill="#f97316" radius={[0, 4, 4, 0]} barSize={20} />
-                            </BarChart>
-                        </ResponsiveContainer>
-                    </div>
-                </div>
-            </div>
+
         </div>
     );
 };
@@ -1852,17 +1814,17 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
                             {inboundExpanded && (
                                 <div className="mt-1 space-y-1 pl-11">
                                     <button
-                                        onClick={() => setActiveTab('inspection_analysis')}
-                                        className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === 'inspection_analysis' ? 'text-primary-600 bg-white shadow-sm' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'}`}
-                                    >
-                                        종합분석현황
-                                    </button>
-                                    <button
                                         onClick={() => setActiveTab('inbound_analysis')}
                                         className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === 'inbound_analysis' ? 'text-primary-600 bg-white shadow-sm' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
                                             }`}
                                     >
-                                        대시보드 (기존)
+                                        대시보드
+                                    </button>
+                                    <button
+                                        onClick={() => setActiveTab('inspection_analysis')}
+                                        className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === 'inspection_analysis' ? 'text-primary-600 bg-white shadow-sm' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'}`}
+                                    >
+                                        종합분석현황
                                     </button>
                                     <button
                                         onClick={() => setActiveTab('inbound_status')}

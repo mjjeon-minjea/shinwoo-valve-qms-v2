@@ -63,7 +63,7 @@ async function uploadFile() {
         console.error('Error during upload:', error);
     } finally {
         // cleanup
-        try { fs.unlinkSync(testFilePath); } catch (e) { }
+        try { fs.unlinkSync(testFilePath); } catch (e) { /* ignore */ }
     }
 }
 
