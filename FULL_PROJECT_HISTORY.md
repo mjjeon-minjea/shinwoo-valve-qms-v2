@@ -10,6 +10,11 @@
   - 네트워크 장비(iptime) 교체를 통한 IP 충돌 해결.
   - 부서장 자가 승인(Self-Approval) 기능 및 제출 취소 버튼 추가.
   - 작업 내역 Git Commit & Push 완료.
+  - **[NEW] Supabase 클라우드 마이그레이션 (Vercel 배포 Fix):**
+    - 로컬 JSON DB (`db.json`) 의존성 제거 및 클라우드 DB(Supabase) 도입.
+    - 데이터 이전: 검사 이력(10만+건), 품목 마스터(5만+건), 사용자 및 보고서 데이터 업로드 완료.
+    - API 수정: `api.js`를 재작성하여 로컬 서버 대신 Supabase Client 연결.
+    - 보안 및 스키마 수리: 누락된 컬럼(`rank`, `itemType` 등) 추가를 위한 SQL 스크립트 작성 및 실행.
 
 ## 2. 2026-02-02
 
