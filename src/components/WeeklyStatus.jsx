@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks } from 'date-fns';
 import { ChevronLeft, ChevronRight, Printer, FileText, CheckCircle, List, AlertTriangle, Calendar as CalendarIcon, Package, CheckSquare } from 'lucide-react';
 import { useUser } from '../contexts/UserContext';
+import { api } from '../lib/api';
 
 // Rank Hierarchy for Sorting
 const rankOrder = {
@@ -61,8 +62,8 @@ const WeeklyStatus = () => {
             try {
                 // Fetch Users and Reports in parallel
                 const [reportsRes, usersRes] = await Promise.all([
-                    fetch('http://localhost:3001/weekly_reports'),
-                    fetch('http://localhost:3001/users')
+                    api.fetch('/weekly_reports'),
+                    api.fetch('/users')
                 ]);
 
                 if (reportsRes.ok && usersRes.ok) {

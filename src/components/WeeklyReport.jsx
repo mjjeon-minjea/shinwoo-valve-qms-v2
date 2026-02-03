@@ -1,6 +1,6 @@
-
 import React, { useState, useEffect } from 'react';
 import { useUser } from '../contexts/UserContext';
+import { api } from '../lib/api';
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks } from 'date-fns';
 import { Save, Send, CheckCircle, AlertCircle, Plus, Trash2, Calendar as CalendarIcon, FileText, CheckSquare, Package, AlertTriangle, Copy } from 'lucide-react';
 
@@ -26,7 +26,7 @@ const WeeklyReport = ({ user: propUser }) => {
         if (!user) return;
         setLoading(true);
         try {
-            const response = await fetch('http://localhost:3001/weekly_reports');
+            const response = await api.fetch('/weekly_reports');
             if (response.ok) {
                 const data = await response.json();
                 setReports(data);
@@ -67,7 +67,7 @@ const WeeklyReport = ({ user: propUser }) => {
 
         setLoading(true);
         try {
-            const response = await fetch('http://localhost:3001/weekly_reports');
+            const response = await api.fetch('/weekly_reports');
             if (response.ok) {
                 const data = await response.json();
                 const prevReport = data.find(r => 
@@ -125,18 +125,17 @@ const WeeklyReport = ({ user: propUser }) => {
         };
 
         try {
-            let url = 'http://localhost:3001/weekly_reports';
+            let url = '/weekly_reports';
             let method = 'POST';
 
             if (report.id) {
-                url = `http://localhost:3001/weekly_reports/${report.id}`;
+                url = `/weekly_reports/${report.id}`;
                 method = 'PUT';
             }
 
-            const response = await fetch(url, {
+            const response = await api.fetch(url, {
                 method: method,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(updatedReport)
+                body: updatedReport
             });
 
             if (response.ok) {
@@ -161,10 +160,9 @@ const WeeklyReport = ({ user: propUser }) => {
         };
 
         try {
-            const response = await fetch(`http://localhost:3001/weekly_reports/${report.id}`, {
+            const response = await api.fetch(`/weekly_reports/${report.id}`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(updatedReport)
+                body: updatedReport
             });
 
             if (response.ok) {
@@ -198,10 +196,9 @@ const WeeklyReport = ({ user: propUser }) => {
         };
 
         try {
-            const response = await fetch(`http://localhost:3001/weekly_reports/${report.id}`, {
+            const response = await api.fetch(`/weekly_reports/${report.id}`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(updatedReport)
+                body: updatedReport
             });
 
             if (response.ok) {
@@ -220,7 +217,7 @@ const WeeklyReport = ({ user: propUser }) => {
         if (!window.confirm('정말 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) return;
 
         try {
-            const response = await fetch(`http://localhost:3001/weekly_reports/${report.id}`, {
+            const response = await api.fetch(`/weekly_reports/${report.id}`, {
                 method: 'DELETE'
             });
 

@@ -1,6 +1,8 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
+import { api } from '../lib/api';
+
 const UserContext = createContext();
 
 export const UserProvider = ({ children }) => {
@@ -10,7 +12,7 @@ export const UserProvider = ({ children }) => {
 
     const fetchUsers = async () => {
         try {
-            const response = await fetch('http://localhost:3001/users');
+            const response = await api.fetch('/users');
             const data = await response.json();
             setUsers(data);
             // Default to first user (Employee)

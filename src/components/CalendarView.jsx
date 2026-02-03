@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths } from 'date-fns';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Filter, CheckSquare, Activity, AlertTriangle } from 'lucide-react';
 import { useUser } from '../contexts/UserContext';
+import { api } from '../lib/api';
 
 const CalendarView = ({ user: propUser }) => {
     const { user: contextUser } = useUser();
@@ -20,7 +21,7 @@ const CalendarView = ({ user: propUser }) => {
     const fetchEvents = async () => {
         try {
             setLoading(true);
-            const response = await fetch('http://localhost:3001/weekly_reports');
+            const response = await api.fetch('/weekly_reports');
             if (response.ok) {
                 const reports = await response.json();
                 let allEvents = [];
