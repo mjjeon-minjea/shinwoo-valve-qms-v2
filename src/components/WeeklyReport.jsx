@@ -142,7 +142,18 @@ const WeeklyReport = ({ user: propUser }) => {
                 const savedData = await response.json();
                 setReport(savedData);
                 alert(submit ? '보고서가 제출되었습니다.' : '임시 저장되었습니다.');
-                fetchReports(); // Refresh
+                
+                // Optimsitic update: Update list locally to avoid stale read from immediate refetch
+                setReports(prev => {
+                    const idx = prev.findIndex(r => r.id === savedData.id);
+                    if (idx >= 0) {
+                        const newReports = [...prev];
+                        newReports[idx] = savedData;
+                        return newReports;
+                    } else {
+                        return [...prev, savedData];
+                    }
+                });
             }
         } catch (error) {
             console.error('Error saving report:', error);
