@@ -27,3 +27,10 @@
   - `db.json`의 대용량 데이터(검사 이력 10만 건, 품목 5만 건) 전체 업로드 (Migration Script 작성).
   - API 구조 변경: `src/lib/api.js` 내부 로직을 `fetch(local)`에서 `supabase.from(table)` 방식으로 전면 수정.
   - Vercel 배포 환경에서도 데이터가 영구 저장되고, 장소에 구애받지 않고 일관된 데이터를 조회할 수 있게 됨.
+
+## 4. 배포 안정화 (Troubleshooting)
+
+- **이슈:** 로컬에서는 잘 되나, 외부망(다른 PC) Vercel 접속 시 데이터 미출력.
+- **원인:** 로컬 `.env` 파일이 보안상 Git에 올라가지 않아, Vercel 서버가 Supabase 열쇠(Key)를 가지고 있지 않았음.
+- **조치:** Vercel 환경 변수(Environment Variables)에 URL과 ANON_KEY 등록 후 재배포(Redeploy).
+- **결과:** 모든 디바이스에서 정상적으로 데이터 접속 및 로그인 가능 확인 (AI 에이전트 직접 검증 완료).

@@ -15,6 +15,12 @@
     - 데이터 이전: 검사 이력(10만+건), 품목 마스터(5만+건), 사용자 및 보고서 데이터 업로드 완료.
     - API 수정: `api.js`를 재작성하여 로컬 서버 대신 Supabase Client 연결.
     - 보안 및 스키마 수리: 누락된 컬럼(`rank`, `itemType` 등) 추가를 위한 SQL 스크립트 작성 및 실행.
+  - **[Fix] Vercel 배포 트러블슈팅:**
+    - 증상: 다른 PC에서 Vercel 접속 시 데이터가 보이지 않는 현상.
+    - 원인: Vercel 환경 변수(`VITE_SUPABASE_URL`, `ANON_KEY`) 미등록 (GitIgnore로 인해 누락).
+    - 해결: Vercel 대시보드에서 환경 변수 수동 등록 및 `Redeploy` 수행.
+    - 검증: Browser Subagent를 통해 실제 배포 사이트 접속, 로그인, 데이터 로딩 성공 확인.
+  - **[Verify] 관리자 기능 확인:** Supabase 연동으로 인해 회원 관리 등 관리자 기능이 전역적으로 반영됨을 확인.
 
 ## 2. 2026-02-02
 
