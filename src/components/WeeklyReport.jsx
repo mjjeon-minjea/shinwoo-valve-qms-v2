@@ -94,6 +94,27 @@ const WeeklyReport = ({ user: propUser }) => {
         }
     };
 
+    const handleMyReport = () => {
+        const myReport = reports.find(r => 
+            r.authorId === user.id && r.weekStartDate === weekKey
+        );
+        
+        if (myReport) {
+            setReport(myReport);
+        } else {
+            setReport({
+                authorId: user.id,
+                authorName: user.name,
+                weekStartDate: weekKey,
+                status: 'draft',
+                schedule: [],
+                projects: [],
+                issues: [],
+                samples: []
+            });
+        }
+    };
+
     const handleSave = async (submit = false) => {
         if (!report) return;
 
@@ -162,7 +183,12 @@ const WeeklyReport = ({ user: propUser }) => {
     const handleResubmit = async () => {
         if (!report || !report.id) return;
         
-        if (!window.confirm('승인이 취소되고 작성중 상태로 돌아갑니다. 진행하시겠습니까?')) return;
+        const isApproved = report.status === 'approved';
+        const msg = isApproved 
+            ? '승인이 취소되고 작성중 상태로 돌아갑니다. 진행하시겠습니까?' 
+            : '제출을 취소하고 수정 모드로 전환하시겠습니까?';
+
+        if (!window.confirm(msg)) return;
 
         const updatedReport = {
             ...report,
@@ -179,7 +205,7 @@ const WeeklyReport = ({ user: propUser }) => {
             });
 
             if (response.ok) {
-                alert('재상신 처리가 완료되었습니다. 내용을 수정할 수 있습니다.');
+                alert('수정 모드로 전환되었습니다.');
                 fetchReports();
             }
         } catch (error) {
@@ -260,7 +286,7 @@ const WeeklyReport = ({ user: propUser }) => {
     const renderTeamStatus = () => {
         if (!user || user.role === 'employee') return null;
 
-        const teamReports = reports.filter(r => r.weekStartDate === weekKey && r.authorId !== user.id);
+        const teamReports = reports.filter(r => r.weekStartDate === weekKey);
 
         return (
             <div className="mb-8 bg-white p-6 rounded-lg shadow-sm border border-indigo-100">
@@ -268,6 +294,19 @@ const WeeklyReport = ({ user: propUser }) => {
                     <CheckCircle className="w-5 h-5 mr-2 text-indigo-600" />
                     팀원 보고 현황 ({format(weekStart, 'MM/dd')} ~ {format(weekEnd, 'MM/dd')})
                 </h3>
+                
+                {/* My Report Button for Manager */}
+                {isReviewMode && (
+                    <div className="mb-4">
+                        <button 
+                            onClick={handleMyReport}
+                            className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition shadow-sm"
+                        >
+                            <FileText className="w-4 h-4 mr-2" />
+                            내 보고서 작성하기
+                        </button>
+                    </div>
+                )}
                 {teamReports.length === 0 ? (
                     <p className="text-gray-500">제출된 보고서가 없습니다.</p>
                 ) : (
@@ -300,7 +339,9 @@ const WeeklyReport = ({ user: propUser }) => {
     const isReadOnly = report && report.status !== 'draft' && report.status !== 'rejected' && report.authorId === user.id;
     const isReviewMode = report && report.authorId !== user.id;
     const canReview = isReviewMode && user.role === 'manager' && report.status === 'submitted';
-    const canApprove = isReviewMode && user.role === 'director' && (report.status === 'reviewed' || report.status === 'submitted');
+    // Allow Director to approve others OR themselves. Allow Manager to approve themselves (Self-Approval).
+    const canApprove = report && ((user.role === 'director' && (report.status === 'reviewed' || report.status === 'submitted')) || 
+                       (user.role === 'manager' && report.authorId === user.id && report.status === 'submitted'));
 
     return (
         <div className="p-6 max-w-7xl mx-auto bg-gray-50 min-h-screen">
@@ -351,10 +392,11 @@ const WeeklyReport = ({ user: propUser }) => {
                                 </>
                             )}
 
-                            {/* Author Resubmit Action (Approved -> Draft) */}
-                            {report.status === 'approved' && report.authorId === user.id && (
+                            {/* Author Resubmit Action (Approved/Submitted -> Draft) */}
+                            {(report.status === 'approved' || report.status === 'submitted') && report.authorId === user.id && (
                                 <button onClick={handleResubmit} className="px-4 py-2 bg-orange-100 text-orange-700 border border-orange-200 rounded-lg hover:bg-orange-200 flex items-center transition-colors">
-                                    <AlertCircle className="w-4 h-4 mr-2" /> 재상신(승인취소)
+                                    <AlertCircle className="w-4 h-4 mr-2" /> 
+                                    {report.status === 'approved' ? '재상신(승인취소)' : '제출취소(수정하기)'}
                                 </button>
                             )}
 
