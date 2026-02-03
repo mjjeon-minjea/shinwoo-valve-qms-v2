@@ -33,7 +33,7 @@ const WeeklyReport = ({ user: propUser }) => {
                 
                 // Find current user's report for this week
                 const myReport = data.find(r => 
-                    r.authorId === user.id && r.weekStartDate === weekKey
+                    String(r.authorId) === String(user.id) && r.weekStartDate === weekKey
                 );
 
                 if (myReport) {
@@ -71,7 +71,7 @@ const WeeklyReport = ({ user: propUser }) => {
             if (response.ok) {
                 const data = await response.json();
                 const prevReport = data.find(r => 
-                    r.authorId === user.id && r.weekStartDate === previousWeekKey
+                    String(r.authorId) === String(user.id) && r.weekStartDate === previousWeekKey
                 );
 
                 if (prevReport) {
@@ -96,7 +96,7 @@ const WeeklyReport = ({ user: propUser }) => {
 
     const handleMyReport = () => {
         const myReport = reports.find(r => 
-            r.authorId === user.id && r.weekStartDate === weekKey
+            String(r.authorId) === String(user.id) && r.weekStartDate === weekKey
         );
         
         if (myReport) {
@@ -344,12 +344,12 @@ const WeeklyReport = ({ user: propUser }) => {
     if (!user) return <div className="p-8">로그인이 필요합니다. (사용자 전환을 이용해주세요)</div>;
     if (loading) return <div className="p-8">로딩 중...</div>;
 
-    const isReadOnly = report && report.status !== 'draft' && report.status !== 'rejected' && report.authorId === user.id;
-    const isReviewMode = report && report.authorId !== user.id;
+    const isReadOnly = report && report.status !== 'draft' && report.status !== 'rejected' && String(report.authorId) === String(user.id);
+    const isReviewMode = report && String(report.authorId) !== String(user.id);
     const canReview = isReviewMode && user.role === 'manager' && report.status === 'submitted';
     // Allow Director to approve others OR themselves. Allow Manager to approve themselves (Self-Approval).
     const canApprove = report && ((user.role === 'director' && (report.status === 'reviewed' || report.status === 'submitted')) || 
-                       (user.role === 'manager' && report.authorId === user.id && report.status === 'submitted'));
+                       (user.role === 'manager' && String(report.authorId) === String(user.id) && report.status === 'submitted'));
 
     return (
         <div className="p-6 max-w-7xl mx-auto bg-gray-50 min-h-screen">
@@ -401,7 +401,7 @@ const WeeklyReport = ({ user: propUser }) => {
                             )}
 
                             {/* Author Resubmit Action (Approved/Submitted -> Draft) */}
-                            {(report.status === 'approved' || report.status === 'submitted') && report.authorId === user.id && (
+                            {(report.status === 'approved' || report.status === 'submitted') && String(report.authorId) === String(user.id) && (
                                 <button onClick={handleResubmit} className="px-4 py-2 bg-orange-100 text-orange-700 border border-orange-200 rounded-lg hover:bg-orange-200 flex items-center transition-colors">
                                     <AlertCircle className="w-4 h-4 mr-2" /> 
                                     {report.status === 'approved' ? '재상신(승인취소)' : '제출취소(수정하기)'}
