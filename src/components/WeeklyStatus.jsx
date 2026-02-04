@@ -97,8 +97,8 @@ const WeeklyStatus = () => {
         const samples = [];
 
         reports.forEach(report => {
-            // Find user to get current rank
-            const author = usersList.find(u => u.id === report.authorId) || {};
+            // Find user to get current rank - Ensure ID comparison is string safe
+            const author = usersList.find(u => String(u.id) === String(report.authorId)) || {};
             const userRank = author.rank || report.rank || '사원';
 
             const authorInfo = {
@@ -281,7 +281,7 @@ const WeeklyStatus = () => {
                                 <div className="w-40 flex-shrink-0 mb-1 sm:mb-0">
                                     <NameBadge name={item.name} rank={item.rank} />
                                 </div>
-                                <div className="w-32 flex-shrink-0 text-sm font-bold text-gray-700 truncate">
+                                <div className="w-48 flex-shrink-0 text-sm font-bold text-gray-700 truncate">
                                     {item.date} 
                                     {item.type === '휴가' 
                                         ? <span className="text-xs text-blue-600 bg-blue-50 px-1 rounded ml-1">종일</span> 
