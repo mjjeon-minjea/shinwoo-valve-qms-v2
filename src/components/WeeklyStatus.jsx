@@ -136,10 +136,21 @@ const WeeklyStatus = () => {
         // Sort by Rank
         const sortByRank = (a, b) => a.weight - b.weight;
 
+        // Sort by Date then Time
+        const sortByDateAndTime = (a, b) => {
+            if (a.date !== b.date) {
+                return new Date(a.date) - new Date(b.date);
+            }
+            // If dates are equal, sort by time (treat empty as 00:00)
+            const timeA = a.time || '00:00';
+            const timeB = b.time || '00:00';
+            return timeA.localeCompare(timeB);
+        };
+
         setAggregatedData({
             projects: projects.sort(sortByRank),
             issues: issues.sort(sortByRank),
-            schedules: schedules.sort(sortByRank),
+            schedules: schedules.sort(sortByDateAndTime),
             samples: samples.sort(sortByRank)
         });
     };
@@ -271,7 +282,7 @@ const WeeklyStatus = () => {
                                     <NameBadge name={item.name} rank={item.rank} />
                                 </div>
                                 <div className="w-32 flex-shrink-0 text-sm font-bold text-gray-700 truncate">
-                                    {item.date} ({item.type})
+                                    {item.date} {item.time && <span className="text-xs text-gray-500 ml-1">{item.time}</span>} ({item.type})
                                 </div>
                                 <div className="flex-1 text-sm text-gray-800">
                                     {item.content} <span className="text-gray-400 text-xs ml-2">{item.note}</span>

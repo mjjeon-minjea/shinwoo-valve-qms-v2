@@ -212,10 +212,22 @@ const WeeklyReport = ({ user: propUser }) => {
                 body: updatedReport
             });
 
-            if (response.ok) {
-                alert('수정 모드로 전환되었습니다.');
-                fetchReports();
-            }
+        if (response.ok) {
+            const savedData = await response.json();
+            alert('수정 모드로 전환되었습니다.');
+            setReport(savedData); // Update current view immediately
+            
+            // Update list locally
+            setReports(prev => {
+                const idx = prev.findIndex(r => r.id === savedData.id);
+                if (idx >= 0) {
+                    const newReports = [...prev];
+                    newReports[idx] = savedData;
+                    return newReports;
+                }
+                return prev;
+            });
+        }
         } catch (error) {
             console.error('Error resubmitting:', error);
             alert('처리 중 오류가 발생했습니다.');
@@ -442,15 +454,18 @@ const WeeklyReport = ({ user: propUser }) => {
                         {activeTab === 'schedule' && (
                             <SectionTable 
                                 title="근태 및 일정 관리"
-                                headers={['날짜', '구분', '내용', '비고']}
+                                headers={['날짜', '시간', '구분', '내용', '비고']}
                                 data={report.schedule || []}
                                 readOnly={isReadOnly || isReviewMode}
-                                onAdd={() => addRow('schedule', { date: format(new Date(), 'yyyy-MM-dd'), type: '미팅', content: '', note: '' })}
+                                onAdd={() => addRow('schedule', { date: format(new Date(), 'yyyy-MM-dd'), time: '09:00', type: '미팅', content: '', note: '' })}
                                 onRemove={(i) => removeRow('schedule', i)}
                                 renderRow={(item, i) => (
                                     <>
                                         <td>
                                             <input type="date" value={item.date} onChange={(e) => updateRow('schedule', i, 'date', e.target.value)} disabled={isReadOnly || isReviewMode} className="w-full bg-transparent p-1"/>
+                                        </td>
+                                        <td>
+                                            <input type="time" value={item.time || ''} onChange={(e) => updateRow('schedule', i, 'time', e.target.value)} disabled={isReadOnly || isReviewMode} className="w-full bg-transparent p-1"/>
                                         </td>
                                         <td>
                                             <select value={item.type} onChange={(e) => updateRow('schedule', i, 'type', e.target.value)} disabled={isReadOnly || isReviewMode} className="w-full bg-transparent p-1">
