@@ -15,8 +15,18 @@ export const api = {
 
         console.log(`[Supabase API] ${options.method || 'GET'} ${table}`);
 
+        // Normalize body: If string, parse it. If object, use as is.
+        let requestBody = options.body;
+        if (typeof requestBody === 'string') {
+            try {
+                requestBody = JSON.parse(requestBody);
+            } catch (e) {
+                console.warn('Failed to parse body as JSON in api.fetch', e);
+            }
+        }
+
         if (options.method === 'POST') {
-            const { data, error } = await supabase.from(table).insert(options.body).select();
+            const { data, error } = await supabase.from(table).insert(requestBody).select();
             if (error) throw error;
             return {
                 ok: true,
@@ -26,7 +36,7 @@ export const api = {
         else if (options.method === 'PUT' || options.method === 'PATCH') {
             const id = pathParts[1]; // e.g., '1' from '/users/1'
             // If body has id, remove it to avoid changing PK
-            const updateData = { ...options.body };
+            const updateData = { ...requestBody };
             delete updateData.id; 
 
             const { data, error } = await supabase.from(table).update(updateData).eq('id', id).select();

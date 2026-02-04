@@ -580,7 +580,7 @@ const InboundHistory = () => {
                     const res = await api.fetch('/inspections/batch', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(validData)
+                        body: validData
                     });
 
                     if (res.ok) {
@@ -628,13 +628,13 @@ const InboundHistory = () => {
             await api.fetch(`/inspections/${editingItem.id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ...editingItem, ...data })
+                body: { ...editingItem, ...data }
             });
         } else {
             await api.fetch('/inspections', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id: String(Date.now()), ...data })
+                body: { id: String(Date.now()), ...data }
             });
         }
         setIsModalOpen(false);
@@ -1484,7 +1484,7 @@ const HomepageSettings = () => {
             const res = await api.fetch('/settings/global', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id: 'global', popupEnabled })
+                body: { id: 'global', popupEnabled }
             });
 
             if (res.ok) {

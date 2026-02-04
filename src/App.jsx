@@ -111,7 +111,7 @@ function App() {
             await api.fetch(API_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(newUser)
+                body: newUser
             });
             await fetchUsers(); // Refresh list
             alert('회원가입이 완료되었습니다!\n관리자 승인 후 로그인 가능합니다.');
@@ -131,7 +131,7 @@ function App() {
             await api.fetch(API_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(memberData)
+                body: memberData
             });
             await fetchUsers(); // Refresh list
         } catch (error) {
@@ -157,7 +157,7 @@ function App() {
             await api.fetch(`${API_URL}/${updatedUser.id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(updatedUser)
+                body: updatedUser
             });
             await fetchUsers(); // Refresh list
 
