@@ -465,7 +465,37 @@ const WeeklyReport = ({ user: propUser }) => {
                                             <input type="date" value={item.date} onChange={(e) => updateRow('schedule', i, 'date', e.target.value)} disabled={isReadOnly || isReviewMode} className="w-full bg-transparent p-1"/>
                                         </td>
                                         <td>
-                                            <input type="time" value={item.time || ''} onChange={(e) => updateRow('schedule', i, 'time', e.target.value)} disabled={isReadOnly || isReviewMode} className="w-full bg-transparent p-1"/>
+                                            <div className="flex items-center space-x-1">
+                                                <select 
+                                                    value={(item.time || '09:00').split(':')[0]} 
+                                                    onChange={(e) => {
+                                                        const newHour = e.target.value;
+                                                        const currentMinute = (item.time || '09:00').split(':')[1] || '00';
+                                                        updateRow('schedule', i, 'time', `${newHour}:${currentMinute}`);
+                                                    }} 
+                                                    disabled={isReadOnly || isReviewMode} 
+                                                    className="w-16 bg-transparent p-1 border border-gray-200 rounded text-center focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                                >
+                                                    {Array.from({ length: 24 }, (_, k) => String(k).padStart(2, '0')).map(h => (
+                                                        <option key={h} value={h}>{h}</option>
+                                                    ))}
+                                                </select>
+                                                <span className="text-gray-400">:</span>
+                                                <select 
+                                                    value={(item.time || '09:00').split(':')[1]} 
+                                                    onChange={(e) => {
+                                                        const newMinute = e.target.value;
+                                                        const currentHour = (item.time || '09:00').split(':')[0] || '09';
+                                                        updateRow('schedule', i, 'time', `${currentHour}:${newMinute}`);
+                                                    }} 
+                                                    disabled={isReadOnly || isReviewMode} 
+                                                    className="w-16 bg-transparent p-1 border border-gray-200 rounded text-center focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                                >
+                                                    {['00', '10', '20', '30', '40', '50'].map(m => (
+                                                        <option key={m} value={m}>{m}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
                                         </td>
                                         <td>
                                             <select value={item.type} onChange={(e) => updateRow('schedule', i, 'type', e.target.value)} disabled={isReadOnly || isReviewMode} className="w-full bg-transparent p-1">
