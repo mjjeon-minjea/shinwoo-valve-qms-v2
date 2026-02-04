@@ -359,9 +359,9 @@ const WeeklyReport = ({ user: propUser }) => {
 
     const isReadOnly = report && report.status !== 'draft' && report.status !== 'rejected' && String(report.authorId) === String(user.id);
     const isReviewMode = report && String(report.authorId) !== String(user.id);
-    const canReview = user.role === 'manager' && report.status === 'submitted';
+    const canReview = user.role === 'manager' && report?.status === 'submitted';
     // Allow Director to approve. Manager Self-Approval is removed.
-    const canApprove = user.role === 'director' && (report.status === 'reviewed' || report.status === 'submitted');
+    const canApprove = user.role === 'director' && (report?.status === 'reviewed' || report?.status === 'submitted');
 
     return (
         <div className="p-6 max-w-7xl mx-auto bg-gray-50 min-h-screen">
