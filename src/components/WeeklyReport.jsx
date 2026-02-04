@@ -29,7 +29,8 @@ const WeeklyReport = ({ user: propUser }) => {
             const response = await api.fetch('/weekly_reports');
             if (response.ok) {
                 const data = await response.json();
-                setReports(data);
+                // Ensure data is an array to prevent crashes
+                setReports(Array.isArray(data) ? data : []);
                 
                 // Find current user's report for this week
                 const myReport = data.find(r => 
@@ -384,10 +385,10 @@ const WeeklyReport = ({ user: propUser }) => {
                     <div className="bg-gray-50 px-6 py-4 border-b flex justify-between items-center">
                         <div className="flex items-center space-x-3">
                             <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold">
-                                {report.authorName[0]}
+                                {report.authorName?.[0] || '?'}
                             </div>
                             <div>
-                                <h3 className="font-bold text-gray-800">{report.authorName} 주간보고</h3>
+                                <h3 className="font-bold text-gray-800">{report.authorName || '사용자'} 주간보고</h3>
                                 <p className="text-xs text-gray-500">상태: {
                                     report.status === 'submitted' ? '검토중' : 
                                     report.status === 'reviewed' ? '승인대기중' : 
