@@ -42,8 +42,9 @@ function App() {
         const savedUsers = localStorage.getItem('app_users');
         return savedUsers ? JSON.parse(savedUsers) : [
             { id: 1, name: '전민재', company: '품질보증부', rank: '대리', role: 'employee', email: 'mjjeon@shinwoovalve.com', password: '1', date: '2025-12-30', status: 'Active' },
-            { id: 2, name: '손양수', company: '품질보증부', rank: '부장', role: 'manager', email: 'ysson@shinwoovalve.com', password: '11', date: '2025-12-30', status: 'Active' },
-            { id: 3, name: '오민석', company: '품질보증부', rank: '이사', role: 'director', email: 'msoh@shinwoovalve.com', password: '111', date: '2025-12-30', status: 'Active' },
+            { id: 4, name: '김철수', company: '품질보증부', rank: '과장', role: 'manager', email: 'cskim@shinwoovalve.com', password: '11', date: '2026-02-04', status: 'Active' },
+            { id: 2, name: '손양수', company: '품질보증부', rank: '부장', role: 'director', email: 'ysson@shinwoovalve.com', password: '111', date: '2025-12-30', status: 'Active' },
+            { id: 3, name: '오민석', company: '품질보증부', rank: '이사', role: 'director', email: 'msoh@shinwoovalve.com', password: '1111', date: '2025-12-30', status: 'Active' },
         ];
     });
 
