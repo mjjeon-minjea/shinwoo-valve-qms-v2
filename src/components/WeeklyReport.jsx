@@ -339,8 +339,8 @@ const WeeklyReport = ({ user: propUser }) => {
                                         ${r.status === 'submitted' ? 'bg-blue-100 text-blue-700' : 
                                           r.status === 'reviewed' ? 'bg-purple-100 text-purple-700' :
                                           r.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-gray-200'}`}>
-                                        {r.status === 'submitted' ? '제출됨' : 
-                                         r.status === 'reviewed' ? '검토완료' :
+                                        {r.status === 'submitted' ? '검토중' : 
+                                         r.status === 'reviewed' ? '승인대기중' :
                                          r.status === 'approved' ? '승인됨' : '작성중'}
                                     </span>
                                 </div>
@@ -358,10 +358,9 @@ const WeeklyReport = ({ user: propUser }) => {
 
     const isReadOnly = report && report.status !== 'draft' && report.status !== 'rejected' && String(report.authorId) === String(user.id);
     const isReviewMode = report && String(report.authorId) !== String(user.id);
-    const canReview = isReviewMode && user.role === 'manager' && report.status === 'submitted';
-    // Allow Director to approve others OR themselves. Allow Manager to approve themselves (Self-Approval).
-    const canApprove = report && ((user.role === 'director' && (report.status === 'reviewed' || report.status === 'submitted')) || 
-                       (user.role === 'manager' && String(report.authorId) === String(user.id) && report.status === 'submitted'));
+    const canReview = user.role === 'manager' && report.status === 'submitted';
+    // Allow Director to approve. Manager Self-Approval is removed.
+    const canApprove = user.role === 'director' && (report.status === 'reviewed' || report.status === 'submitted');
 
     return (
         <div className="p-6 max-w-7xl mx-auto bg-gray-50 min-h-screen">
@@ -389,7 +388,11 @@ const WeeklyReport = ({ user: propUser }) => {
                             </div>
                             <div>
                                 <h3 className="font-bold text-gray-800">{report.authorName} 주간보고</h3>
-                                <p className="text-xs text-gray-500">상태: {report.status}</p>
+                                <p className="text-xs text-gray-500">상태: {
+                                    report.status === 'submitted' ? '검토중' : 
+                                    report.status === 'reviewed' ? '승인대기중' : 
+                                    report.status === 'approved' ? '승인됨' : '작성중'
+                                }</p>
                             </div>
                         </div>
                         <div className="flex items-center space-x-2">
