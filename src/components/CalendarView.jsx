@@ -26,6 +26,9 @@ const CalendarView = ({ user: propUser }) => {
                 const reports = await response.json();
                 let allEvents = [];
                 reports.forEach(report => {
+                    // Filter: Only show Approved reports (match Weekly Status logic)
+                    if (report.status !== 'approved') return;
+
                     // 1. Schedule Events
                     if (report.schedule && Array.isArray(report.schedule)) {
                         report.schedule.forEach(item => {
@@ -174,9 +177,23 @@ const CalendarView = ({ user: propUser }) => {
                 const cloneDay = day;
                 
                 // Find events for this day AND fitler them
-                const dayEvents = events.filter(event => {
+                let dayEvents = events.filter(event => {
                     if (!isSameDay(new Date(event.date), day)) return false;
                     return filters[event.category]; // Check filter
+                });
+
+                // Sort: Vacation (All Day) first, then by Time
+                dayEvents.sort((a, b) => {
+                    // 1. Vacation ('휴가') comes first
+                    const isVacationA = a.type === '휴가';
+                    const isVacationB = b.type === '휴가';
+                    if (isVacationA && !isVacationB) return -1;
+                    if (!isVacationA && isVacationB) return 1;
+
+                    // 2. Sort by Time (treat empty as 00:00)
+                    const timeA = a.time || '00:00';
+                    const timeB = b.time || '00:00';
+                    return timeA.localeCompare(timeB);
                 });
 
                 days.push(
@@ -217,12 +234,22 @@ const CalendarView = ({ user: propUser }) => {
                                         title={`[${event.type}] ${event.authorName}: ${event.content}`}
                                         className={`text-[11px] px-1.5 py-1 rounded border mb-1 truncate cursor-pointer transition-colors ${styleClass}`}
                                     >
-                                        <div className="flex items-center gap-1">
-                                            <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 
-                                                ${event.category === 'schedule' ? 'bg-green-500' : 
-                                                  event.category === 'project' ? 'bg-blue-500' : 'bg-red-500'}`
-                                            }></span>
-                                            <span className="font-bold whitespace-nowrap opacity-75 text-[10px]">{event.authorName}</span>
+                                        <div className="flex items-center gap-1 justify-between">
+                                            <div className="flex items-center gap-1 overflow-hidden">
+                                                <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 
+                                                    ${event.category === 'schedule' ? 'bg-green-500' : 
+                                                      event.category === 'project' ? 'bg-blue-500' : 'bg-red-500'}`
+                                                }></span>
+                                                <span className="font-bold whitespace-nowrap opacity-75 text-[10px]">{event.authorName}</span>
+                                            </div>
+                                            {/* Time or AllDay Badge - Only for Schedule */}
+                                            {event.category === 'schedule' && (
+                                                <span className="text-[9px] font-mono opacity-80 flex-shrink-0 ml-1">
+                                                    {event.type === '휴가' 
+                                                        ? <span className="bg-blue-100 text-blue-600 px-1 rounded-sm">종일</span>
+                                                        : event.time}
+                                                </span>
+                                            )}
                                         </div>
                                         <div className="truncate font-medium leading-tight">
                                            {event.content}

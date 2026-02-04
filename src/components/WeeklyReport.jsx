@@ -192,9 +192,9 @@ const WeeklyReport = ({ user: propUser }) => {
     const handleResubmit = async () => {
         if (!report || !report.id) return;
         
-        const isApproved = report.status === 'approved';
-        const msg = isApproved 
-            ? '승인이 취소되고 작성중 상태로 돌아갑니다. 진행하시겠습니까?' 
+        const isApprovedOrReviewed = report.status === 'approved' || report.status === 'reviewed';
+        const msg = isApprovedOrReviewed 
+            ? '검토/승인이 취소되고 작성중 상태로 돌아갑니다. 진행하시겠습니까?' 
             : '제출을 취소하고 수정 모드로 전환하시겠습니까?';
 
         if (!window.confirm(msg)) return;
@@ -412,8 +412,8 @@ const WeeklyReport = ({ user: propUser }) => {
                                 </>
                             )}
 
-                            {/* Author Resubmit Action (Approved/Submitted -> Draft) */}
-                            {(report.status === 'approved' || report.status === 'submitted') && String(report.authorId) === String(user.id) && (
+                            {/* Author Resubmit Action (Approved/Submitted/Reviewed -> Draft) */}
+                            {(report.status === 'approved' || report.status === 'submitted' || report.status === 'reviewed') && String(report.authorId) === String(user.id) && (
                                 <button onClick={handleResubmit} className="px-4 py-2 bg-orange-100 text-orange-700 border border-orange-200 rounded-lg hover:bg-orange-200 flex items-center transition-colors">
                                     <AlertCircle className="w-4 h-4 mr-2" /> 
                                     {report.status === 'approved' ? '재상신(승인취소)' : '제출취소(수정하기)'}
