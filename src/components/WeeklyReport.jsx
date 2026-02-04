@@ -465,40 +465,61 @@ const WeeklyReport = ({ user: propUser }) => {
                                             <input type="date" value={item.date} onChange={(e) => updateRow('schedule', i, 'date', e.target.value)} disabled={isReadOnly || isReviewMode} className="w-full bg-transparent p-1"/>
                                         </td>
                                         <td>
-                                            <div className="flex items-center space-x-1">
-                                                <select 
-                                                    value={(item.time || '09:00').split(':')[0]} 
-                                                    onChange={(e) => {
-                                                        const newHour = e.target.value;
-                                                        const currentMinute = (item.time || '09:00').split(':')[1] || '00';
-                                                        updateRow('schedule', i, 'time', `${newHour}:${currentMinute}`);
-                                                    }} 
-                                                    disabled={isReadOnly || isReviewMode} 
-                                                    className="w-16 bg-transparent p-1 border border-gray-200 rounded text-center focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                                >
-                                                    {Array.from({ length: 24 }, (_, k) => String(k).padStart(2, '0')).map(h => (
-                                                        <option key={h} value={h}>{h}</option>
-                                                    ))}
-                                                </select>
-                                                <span className="text-gray-400">:</span>
-                                                <select 
-                                                    value={(item.time || '09:00').split(':')[1]} 
-                                                    onChange={(e) => {
-                                                        const newMinute = e.target.value;
-                                                        const currentHour = (item.time || '09:00').split(':')[0] || '09';
-                                                        updateRow('schedule', i, 'time', `${currentHour}:${newMinute}`);
-                                                    }} 
-                                                    disabled={isReadOnly || isReviewMode} 
-                                                    className="w-16 bg-transparent p-1 border border-gray-200 rounded text-center focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                                >
-                                                    {['00', '10', '20', '30', '40', '50'].map(m => (
-                                                        <option key={m} value={m}>{m}</option>
-                                                    ))}
-                                                </select>
-                                            </div>
+                                            {item.type === '휴가' ? (
+                                                <div className="flex items-center justify-center h-full">
+                                                    <span className="text-xs font-bold text-gray-500 bg-gray-100 px-2 py-1 rounded">종일</span>
+                                                </div>
+                                            ) : (
+                                                <div className="flex items-center space-x-1">
+                                                    <select 
+                                                        value={(item.time || '09:00').split(':')[0]} 
+                                                        onChange={(e) => {
+                                                            const newHour = e.target.value;
+                                                            const currentMinute = (item.time || '09:00').split(':')[1] || '00';
+                                                            updateRow('schedule', i, 'time', `${newHour}:${currentMinute}`);
+                                                        }} 
+                                                        disabled={isReadOnly || isReviewMode} 
+                                                        className="w-16 bg-transparent p-1 border border-gray-200 rounded text-center focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                                    >
+                                                        {Array.from({ length: 24 }, (_, k) => String(k).padStart(2, '0')).map(h => (
+                                                            <option key={h} value={h}>{h}</option>
+                                                        ))}
+                                                    </select>
+                                                    <span className="text-gray-400">:</span>
+                                                    <select 
+                                                        value={(item.time || '09:00').split(':')[1]} 
+                                                        onChange={(e) => {
+                                                            const newMinute = e.target.value;
+                                                            const currentHour = (item.time || '09:00').split(':')[0] || '09';
+                                                            updateRow('schedule', i, 'time', `${currentHour}:${newMinute}`);
+                                                        }} 
+                                                        disabled={isReadOnly || isReviewMode} 
+                                                        className="w-16 bg-transparent p-1 border border-gray-200 rounded text-center focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                                    >
+                                                        {['00', '10', '20', '30', '40', '50'].map(m => (
+                                                            <option key={m} value={m}>{m}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            )}
                                         </td>
                                         <td>
-                                            <select value={item.type} onChange={(e) => updateRow('schedule', i, 'type', e.target.value)} disabled={isReadOnly || isReviewMode} className="w-full bg-transparent p-1">
+                                            <select 
+                                                value={item.type} 
+                                                onChange={(e) => {
+                                                    const newType = e.target.value;
+                                                    updateRow('schedule', i, 'type', newType);
+                                                    // If changing TO Vacation, optional: set time to default or clear it?
+                                                    // For now, we prefer to keep the underlying value or irrelevant.
+                                                    // But sorting logic might prefer Vacation to be sorted first.
+                                                    if (newType === '휴가') {
+                                                        // Set time to 00:00 or empty to ensure it sorts first if we want
+                                                        updateRow('schedule', i, 'time', '00:00');
+                                                    }
+                                                }} 
+                                                disabled={isReadOnly || isReviewMode} 
+                                                className="w-full bg-transparent p-1"
+                                            >
                                                 <option>미팅</option>
                                                 <option>외근</option>
                                                 <option>휴가</option>

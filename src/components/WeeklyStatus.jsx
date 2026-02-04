@@ -282,7 +282,12 @@ const WeeklyStatus = () => {
                                     <NameBadge name={item.name} rank={item.rank} />
                                 </div>
                                 <div className="w-32 flex-shrink-0 text-sm font-bold text-gray-700 truncate">
-                                    {item.date} {item.time && <span className="text-xs text-gray-500 ml-1">{item.time}</span>} ({item.type})
+                                    {item.date} 
+                                    {item.type === '휴가' 
+                                        ? <span className="text-xs text-blue-600 bg-blue-50 px-1 rounded ml-1">종일</span> 
+                                        : item.time && <span className="text-xs text-gray-500 ml-1">{item.time}</span>
+                                    } 
+                                    ({item.type})
                                 </div>
                                 <div className="flex-1 text-sm text-gray-800">
                                     {item.content} <span className="text-gray-400 text-xs ml-2">{item.note}</span>
