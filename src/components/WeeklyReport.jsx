@@ -517,7 +517,7 @@ const WeeklyReport = ({ user: propUser }) => {
                                                     // For now, we prefer to keep the underlying value or irrelevant.
                                                     // But sorting logic might prefer Vacation to be sorted first.
                                                     if (newType === '휴가') {
-                                                        // Set time to 00:00 or empty to ensure it sorts first if we want
+                                                        // Set time to 00:00 to ensure it sorts correctly
                                                         updateRow('schedule', i, 'time', '00:00');
                                                     }
                                                 }} 

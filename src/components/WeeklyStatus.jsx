@@ -99,7 +99,7 @@ const WeeklyStatus = () => {
         reports.forEach(report => {
             // Find user to get current rank - Ensure ID comparison is string safe
             const author = usersList.find(u => String(u.id) === String(report.authorId)) || {};
-            const userRank = author.rank || report.rank || '사원';
+            const userRank = author?.rank || report?.rank || '사원';
 
             const authorInfo = {
                 name: report.authorName,
@@ -142,8 +142,8 @@ const WeeklyStatus = () => {
                 return new Date(a.date) - new Date(b.date);
             }
             // If dates are equal, sort by time (treat empty as 00:00)
-            const timeA = a.time || '00:00';
-            const timeB = b.time || '00:00';
+            const timeA = (a.time && typeof a.time === 'string') ? a.time : '00:00';
+            const timeB = (b.time && typeof b.time === 'string') ? b.time : '00:00';
             return timeA.localeCompare(timeB);
         };
 

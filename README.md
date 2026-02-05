@@ -1,5 +1,7 @@
 # Shinwoo Valve QMS Homepage
 
+> **Note for AI Assistants**: Please refer to `AI_INTERACTION_RULES.md` for communication preferences (Korean language enforcement) and project guidelines.
+
 A modern, responsive homepage for Shinwoo Valve's Quality Management System (QMS), built with React, Vite, and Tailwind CSS.
 
 ## Features
@@ -19,6 +21,7 @@ Before running this project, ensure you have **Node.js** installed on your syste
 
 1. **Install Dependencies**
    Open your terminal in this directory and run:
+
    ```bash
    npm install
    ```
@@ -27,7 +30,6 @@ Before running this project, ensure you have **Node.js** installed on your syste
    ```bash
    npm run dev
    ```
-   
 3. **Build for Production**
    ```bash
    npm run build

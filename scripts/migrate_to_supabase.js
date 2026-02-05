@@ -57,10 +57,14 @@ async function migrate() {
     for (let i = 0; i < data.length; i += BATCH_SIZE) {
       const batch = data.slice(i, i + BATCH_SIZE);
       
-      // Sanitization: Ensure empty strings for numbers are null or 0
+      // Sanitization: Convert empty strings to null to prevent integer syntax errors in Supabase
       const sanitizedBatch = batch.map(row => {
         const newRow = { ...row };
-        // Basic cleanup if needed
+        Object.keys(newRow).forEach(key => {
+            if (newRow[key] === '') {
+                newRow[key] = null;
+            }
+        });
         return newRow;
       });
 

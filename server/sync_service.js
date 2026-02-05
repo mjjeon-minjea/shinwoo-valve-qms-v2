@@ -24,7 +24,7 @@ async function syncTable(viewName, tableName) {
     // 2. Upsert to Supabase
     // Note: This assumes the tables exist in Supabase. 
     // If simple INSERT is needed, use .insert()
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from(tableName)
       .upsert(rows); // Upsert based on Primary Key
 
@@ -51,10 +51,12 @@ export function startScheduler() {
   });
 
   // Run once immediately on startup for testing
+  /*
   console.log("⚡ [Scheduler] Running immediate initial sync...");
   (async () => {
     for (const [view, table] of Object.entries(SYNC_MAP)) {
       await syncTable(view, table);
     }
   })();
+  */
 }

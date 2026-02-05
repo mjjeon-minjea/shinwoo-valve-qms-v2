@@ -1,9 +1,8 @@
-import React, { useMemo } from 'react';
-import { X } from 'lucide-react';
+import { useMemo } from 'react';
 
 const ProgressModal = ({ isOpen, type, current, total, startTime }) => {
-    if (!isOpen) return null;
-
+    
+    // Hooks defined unconditionally
     const percentage = useMemo(() => {
         if (total === 0) return 0;
         return Math.min(100, Math.round((current / total) * 100));
@@ -27,6 +26,9 @@ const ProgressModal = ({ isOpen, type, current, total, startTime }) => {
 
     const title = type === 'upload' ? '데이터 업로드 중' : '데이터 삭제 중';
     const statusText = type === 'upload' ? '등록중' : '삭제중';
+
+    // Early return AFTER hooks
+    if (!isOpen) return null;
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">

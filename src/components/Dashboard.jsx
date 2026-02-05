@@ -1,15 +1,15 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-    LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area,
-    PieChart, Pie, Cell, BarChart, Bar, Legend, ComposedChart
+    XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+    PieChart, Pie, Cell, BarChart, Bar, Legend, Area, ComposedChart
 } from 'recharts';
 import {
     Box, Package, ClipboardCheck, AlertTriangle, XCircle, Activity,
     Settings, CheckCircle, HelpCircle, ChevronRight, ChevronDown,
-    Users, MoreHorizontal, UserCheck, User, RefreshCw, MessageSquare,
+    MoreHorizontal, User, RefreshCw, MessageSquare,
     Plus, Trash2, Edit, X, Upload, FileText, LayoutDashboard, Search,
-    Monitor, Sliders, ToggleLeft, ToggleRight, Save, Filter
+    Monitor, Save, Filter
 } from 'lucide-react';
 import Chatbot from './Chatbot';
 import ProgressModal from './ProgressModal';
@@ -657,20 +657,25 @@ const InboundHistory = () => {
         if (window.confirm('정말로 모든 검사 이력을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.')) {
             if (window.confirm('전체 삭제를 진행합니다. 정말 확실합니까?')) {
                 try {
-                    updateProgress(50, 100, 'delete'); // Show "Deleting..."
+                    updateProgress(0, inspections.length, 'delete'); // Show "Deleting..."
                     
-                    // Server supports batch delete via custom route in server.js
-                    const res = await api.fetch('/inspections', { method: 'DELETE' });
+                    // Client-side Batch Delete (Reliable for Supabase w/o custom server route)
+                    const ids = inspections.map(item => item.id);
+                    let deletedCount = 0;
 
-                    if (res.ok) {
-                        updateProgress(100, 100, 'delete');
-                        setTimeout(() => closeProgress(), 500);
-                        alert('모든 데이터가 삭제되었습니다.');
-                        fetchInspections();
-                    } else {
-                        // Fallback if server returns error (e.g. 404)
-                        throw new Error(`Batch delete failed: ${res.status}`);
+                    // Delete in chunks to avoid overwhelming the network
+                    const CHUNK_SIZE = 10;
+                    for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
+                        const chunk = ids.slice(i, i + CHUNK_SIZE);
+                        await Promise.all(chunk.map(id => api.fetch(`/inspections/${id}`, { method: 'DELETE' })));
+                        
+                        deletedCount += chunk.length;
+                        updateProgress(deletedCount, ids.length, 'delete');
                     }
+
+                    setTimeout(() => closeProgress(), 500);
+                    alert('모든 데이터가 삭제되었습니다.');
+                    fetchInspections();
 
                 } catch (error) {
                     console.error('Delete All Error:', error);
@@ -711,6 +716,14 @@ const InboundHistory = () => {
         });
     };
 
+    const clearFilter = (key) => {
+        setFilters(prev => {
+            const newFilters = { ...prev };
+            delete newFilters[key];
+            return newFilters;
+        });
+    };
+
     // ... (inside filteredInspections)
     const filteredInspections = inspections.filter(item => {
         return Object.entries(filters).every(([key, selectedValues]) => {
@@ -721,11 +734,18 @@ const InboundHistory = () => {
     });
 
     // Pagination Logic
-    // Sort by date/id desc first (newest top)
+    // Sort by Date Descending, then by ID Descending (String safe)
     const sortedInspections = [...filteredInspections].sort((a, b) => {
-         if (a.id < b.id) return 1;
-         if (a.id > b.id) return -1;
-         return 0;
+        // 1. Sort by Date
+        const dateA = new Date(a.date);
+        const dateB = new Date(b.date);
+        if (dateA > dateB) return -1;
+        if (dateA < dateB) return 1;
+        
+        // 2. Secondary Sort by ID (String comparison for safety)
+        const idA = String(a.id);
+        const idB = String(b.id);
+        return idB.localeCompare(idA);
     });
     const indexOfLastItem = currentPage * itemsPerPage;
     const indexOfFirstItem = indexOfLastItem - itemsPerPage;
@@ -973,19 +993,19 @@ const PlaceholderView = ({ title, icon: Icon }) => (
 );
 
 const InquiryManagement = ({ isAdmin, user }) => {
-    const [inquiries, setInquiries] = React.useState([]);
-    const [selectedInquiry, setSelectedInquiry] = React.useState(null);
-    const [newMessage, setNewMessage] = React.useState('');
-    const messagesEndRef = React.useRef(null);
+    const [inquiries, setInquiries] = useState([]);
+    const [selectedInquiry, setSelectedInquiry] = useState(null);
+    const [newMessage, setNewMessage] = useState('');
+    const messagesEndRef = useRef(null);
 
-    React.useEffect(() => {
+    useEffect(() => {
         fetchInquiries();
         const interval = setInterval(fetchInquiries, 1000); // Polling every 1s for real-time feel
         return () => clearInterval(interval);
     }, []);
 
     // Sync selectedInquiry with updated inquiries list
-    React.useEffect(() => {
+    useEffect(() => {
         if (selectedInquiry) {
             const updated = inquiries.find(i => i.id === selectedInquiry.id);
             if (updated && JSON.stringify(updated.messages) !== JSON.stringify(selectedInquiry.messages)) {
@@ -995,7 +1015,7 @@ const InquiryManagement = ({ isAdmin, user }) => {
     }, [inquiries]);
 
     // Scroll to bottom only when messages change
-    React.useEffect(() => {
+    useEffect(() => {
         if (selectedInquiry) {
             messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
         }

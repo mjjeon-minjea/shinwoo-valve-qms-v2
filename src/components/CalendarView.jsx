@@ -1,15 +1,11 @@
 
-import React, { useState, useEffect } from 'react';
-import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths } from 'date-fns';
+import { useState, useEffect } from 'react';
+import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSameMonth, isSameDay, addMonths, subMonths } from 'date-fns';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Filter, CheckSquare, Activity, AlertTriangle } from 'lucide-react';
-import { useUser } from '../contexts/UserContext';
 import { api } from '../lib/api';
 
-const CalendarView = ({ user: propUser }) => {
-    const { user: contextUser } = useUser();
-    const user = propUser || contextUser;
+const CalendarView = () => {
     const [currentMonth, setCurrentMonth] = useState(new Date());
-    const [selectedDate, setSelectedDate] = useState(new Date());
     const [events, setEvents] = useState([]);
     const [loading, setLoading] = useState(true);
     const [filters, setFilters] = useState({
@@ -203,7 +199,6 @@ const CalendarView = ({ user: propUser }) => {
                             ${!isSameMonth(day, monthStart) ? 'bg-slate-50/50 text-slate-300' : ''}
                             ${isSameDay(day, new Date()) ? 'ring-2 ring-primary-100 bg-primary-50/10' : ''}
                         `}
-                        onClick={() => setSelectedDate(cloneDay)}
                     >
                         <div className={`text-sm font-bold mb-2 flex justify-between items-center
                             ${!isSameMonth(day, monthStart) ? 'text-slate-300' : 

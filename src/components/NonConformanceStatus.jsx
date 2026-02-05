@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
     PieChart, Pie, Cell
@@ -148,7 +148,7 @@ const NonConformanceStatus = () => {
                 <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
                     <div className="mb-6">
                         <h3 className="font-bold text-slate-800">제품명별 현황 (재고분류)</h3>
-                        <p className="text-xs text-slate-400">품목 마스터 '재고분류설명' 기준 집계</p>
+                        <p className="text-xs text-slate-400">품목 마스터 &apos;재고분류설명&apos; 기준 집계</p>
                     </div>
                     <div className="h-[350px] w-full">
                         <ResponsiveContainer width="100%" height="100%">
@@ -174,7 +174,7 @@ const NonConformanceStatus = () => {
                 <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
                     <div className="mb-6">
                          <h3 className="font-bold text-slate-800">사이즈별 현황 (소분류)</h3>
-                         <p className="text-xs text-slate-400">품목 마스터 '소분류설명' 기준 집계</p>
+                         <p className="text-xs text-slate-400">품목 마스터 &apos;소분류설명&apos; 기준 집계</p>
                     </div>
                     <div className="h-[350px] w-full">
                         <ResponsiveContainer width="100%" height="100%">
