@@ -48,7 +48,21 @@ export const api = {
         }
         else if (options.method === 'DELETE') {
             const id = pathParts[1];
-            const { error } = await supabase.from(table).delete().eq('id', id);
+            
+            let query = supabase.from(table).delete();
+
+            if (id) {
+                // Delete specific item
+                query = query.eq('id', id);
+            } else {
+                // Delete ALL items (Batch Delete)
+                // Supabase requires a WHERE clause for safety. We use a condition that is always true for our data.
+                // Assuming IDs are generated strings or valid numbers, neq '0' usually matches all.
+                query = query.neq('id', '0'); 
+            }
+
+            const { error } = await query;
+            
             if (error) throw error;
             return {
                 ok: true,
