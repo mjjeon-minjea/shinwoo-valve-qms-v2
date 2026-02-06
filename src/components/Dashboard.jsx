@@ -657,22 +657,12 @@ const InboundHistory = () => {
         if (window.confirm('정말로 모든 검사 이력을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.')) {
             if (window.confirm('전체 삭제를 진행합니다. 정말 확실합니까?')) {
                 try {
-                    updateProgress(0, inspections.length, 'delete'); // Show "Deleting..."
+                    updateProgress(0, 100, 'delete'); // Show "Deleting..."
                     
-                    // Client-side Batch Delete (Reliable for Supabase w/o custom server route)
-                    const ids = inspections.map(item => item.id);
-                    let deletedCount = 0;
-
-                    // Delete in chunks to avoid overwhelming the network
-                    const CHUNK_SIZE = 10;
-                    for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
-                        const chunk = ids.slice(i, i + CHUNK_SIZE);
-                        await Promise.all(chunk.map(id => api.fetch(`/inspections/${id}`, { method: 'DELETE' })));
-                        
-                        deletedCount += chunk.length;
-                        updateProgress(deletedCount, ids.length, 'delete');
-                    }
-
+                    // Server-side Batch Delete (Instant)
+                    await api.fetch('/inspections', { method: 'DELETE' });
+                    
+                    updateProgress(100, 100, 'delete');
                     setTimeout(() => closeProgress(), 500);
                     alert('모든 데이터가 삭제되었습니다.');
                     fetchInspections();
