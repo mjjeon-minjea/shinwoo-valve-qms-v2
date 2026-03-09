@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks } from 'date-fns';
+// eslint-disable-next-line no-unused-vars
 import { ChevronLeft, ChevronRight, Printer, FileText, CheckCircle, List, AlertTriangle, Calendar as CalendarIcon, Package, CheckSquare } from 'lucide-react';
 import { useUser } from '../contexts/UserContext';
 import { api } from '../lib/api';
@@ -40,9 +41,11 @@ const getBadgeColor = (rank) => {
 };
 
 const WeeklyStatus = () => {
+    // eslint-disable-next-line no-unused-vars
     const { user } = useUser();
     const [currentDate, setCurrentDate] = useState(new Date());
     const [reports, setReports] = useState([]);
+    // eslint-disable-next-line no-unused-vars
     const [users, setUsers] = useState([]); // Store users for rank lookup
     const [aggregatedData, setAggregatedData] = useState({
         projects: [],

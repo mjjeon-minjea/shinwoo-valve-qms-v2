@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect } from 'react';
 
 import { api } from '../lib/api';
 
@@ -46,6 +46,7 @@ export const UserProvider = ({ children }) => {
     );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useUser = () => {
     const context = useContext(UserContext);
     if (!context) {

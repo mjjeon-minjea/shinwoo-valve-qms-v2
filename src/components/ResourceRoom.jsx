@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Search, Plus, Edit, Trash2, X, ChevronLeft, ChevronRight, Download, FileText } from 'lucide-react';
 import { api } from '../lib/api';
 

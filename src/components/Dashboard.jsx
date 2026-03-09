@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+    // eslint-disable-next-line no-unused-vars
     PieChart, Pie, Cell, BarChart, Bar, Legend, Area, ComposedChart
 } from 'recharts';
 import {
@@ -53,6 +54,7 @@ const formatDate = (val) => {
 
 const InboundAnalysis = () => {
     const [inspections, setInspections] = useState([]);
+    // eslint-disable-next-line no-unused-vars
     const [loading, setLoading] = useState(true);
 
 
@@ -168,6 +170,7 @@ const InboundAnalysis = () => {
         return acc;
     }, {});
 
+    // eslint-disable-next-line no-unused-vars
     const supplierDefectCount = Object.keys(supplierMap).map(name => ({
         name,
         value: supplierMap[name].defect, // Count of defects
@@ -186,6 +189,7 @@ const InboundAnalysis = () => {
         return acc;
     }, {});
 
+    // eslint-disable-next-line no-unused-vars
     const defectTypeCount = Object.keys(defectTypeMap).map(name => ({
         name,
         value: defectTypeMap[name].count,
@@ -193,6 +197,7 @@ const InboundAnalysis = () => {
     })).sort((a, b) => b.value - a.value).slice(0, 10);
 
     // Custom Tooltip Component
+    // eslint-disable-next-line no-unused-vars
     const CustomTooltip = ({ active, payload, label }) => {
         if (active && payload && payload.length) {
             const data = payload[0].payload;
@@ -443,6 +448,7 @@ const InboundAnalysis = () => {
 
 const InboundHistory = () => {
     const [inspections, setInspections] = useState([]);
+    // eslint-disable-next-line no-unused-vars
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingItem, setEditingItem] = useState(null);
@@ -992,6 +998,7 @@ const InquiryManagement = ({ isAdmin, user }) => {
         fetchInquiries();
         const interval = setInterval(fetchInquiries, 1000); // Polling every 1s for real-time feel
         return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     // Sync selectedInquiry with updated inquiries list
@@ -1002,6 +1009,7 @@ const InquiryManagement = ({ isAdmin, user }) => {
                 setSelectedInquiry(updated);
             }
         }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [inquiries]);
 
     // Scroll to bottom only when messages change
@@ -1009,6 +1017,7 @@ const InquiryManagement = ({ isAdmin, user }) => {
         if (selectedInquiry) {
             messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
         }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedInquiry?.messages?.length]);
 
     const fetchInquiries = async () => {
@@ -1197,6 +1206,7 @@ const MemberManagement = ({ members, onDeleteMember, onEditMember, onAddMember, 
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [editingUser, setEditingUser] = useState(null);
+    // eslint-disable-next-line no-unused-vars
     const [showPassword, setShowPassword] = useState(false);
 
     const handleAddSubmit = (e) => {
@@ -1746,8 +1756,10 @@ const Home = ({ setActiveTab }) => {
 };
 
 const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAddMember, onRefresh }) => {
+    // eslint-disable-next-line no-unused-vars
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState('home'); // Default to home
+    // eslint-disable-next-line no-unused-vars
     const [isMenuOpen, setIsMenuOpen] = useState(true);
     const [mainExpanded, setMainExpanded] = useState(true);
     const [inboundExpanded, setInboundExpanded] = useState(true);

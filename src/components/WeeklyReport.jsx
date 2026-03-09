@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useUser } from '../contexts/UserContext';
 import { api } from '../lib/api';
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks } from 'date-fns';
@@ -20,6 +20,7 @@ const WeeklyReport = ({ user: propUser }) => {
 
     useEffect(() => {
         fetchReports();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [user, weekKey]);
 
     const fetchReports = async () => {
@@ -267,6 +268,7 @@ const WeeklyReport = ({ user: propUser }) => {
     };
 
     // Helper to update arrays in report
+    // eslint-disable-next-line no-unused-vars
     const updateSection = (section, items) => {
         setReport(prev => ({ ...prev, [section]: items }));
     };

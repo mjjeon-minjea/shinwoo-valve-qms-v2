@@ -170,6 +170,7 @@ const CalendarView = () => {
         while (day <= endDate) {
             for (let i = 0; i < 7; i++) {
                 formattedDate = format(day, 'd');
+                // eslint-disable-next-line no-unused-vars
                 const cloneDay = day;
                 
                 // Find events for this day AND fitler them

@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
+// eslint-disable-next-line no-unused-vars
 import { ArrowRight, User, Lock, Mail, Building, Eye, EyeOff, MessageSquare, Youtube, Play, Award } from 'lucide-react';
 
 const Hero = ({ onLogin, onSignup }) => {

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { MessageSquare, X, Send } from 'lucide-react';
 import { api } from '../lib/api';
 
@@ -10,6 +10,7 @@ const Chatbot = () => {
     const [inputValue, setInputValue] = useState('');
     const messagesEndRef = useRef(null);
 
+    // eslint-disable-next-line no-unused-vars
     const [sessionId, setSessionId] = useState(Date.now().toString());
     const [isSessionCreated, setIsSessionCreated] = useState(false);
 

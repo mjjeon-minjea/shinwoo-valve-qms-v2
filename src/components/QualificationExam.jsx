@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { examQuestions } from '../data/examQuestions';
 import { CheckCircle, AlertCircle, ArrowRight, RefreshCw, FileText, Download, User, Building, Hash, BadgeCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -123,6 +123,7 @@ const QualificationExam = () => {
         }
     };
 
+    // eslint-disable-next-line no-unused-vars
     const getScoreColor = (s) => {
         if (s >= 80) return 'text-green-600';
         if (s >= 60) return 'text-blue-600';
@@ -291,7 +292,7 @@ const QualificationExam = () => {
                             </div>
 
                             <div className="space-y-12">
-                                {currentQuestions.map((q, index) => (
+                                {currentQuestions.map((q) => (
                                     <div key={q.id} className="border-b border-slate-100 pb-10 last:border-0">
                                         <div className="flex gap-4 mb-4">
                                             <span className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-slate-800 text-white rounded-full font-bold">

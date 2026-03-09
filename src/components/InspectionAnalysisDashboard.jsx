@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
     PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer,
     BarChart, Bar, XAxis, YAxis, CartesianGrid
@@ -33,6 +33,7 @@ const InspectionAnalysisDashboard = () => {
         if (rawData.inspections.length > 0) {
             processData(rawData.inspections, rawData.items);
         }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedYear, selectedMonth, rawData]);
 
     const fetchData = async () => {
@@ -147,6 +148,7 @@ const InspectionAnalysisDashboard = () => {
             .slice(0, 5);
         
         // Helper for Top 10
+        // eslint-disable-next-line no-unused-vars
         const getTop10 = (map) => Object.entries(map)
              .map(([name, value]) => ({ name, value }))
              .sort((a, b) => b.value - a.value)

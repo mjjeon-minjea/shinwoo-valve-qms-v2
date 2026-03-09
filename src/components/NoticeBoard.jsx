@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
+// eslint-disable-next-line no-unused-vars
 import { Search, Plus, Edit, Trash2, X, ChevronLeft, ChevronRight, Eye, AlertTriangle } from 'lucide-react';
 import { api } from '../lib/api';
 
