@@ -24,6 +24,8 @@ import CalendarView from './CalendarView';
 import { api } from '../lib/api';
 import NonConformanceStatus from './NonConformanceStatus';
 import InspectionAnalysisDashboard from './InspectionAnalysisDashboard';
+import ProcessInspectionDashboard from './ProcessInspectionDashboard';
+import ProcessHistory from './ProcessHistory';
 
 // --- Helper Functions ---
 
@@ -1763,6 +1765,7 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
     const [isMenuOpen, setIsMenuOpen] = useState(true);
     const [mainExpanded, setMainExpanded] = useState(true);
     const [inboundExpanded, setInboundExpanded] = useState(true);
+    const [processExpanded, setProcessExpanded] = useState(true);
     const [adminExpanded, setAdminExpanded] = useState(true);
     const [showPopup, setShowPopup] = useState(false);
 
@@ -1806,7 +1809,11 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
             case 'inspection_analysis': return <InspectionAnalysisDashboard />;
             case 'inbound_status': return <NonConformanceStatus />;
             case 'inbound_history': return <InboundHistory />;
-            case 'process': return <PlaceholderView title="공정검사 현황" icon={Settings} />;
+            case 'process':
+            case 'process_dashboard': return <ProcessInspectionDashboard user={user} isAdmin={isAdmin} />;
+            case 'process_analysis': return <PlaceholderView title="공정검사 종합분석현황 (준비 중)" icon={Activity} />;
+            case 'process_by_process': return <PlaceholderView title="공정별 분석현황 (준비 중)" icon={Activity} />;
+            case 'process_history': return <ProcessHistory />;
             case 'final': return <PlaceholderView title="최종검사 현황" icon={CheckCircle} />;
             case 'inquiries': return <InquiryManagement isAdmin={isAdmin} user={user} />;
             case 'members': return <MemberManagement members={members} onDeleteMember={onDeleteMember} onEditMember={onEditMember} onAddMember={onAddMember} onRefresh={onRefresh} />;
@@ -1915,18 +1922,52 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
                             )}
                         </div>
 
-                        <button
-                            onClick={() => setActiveTab('process')}
-                            className={`w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium rounded-lg transition-colors ${activeTab === 'process'
-                                ? 'bg-primary-50 text-primary-700'
-                                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                                }`}
-                        >
-                            <div className="flex items-center">
-                                <Settings className={`mr-3 h-5 w-5 ${activeTab === 'process' ? 'text-primary-600' : 'text-slate-400'}`} />
-                                공정검사
-                            </div>
-                        </button>
+                        {/* Process Inspection Menu Group */}
+                        <div>
+                            <button
+                                onClick={() => setProcessExpanded(!processExpanded)}
+                                className={`w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium rounded-lg transition-colors ${activeTab.includes('process') ? 'text-primary-700 bg-primary-50' : 'text-slate-600 hover:bg-slate-50'
+                                    }`}
+                            >
+                                <div className="flex items-center">
+                                    <Settings className={`mr-3 h-5 w-5 ${activeTab.includes('process') ? 'text-primary-600' : 'text-slate-400'}`} />
+                                    공정검사
+                                </div>
+                                <ChevronDown className={`w-4 h-4 transition-transform ${processExpanded ? 'transform rotate-180' : ''} ${activeTab.includes('process') ? 'text-primary-500' : 'text-slate-400'}`} />
+                            </button>
+
+                            {processExpanded && (
+                                <div className="mt-1 space-y-1 pl-11">
+                                    <button
+                                        onClick={() => setActiveTab('process_dashboard')}
+                                        className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === 'process_dashboard' || activeTab === 'process' ? 'text-primary-600 bg-white shadow-sm' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                                            }`}
+                                    >
+                                        대시보드
+                                    </button>
+                                    <button
+                                        onClick={() => setActiveTab('process_analysis')}
+                                        className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === 'process_analysis' ? 'text-primary-600 bg-white shadow-sm' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'}`}
+                                    >
+                                        종합분석현황
+                                    </button>
+                                    <button
+                                        onClick={() => setActiveTab('process_by_process')}
+                                        className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === 'process_by_process' ? 'text-primary-600 bg-white shadow-sm' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                                            }`}
+                                    >
+                                        공정별 분석현황
+                                    </button>
+                                    <button
+                                        onClick={() => setActiveTab('process_history')}
+                                        className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === 'process_history' ? 'text-primary-600 bg-white shadow-sm' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                                            }`}
+                                    >
+                                        이력 조회 및 등록
+                                    </button>
+                                </div>
+                            )}
+                        </div>
 
                         <button
                             onClick={() => setActiveTab('final')}

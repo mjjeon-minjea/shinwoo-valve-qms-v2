@@ -103,6 +103,46 @@ server.delete('/inspections', (req, res) => {
     }
 });
 
+// =====================================================
+// Process Inspections Batch Routes
+// =====================================================
+
+// Batch Insert for Process Inspections
+server.post('/process_inspections/batch', (req, res) => {
+    try {
+        const db = router.db;
+        const items = req.body;
+
+        if (!Array.isArray(items)) {
+            return res.status(400).send('Request body must be an array.');
+        }
+
+        const current = db.get('process_inspections').value() || [];
+        const merged = current.concat(items);
+        db.set('process_inspections', merged).write();
+
+        console.log(`[Process Batch Upload] Added ${items.length} items.`);
+        res.jsonp({ success: true, count: items.length });
+    } catch (error) {
+        console.error('[Process Batch Upload Error]', error);
+        res.status(500).send(error.message);
+    }
+});
+
+// Batch Delete (Truncate) for Process Inspections
+server.delete('/process_inspections', (req, res) => {
+    try {
+        const db = router.db;
+        db.set('process_inspections', []).write();
+
+        console.log('[Process Batch Delete] All process_inspections cleared.');
+        res.jsonp({ success: true, count: 0 });
+    } catch (error) {
+        console.error('[Process Batch Delete Error]', error);
+        res.status(500).send(error.message);
+    }
+});
+
 server.use(router);
 
 server.listen(PORT, '0.0.0.0', () => {

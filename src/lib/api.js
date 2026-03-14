@@ -5,17 +5,57 @@ const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
+// ====================================================
+// 로컬 JSON 서버(3001포트)를 사용하는 테이블 목록
+// Supabase에 없고 로컬 db.json 에만 있는 리소스들
+// ====================================================
+const LOCAL_JSON_TABLES = [
+    'process_inspections',
+    'inspections',
+    'users',
+    'notices',
+    'resources',
+    'settings',
+    'inquiries',
+    'weekly_reports',
+    'calendar_events',
+];
+
+const LOCAL_SERVER = 'http://localhost:3001';
+
+// 로컬 JSON 서버 전용 fetch 래퍼
+const localFetch = async (url, options = {}) => {
+    const fullUrl = `${LOCAL_SERVER}${url}`;
+    const fetchOptions = {
+        method: options.method || 'GET',
+        headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+    };
+    if (options.body !== undefined) {
+        fetchOptions.body = typeof options.body === 'string'
+            ? options.body
+            : JSON.stringify(options.body);
+    }
+    const res = await fetch(fullUrl, fetchOptions);
+    return res;
+};
+
 export const api = {
     fetch: async (url, options = {}) => {
-        // Parse URL to map to Supabase tables
-        // URL format: '/table_name' or '/table_name/id'
-        const endpoint = url.split('?')[0]; // Remove query params
+        // URL 파싱: '/table_name' 또는 '/table_name/id' 형식
+        const endpoint = url.split('?')[0];
         const pathParts = endpoint.split('/').filter(p => p !== '');
-        const table = pathParts[0]; // e.g., 'users', 'inspections'
+        const table = pathParts[0]; // e.g., 'process_inspections'
+
+        // ── 로컬 JSON 서버 라우팅 ──────────────────────────────────
+        // LOCAL_JSON_TABLES 목록에 있는 테이블은 로컬 서버를 사용
+        if (LOCAL_JSON_TABLES.includes(table)) {
+            return localFetch(url, options);
+        }
+        // ─────────────────────────────────────────────────────────
 
         console.log(`[Supabase API] ${options.method || 'GET'} ${table}`);
 
-        // Normalize body: If string, parse it. If object, use as is.
+        // body 정규화: 문자열이면 파싱, 객체면 그대로 사용
         let requestBody = options.body;
         if (typeof requestBody === 'string') {
             try {
@@ -34,10 +74,9 @@ export const api = {
             };
         }
         else if (options.method === 'PUT' || options.method === 'PATCH') {
-            const id = pathParts[1]; // e.g., '1' from '/users/1'
-            // If body has id, remove it to avoid changing PK
+            const id = pathParts[1];
             const updateData = { ...requestBody };
-            delete updateData.id; 
+            delete updateData.id;
 
             const { data, error } = await supabase.from(table).update(updateData).eq('id', id).select();
             if (error) throw error;
@@ -48,21 +87,17 @@ export const api = {
         }
         else if (options.method === 'DELETE') {
             const id = pathParts[1];
-            
+
             let query = supabase.from(table).delete();
 
             if (id) {
-                // Delete specific item
                 query = query.eq('id', id);
             } else {
-                // Delete ALL items (Batch Delete)
-                // Supabase requires a WHERE clause for safety. We use a condition that is always true for our data.
-                // Assuming IDs are generated strings or valid numbers, neq '0' usually matches all.
-                query = query.neq('id', '0'); 
+                query = query.neq('id', '0');
             }
 
             const { error } = await query;
-            
+
             if (error) throw error;
             return {
                 ok: true,
