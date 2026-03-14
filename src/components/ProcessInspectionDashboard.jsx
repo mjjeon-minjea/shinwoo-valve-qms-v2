@@ -67,8 +67,10 @@ const ProcessInspectionDashboard = () => {
             if (row.failedQuantity > 0) {
                 failedRecords++;
                 failedQty += row.failedQuantity;
+                // 처리방안 텍스트가 존재하거나, 기입여부가 'Y'로 명시된 경우
+                const hasResolution = (row.resolution && row.resolution.trim() !== '') || row.isResolutionEntered === 'Y';
                 
-                if (row.isResolutionEntered === 'Y') {
+                if (hasResolution) {
                     resolvedRecords++;
                 } else {
                     unresolvedRecords++;
@@ -375,7 +377,7 @@ const ProcessInspectionDashboard = () => {
                 <div className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm relative overflow-hidden flex flex-col justify-between">
                     <div className="absolute left-0 top-0 bottom-0 w-1 bg-red-500"></div>
                     <div className="flex justify-between items-start mb-2">
-                        <h3 className="text-xs font-bold text-slate-500 tracking-wider">미조치 알림 (PENDING ACTIONS)</h3>
+                        <h3 className="text-xs font-bold text-slate-500 tracking-wider">미기입 건수 (PENDING ACTIONS)</h3>
                         <AlertTriangle className="w-4 h-4 text-red-400 fill-red-100" />
                     </div>
                     <div>
@@ -383,7 +385,7 @@ const ProcessInspectionDashboard = () => {
                             {kpiData.unresolvedRecords.toLocaleString()} <span className="text-sm font-bold text-slate-400">건</span>
                         </div>
                         <div className="text-xs text-red-600 bg-red-50 px-2 py-0.5 rounded inline-flex items-center gap-1 font-bold">
-                            <XCircle className="w-3 h-3" /> 즉각적인 조치 필요
+                            <XCircle className="w-3 h-3" /> 조치 내용 기입 필요
                         </div>
                     </div>
                 </div>
