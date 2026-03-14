@@ -34,7 +34,7 @@ const parseNum = (val) => {
 // ====================================================
 const ProcessHistoryModal = ({ isOpen, onClose, onSave, editingItem }) => {
     const [form, setForm] = useState({
-        inspectionDate: '', modelName: '', workplaceFull: '', itemName: '',
+        inspectionDate: '', modelCategory: '', modelName: '', workplaceFull: '', itemName: '',
         plannedQuantity: '', inspectedQuantity: '', failedQuantity: '', passedQuantity: '',
         resolution: '', isResolutionEntered: '해당없음'
     });
@@ -43,6 +43,7 @@ const ProcessHistoryModal = ({ isOpen, onClose, onSave, editingItem }) => {
         if (editingItem) {
             setForm({
                 inspectionDate: editingItem.inspectionDate || '',
+                modelCategory: editingItem.modelCategory || '',
                 modelName: editingItem.modelName || '',
                 workplaceFull: editingItem.workplaceFull || '',
                 itemName: editingItem.itemName || '',
@@ -56,7 +57,7 @@ const ProcessHistoryModal = ({ isOpen, onClose, onSave, editingItem }) => {
         } else {
             setForm({
                 inspectionDate: new Date().toISOString().split('T')[0],
-                modelName: '', workplaceFull: '', itemName: '',
+                modelCategory: '', modelName: '', workplaceFull: '', itemName: '',
                 plannedQuantity: '', inspectedQuantity: '', failedQuantity: '', passedQuantity: '',
                 resolution: '', isResolutionEntered: '해당없음'
             });
@@ -99,6 +100,11 @@ const ProcessHistoryModal = ({ isOpen, onClose, onSave, editingItem }) => {
                             <label className="block text-xs font-medium text-slate-500 mb-1">검사일자 *</label>
                             <input type="date" name="inspectionDate" value={form.inspectionDate} onChange={handleChange}
                                 className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500" required />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium text-slate-500 mb-1">모델대분류</label>
+                            <input type="text" name="modelCategory" value={form.modelCategory} onChange={handleChange}
+                                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500" />
                         </div>
                         <div>
                             <label className="block text-xs font-medium text-slate-500 mb-1">모델명</label>
@@ -217,7 +223,9 @@ const ProcessHistory = () => {
             try {
                 updateProgress(10, 100, 'upload');
                 const wb = XLSX.read(evt.target.result, { type: 'binary' });
-                const ws = wb.Sheets[wb.SheetNames[0]];
+                // Check if 'LOW DATA' sheet exists, otherwise fall back to first sheet
+                const sheetName = wb.SheetNames.includes('LOW DATA') ? 'LOW DATA' : wb.SheetNames[0];
+                const ws = wb.Sheets[sheetName];
                 const rawRows = XLSX.utils.sheet_to_json(ws, { raw: true, defval: '' });
 
                 updateProgress(40, 100, 'upload');
@@ -246,6 +254,7 @@ const ProcessHistory = () => {
                     resolution: String(findVal(row, ['처리방안']) || ''),
                     workplaceCode: String(findVal(row, ['작업장코드']) || ''),
                     modelName: String(findVal(row, ['모델명']) || ''),
+                    modelCategory: String(findVal(row, ['모델대분류']) || ''),
                     workplace: String(findVal(row, ['작업장']) || ''),
                     equipmentName: String(findVal(row, ['설비명']) || ''),
                     isResolutionEntered: String(findVal(row, ['처리방안 기입여부']) || '해당없음'),
@@ -384,6 +393,7 @@ const ProcessHistory = () => {
 
     const COLUMNS = [
         { key: 'inspectionDate', label: '검사일자', filterable: false },
+        { key: 'modelCategory', label: '모델대분류', filterable: true },
         { key: 'modelName', label: '모델명', filterable: true },
         { key: 'workplaceFull', label: '작업장 / 설비', filterable: true },
         { key: 'itemName', label: '품목명', filterable: false },
@@ -543,6 +553,7 @@ const ProcessHistory = () => {
                                     <tr key={item.id} className="hover:bg-slate-50 transition-colors">
                                         <td className="px-4 py-3 text-xs text-slate-400">{(currentPage - 1) * ITEMS_PER_PAGE + idx + 1}</td>
                                         <td className="px-4 py-3 text-slate-700 whitespace-nowrap">{item.inspectionDate}</td>
+                                        <td className="px-4 py-3 text-blue-700 text-xs font-bold">{item.modelCategory || '-'}</td>
                                         <td className="px-4 py-3 font-medium text-slate-800">{item.modelName || '-'}</td>
                                         <td className="px-4 py-3 text-slate-600 text-xs">{item.workplaceFull || '-'}</td>
                                         <td className="px-4 py-3 text-slate-600 text-xs max-w-[120px] truncate">{item.itemName || '-'}</td>

@@ -1,4 +1,4 @@
-const http = require('http');
+import http from 'http';
 
 function checkPort(port, name) {
   return new Promise((resolve) => {

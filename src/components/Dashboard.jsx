@@ -26,7 +26,10 @@ import NonConformanceStatus from './NonConformanceStatus';
 import InspectionAnalysisDashboard from './InspectionAnalysisDashboard';
 import ProcessInspectionDashboard from './ProcessInspectionDashboard';
 import ProcessHistory from './ProcessHistory';
-
+import ProcessAnalysis from './ProcessAnalysis';
+import WorkplaceAnalysis from './WorkplaceAnalysis';
+import EquipmentAnalysis from './EquipmentAnalysis';
+import ModelCategoryAnalysis from './ModelCategoryAnalysis';
 // --- Helper Functions ---
 
 // Helper: Convert Excel Serial Date to YYYY-MM-DD
@@ -62,7 +65,7 @@ const InboundAnalysis = () => {
 
 
     const [dateRange, setDateRange] = useState({
-        start: '2024-01-01',
+        start: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-01`,
         end: new Date().toISOString().split('T')[0]
     });
     const [groupBy, setGroupBy] = useState('day'); // 'day', 'month', 'year'
@@ -1811,8 +1814,10 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
             case 'inbound_history': return <InboundHistory />;
             case 'process':
             case 'process_dashboard': return <ProcessInspectionDashboard user={user} isAdmin={isAdmin} />;
-            case 'process_analysis': return <PlaceholderView title="공정검사 종합분석현황 (준비 중)" icon={Activity} />;
-            case 'process_by_process': return <PlaceholderView title="공정별 분석현황 (준비 중)" icon={Activity} />;
+            case 'process_by_process': return <ProcessAnalysis />;
+            case 'process_by_workplace': return <WorkplaceAnalysis />;
+            case 'process_by_equipment': return <EquipmentAnalysis />;
+            case 'process_by_model_category': return <ModelCategoryAnalysis />;
             case 'process_history': return <ProcessHistory />;
             case 'final': return <PlaceholderView title="최종검사 현황" icon={CheckCircle} />;
             case 'inquiries': return <InquiryManagement isAdmin={isAdmin} user={user} />;
@@ -1946,17 +1951,32 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
                                         대시보드
                                     </button>
                                     <button
-                                        onClick={() => setActiveTab('process_analysis')}
-                                        className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === 'process_analysis' ? 'text-primary-600 bg-white shadow-sm' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'}`}
-                                    >
-                                        종합분석현황
-                                    </button>
-                                    <button
                                         onClick={() => setActiveTab('process_by_process')}
                                         className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === 'process_by_process' ? 'text-primary-600 bg-white shadow-sm' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
                                             }`}
                                     >
                                         공정별 분석현황
+                                    </button>
+                                    <button
+                                        onClick={() => setActiveTab('process_by_workplace')}
+                                        className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === 'process_by_workplace' ? 'text-primary-600 bg-white shadow-sm' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                                            }`}
+                                    >
+                                        작업장별 분석현황
+                                    </button>
+                                    <button
+                                        onClick={() => setActiveTab('process_by_equipment')}
+                                        className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === 'process_by_equipment' ? 'text-primary-600 bg-white shadow-sm' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                                            }`}
+                                    >
+                                        설비명별 분석현황
+                                    </button>
+                                    <button
+                                        onClick={() => setActiveTab('process_by_model_category')}
+                                        className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === 'process_by_model_category' ? 'text-primary-600 bg-white shadow-sm' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                                            }`}
+                                    >
+                                        모델대분류별 분석현황
                                     </button>
                                     <button
                                         onClick={() => setActiveTab('process_history')}

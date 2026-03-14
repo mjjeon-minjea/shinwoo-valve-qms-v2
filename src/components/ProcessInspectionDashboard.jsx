@@ -1,12 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import { 
-    BarChart, Bar, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer,
-    PieChart, Pie, Cell, ComposedChart, Area, Legend
+    PieChart, Pie, Cell, ResponsiveContainer
 } from 'recharts';
 import { 
-    Filter, Activity, CheckCircle2, AlertTriangle, RefreshCw, 
-    Target, ClipboardCheck, XCircle, TrendingUp, Search, Calendar,
-    Package, Box
+    Activity, CheckCircle2, AlertTriangle, RefreshCw, 
+    Target, ClipboardCheck, XCircle, TrendingUp, Package, Box
 } from 'lucide-react';
 import { api } from '../lib/api';
 
@@ -14,7 +12,7 @@ const ProcessInspectionDashboard = () => {
     const [mesData, setMesData] = useState([]);
     const [loading, setLoading] = useState(true);
     const [dateRange, setDateRange] = useState({
-        start: '2024-01-01',
+        start: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-01`,
         end: new Date().toISOString().split('T')[0]
     });
     const [groupBy, setGroupBy] = useState('month'); // 'day', 'month', 'year'
@@ -56,138 +54,167 @@ const ProcessInspectionDashboard = () => {
         });
     }, [mesData, dateRange]);
 
-    // 1. Calculate KPI Data
+    // 1. Calculate KPI & PPM Data
     const kpiData = useMemo(() => {
-        let planned = 0, inspected = 0, passed = 0, failed = 0;
-        let unresolvedCount = 0;
+        let totalRecords = 0, failedRecords = 0;
+        let inspectedQty = 0, failedQty = 0;
+        let resolvedRecords = 0, unresolvedRecords = 0, unresolvedQty = 0;
 
         filteredData.forEach(row => {
-            planned += row.plannedQuantity || 0;
-            inspected += row.inspectedQuantity || 0;
-            passed += row.passedQuantity || 0;
-            failed += row.failedQuantity || 0;
-            if (row.isResolutionEntered === 'N') unresolvedCount++;
-        });
-
-        const inspectionRate = planned > 0 ? ((inspected / planned) * 100).toFixed(1) : 0;
-        const passRate = inspected > 0 ? ((passed / inspected) * 100).toFixed(1) : 0;
-        const failRate = inspected > 0 ? ((failed / inspected) * 100).toFixed(1) : 0;
-        const unresolvedRate = failed > 0 ? ((unresolvedCount / failed) * 100).toFixed(1) : 0;
-
-        return {
-            planned, inspected, passed, failed, unresolvedCount,
-            inspectionRate, passRate, failRate, unresolvedRate
-        };
-    }, [filteredData]);
-
-    // Summary Rows for KPI Display (Style compatible with InboundAnalysis)
-    const summaryRows = [
-        [
-            { title: '검사 진행률', value: `${kpiData.inspectionRate}%`, subtext: `지시 ${kpiData.planned.toLocaleString()} / 실적 ${kpiData.inspected.toLocaleString()} EA`, icon: Target, color: 'text-blue-600', bg: 'bg-blue-50' },
-            { title: '품질 합격률', value: `${kpiData.passRate}%`, subtext: `합격 ${kpiData.passed.toLocaleString()} / 검사 ${kpiData.inspected.toLocaleString()} EA`, icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-            { title: '불량 발생건수', value: `${kpiData.failed.toLocaleString()} EA`, subtext: `공정 불량률 ${kpiData.failRate}% (수량 기준)`, icon: AlertTriangle, color: 'text-red-600', bg: 'bg-red-50' },
-        ]
-    ];
-
-    // 2. Calculate Trend Data
-    const trendData = useMemo(() => {
-        const dataMap = {};
-        filteredData.forEach(row => {
-            if (!row.inspectionDate) return;
-            const date = new Date(row.inspectionDate);
-            let key = '';
-
-            if (groupBy === 'day') {
-                key = date.toISOString().split('T')[0];
-            } else if (groupBy === 'month') {
-                key = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
-            } else if (groupBy === 'year') {
-                key = `${date.getFullYear()}`;
-            } else { 
-                const year = date.getFullYear();
-                const month = date.getMonth();
-                const day = date.getDate();
-                let weekNum = Math.ceil(day / 7);
-                key = `${year} ${month + 1}M ${weekNum}W`;
-            }
+            totalRecords++;
+            inspectedQty += row.inspectedQuantity || 0;
             
-            if (!dataMap[key]) dataMap[key] = { name: key, ins: 0, pass: 0, fail: 0 };
-            dataMap[key].ins += row.inspectedQuantity || 0;
-            dataMap[key].pass += row.passedQuantity || 0;
-            dataMap[key].fail += row.failedQuantity || 0;
-        });
-
-        const sortedKeys = Object.keys(dataMap).sort();
-        return sortedKeys.map(key => dataMap[key]);
-    }, [filteredData, groupBy]);
-
-    // 3. Calculate Process Defect Data
-    const processDefectData = useMemo(() => {
-        const processMap = { '주조': 0, '가공': 0, '조립': 0 };
-        filteredData.forEach(row => {
-            if (row.failedQuantity > 0 && row.processType) {
-                const key = row.processType;
-                if (processMap.hasOwnProperty(key)) {
-                    processMap[key] += row.failedQuantity;
+            if (row.failedQuantity > 0) {
+                failedRecords++;
+                failedQty += row.failedQuantity;
+                
+                if (row.isResolutionEntered === 'Y') {
+                    resolvedRecords++;
+                } else {
+                    unresolvedRecords++;
+                    unresolvedQty += row.failedQuantity;
                 }
             }
         });
-        return [
-            { name: '주조', value: processMap['주조'] || 0 },
-            { name: '조립', value: processMap['조립'] || 0 },
-            { name: '가공', value: processMap['가공'] || 0 },
-        ].filter(item => item.value >= 0);
-    }, [filteredData]);
 
-    // 4. Calculate Model Defect Data
-    const modelDefectDataConfig = useMemo(() => {
-        const modelMap = {};
-        filteredData.forEach(row => {
-            if (row.failedQuantity > 0) {
-                const model = row.modelName || '기타';
-                modelMap[model] = (modelMap[model] || 0) + row.failedQuantity;
-            }
-        });
+        const failRateByRecord = totalRecords > 0 ? (failedRecords / totalRecords) * 100 : 0;
+        const failRateByQty = inspectedQty > 0 ? (failedQty / inspectedQty) * 100 : 0;
+        const resolutionRate = failedRecords > 0 ? (resolvedRecords / failedRecords) * 100 : 0;
+        
+        // PPM Calculation (Parts Per Million)
+        const ppmByRecord = totalRecords > 0 ? (failedRecords / totalRecords) * 1000000 : 0;
+        const ppmByQty = inspectedQty > 0 ? (failedQty / inspectedQty) * 1000000 : 0;
 
-        const sortedModels = Object.entries(modelMap)
-            .map(([name, value]) => ({ name, value }))
-            .sort((a, b) => b.value - a.value);
-
-        const top4 = sortedModels.slice(0, 4);
-        const others = sortedModels.slice(4).reduce((sum, item) => sum + item.value, 0);
-        
-        const colors = ['#ef4444', '#f59e0b', '#eab308', '#8b5cf6'];
-        const resultData = top4.map((item, idx) => ({
-            ...item,
-            color: colors[idx]
-        }));
-        
-        if (others > 0) {
-            resultData.push({ name: '기타', value: others, color: '#94a3b8' });
-        }
-        
         return {
-             data: resultData,
-             legend: top4
+            totalRecords, failedRecords,
+            inspectedQty, failedQty,
+            resolvedRecords, unresolvedRecords, unresolvedQty,
+            failRateByRecord: failRateByRecord.toFixed(2), 
+            failRateByQty: failRateByQty.toFixed(2), 
+            resolutionRate: resolutionRate.toFixed(1),
+            ppmByRecord: Math.round(ppmByRecord),
+            ppmByQty: Math.round(ppmByQty)
         };
     }, [filteredData]);
 
-    // 5. Calculate Recent Defects Data
-    const recentDefectsData = useMemo(() => {
-        const defects = filteredData.filter(row => row.failedQuantity > 0);
-        defects.sort((a, b) => new Date(b.inspectionDate) - new Date(a.inspectionDate));
-        return defects.slice(0, 5).map((row, idx) => {
-            const isResolved = row.isResolutionEntered === 'Y';
-            return {
-                id: row.id || String(idx),
-                model: row.modelName,
-                workstation: row.workplaceFull,
-                defectQty: row.failedQuantity,
-                isResolved,
-                highlight: row.failedQuantity >= 5
-            };
-        });
-    }, [filteredData]);
+    const TARGET_PPM = 100;
+    const TARGET_PERCENT = 0.01;
+
+    // Helper for Gauge Chart
+    const renderGauge = (value, target, isPPM, title) => {
+        const displayValue = isPPM ? value.toLocaleString() : value;
+        
+        let statusText = '';
+        let statusColor = '';
+        if (value <= target * 0.5) {
+            statusText = '우수 유지';
+            statusColor = 'text-blue-700 border-blue-200 bg-blue-50';
+        } else if (value <= target) {
+            statusText = '안정적 수준';
+            statusColor = 'text-green-700 border-green-200 bg-green-50';
+        } else if (value <= target * 1.5) {
+            statusText = '주의 요망';
+            statusColor = 'text-orange-600 border-orange-200 bg-orange-50';
+        } else {
+            statusText = '조치 필요';
+            statusColor = 'text-red-600 border-red-200 bg-red-50';
+        }
+
+        const bgData = [
+            { name: 'Blue', value: 1, color: '#1e40af' },
+            { name: 'Green', value: 1, color: '#22c55e' },
+            { name: 'Orange', value: 1, color: '#f59e0b' },
+            { name: 'Red', value: 1, color: '#ef4444' }
+        ];
+
+        return (
+            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col items-center justify-center relative h-[280px]">
+                <div className="w-full h-[120px] relative">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                            {/* Background track */}
+                            <Pie
+                                data={bgData}
+                                cx="50%"
+                                cy="100%"
+                                startAngle={180}
+                                endAngle={0}
+                                innerRadius="70%"
+                                outerRadius="100%"
+                                paddingAngle={0}
+                                dataKey="value"
+                                stroke="none"
+                            >
+                                {bgData.map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill={entry.color} />
+                                ))}
+                            </Pie>
+                        </PieChart>
+                    </ResponsiveContainer>
+                    
+                    {/* Needle UI using CSS rotation */}
+                    {(() => {
+                        let needleAngle = 0;
+                        if (value <= target * 0.5) {
+                            needleAngle = -67.5; // Center of Blue (-90 to -45)
+                        } else if (value <= target) {
+                            needleAngle = -22.5; // Center of Green (-45 to 0)
+                        } else if (value <= target * 1.5) {
+                            needleAngle = 22.5;  // Center of Orange (0 to 45)
+                        } else {
+                            needleAngle = 67.5;  // Center of Red (45 to 90)
+                        }
+
+                        
+                        return (
+                            <div 
+                                className="absolute bottom-0 left-1/2 z-10"
+                            >
+                                {/* The Pointer */}
+                                <div 
+                                    className="w-[4px] h-[75px] bg-slate-800 origin-bottom shadow-sm"
+                                    style={{
+                                        position: 'absolute',
+                                        bottom: '0',
+                                        left: '-2px', // half width
+                                        transform: `rotate(${needleAngle}deg)`,
+                                        borderRadius: '4px 4px 0 0',
+                                        transition: 'transform 1s cubic-bezier(0.4, 0, 0.2, 1)'
+                                    }}
+                                >
+                                    {/* The Pivot Dot */}
+                                    <div 
+                                        className="w-4 h-4 rounded-full bg-slate-800 absolute bottom-0 left-1/2 pointer-events-none"
+                                        style={{ transform: 'translate(-50%, 50%)' }}
+                                    ></div>
+                                </div>
+                            </div>
+                        );
+                    })()}
+                </div>
+                
+                {/* Numeric value beneath the gauge */}
+                <div className="text-center w-full mt-2">
+                    <div className="text-4xl font-black text-slate-800 tracking-tight">
+                        {displayValue}{!isPPM && '%'}
+                    </div>
+                </div>
+                
+                {/* Labels and targets */}
+                <div className="mt-3 text-center">
+                    <p className="text-sm font-bold text-slate-700 flex flex-col items-center justify-center gap-1">
+                        {title}
+                        <span className={`text-[10px] font-bold border px-2 py-0.5 rounded-full whitespace-nowrap ${statusColor}`}>
+                            {statusText}
+                        </span>
+                    </p>
+                    <p className="text-[11px] text-slate-400 mt-1">Target: &lt; {target}{isPPM ? ' PPM' : '%'} ({TARGET_PPM}PPM)</p>
+                </div>
+            </div>
+        );
+    };
+
+
 
     return (
         <div className="space-y-6 animate-fade-in bg-slate-50 min-h-screen p-2">
@@ -196,185 +223,308 @@ const ProcessInspectionDashboard = () => {
                 <div>
                     <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
                         <Activity className="w-6 h-6 text-blue-600" />
-                        공정검사 분석 리포트
+                        공정검사 대시보드
                     </h1>
-                    <p className="text-slate-500">생산 공정별 품질 현황 및 주요 이슈 현황</p>
+                    <p className="text-slate-500">생산 공정별 핵심 품질 지표 모니터링</p>
                 </div>
 
+                {/* Filter Controls Container - Stacked */}
                 <div className="flex flex-col items-end gap-2">
+                    {/* Row 1: Date Range & Refresh */}
                     <div className="flex flex-wrap items-center gap-3 bg-white p-2 rounded-xl shadow-sm border border-slate-200">
                         <div className="flex items-center gap-2">
                             <input
                                 type="date"
                                 value={dateRange.start}
                                 onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
-                                className="pl-3 pr-2 py-1.5 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                                className="pl-3 pr-2 py-1.5 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                             />
                             <span className="text-slate-400">~</span>
                             <input
                                 type="date"
                                 value={dateRange.end}
                                 onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
-                                className="pl-3 pr-2 py-1.5 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                                className="pl-3 pr-2 py-1.5 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                             />
                         </div>
                         <div className="h-6 w-px bg-slate-200 mx-1"></div>
-                        <div className="flex bg-slate-100 p-1 rounded-lg">
-                            {['day', 'month', 'year'].map((type) => (
-                                <button
-                                    key={type}
-                                    onClick={() => setGroupBy(type)}
-                                    className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${groupBy === type
-                                        ? 'bg-white text-primary-600 shadow-sm'
-                                        : 'text-slate-500 hover:text-slate-900'
-                                        }`}
-                                >
-                                    {type === 'day' ? '일별' : type === 'month' ? '월별' : '년별'}
-                                </button>
-                            ))}
-                        </div>
                         <button onClick={fetchData} className="p-1.5 text-slate-400 hover:text-blue-600 transition-colors">
                             <RefreshCw className="w-4 h-4" />
                         </button>
+                    </div>
+
+                    {/* Row 2: Quick Month Select */}
+                    <div className="flex items-center gap-2 bg-white p-2 rounded-xl shadow-sm border border-slate-200">
+                        <span className="text-xs font-bold text-slate-500 px-1">빠른 기간 설정 :</span>
+                        <select
+                            className="pl-2 pr-8 py-1 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-slate-50 hover:bg-white transition-colors"
+                            value={parseInt(dateRange.start.split('-')[0]) || new Date().getFullYear()}
+                            onChange={(e) => {
+                                const newYear = parseInt(e.target.value);
+                                const currentYear = dateRange.start.split('-')[0];
+                                const isWholeYear = dateRange.start === `${currentYear}-01-01` && dateRange.end === `${currentYear}-12-31`;
+
+                                if (isWholeYear) {
+                                    setDateRange({
+                                        start: `${newYear}-01-01`,
+                                        end: `${newYear}-12-31`
+                                    });
+                                } else {
+                                    const currentMonth = parseInt(dateRange.start.split('-')[1]);
+                                    const lastDay = new Date(newYear, currentMonth, 0).getDate();
+                                    setDateRange({
+                                        start: `${newYear}-${String(currentMonth).padStart(2, '0')}-01`,
+                                        end: `${newYear}-${String(currentMonth).padStart(2, '0')}-${lastDay}`
+                                    });
+                                }
+                            }}
+                        >
+                            {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map(year => (
+                                <option key={year} value={year}>{year}년</option>
+                            ))}
+                        </select>
+                        <select
+                            className="pl-2 pr-8 py-1 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-slate-50 hover:bg-white transition-colors"
+                            value={(() => {
+                                const year = dateRange.start.split('-')[0];
+                                if (dateRange.start === `${year}-01-01` && dateRange.end === `${year}-12-31`) return 'all';
+                                return parseInt(dateRange.start.split('-')[1]) || (new Date().getMonth() + 1);
+                            })()}
+                            onChange={(e) => {
+                                const val = e.target.value;
+                                const currentYear = parseInt(dateRange.start.split('-')[0]);
+
+                                if (val === 'all') {
+                                    setDateRange({
+                                        start: `${currentYear}-01-01`,
+                                        end: `${currentYear}-12-31`
+                                    });
+                                } else {
+                                    const newMonth = parseInt(val);
+                                    const lastDay = new Date(currentYear, newMonth, 0).getDate();
+                                    setDateRange({
+                                        start: `${currentYear}-${String(newMonth).padStart(2, '0')}-01`,
+                                        end: `${currentYear}-${String(newMonth).padStart(2, '0')}-${lastDay}`
+                                    });
+                                }
+                            }}
+                        >
+                            <option value="all">전체</option>
+                            {Array.from({ length: 12 }, (_, i) => i + 1).map(month => (
+                                <option key={month} value={month}>{month}월</option>
+                            ))}
+                        </select>
                     </div>
                 </div>
             </div>
 
             {/* Summary Cards */}
-            <div className="space-y-4 px-4">
-                {summaryRows.map((row, idx) => (
-                    <div key={idx} className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {row.map((item, i) => (
-                            <div key={i} className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all group">
-                                <div className="flex items-center justify-between mb-4">
-                                    <div className={`p-3 rounded-lg ${item.bg} group-hover:scale-110 transition-transform`}>
-                                        <item.icon className={`w-6 h-6 ${item.color}`} />
-                                    </div>
-                                    <TrendingUp className="w-4 h-4 text-slate-300" />
-                                </div>
-                                <h3 className="text-sm font-medium text-slate-500">{item.title}</h3>
-                                <div className="mt-2 flex items-baseline">
-                                    <span className="text-2xl font-bold text-slate-800 tracking-tight">{item.value}</span>
-                                </div>
-                                <p className="text-xs text-slate-400 mt-1">{item.subtext}</p>
-                            </div>
-                        ))}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 px-4">
+                {/* Card 1: Total Inspections */}
+                <div className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm relative overflow-hidden flex flex-col justify-between">
+                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500"></div>
+                    <div className="flex justify-between items-start mb-2">
+                        <h3 className="text-xs font-bold text-slate-500 tracking-wider">총 검사 실적 (TOTAL INSPECTIONS)</h3>
+                        <Box className="w-5 h-5 text-blue-100" />
                     </div>
-                ))}
-            </div>
-
-            {/* Charts Row */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 px-4">
-                <div className="lg:col-span-2 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                    <h3 className="font-bold text-slate-800 mb-6 flex items-center gap-2">
-                         <TrendingUp className="w-4 h-4 text-blue-500" />
-                         공정 품질 추이 ({groupBy === 'month' ? '월별' : groupBy === 'day' ? '일별' : '년별'})
-                    </h3>
-                    <div className="h-[300px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <ComposedChart data={trendData}>
-                                <defs>
-                                    <linearGradient id="colorIns" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.1}/>
-                                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                                    </linearGradient>
-                                </defs>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748b' }} />
-                                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748b' }} />
-                                <Legend verticalAlign="top" align="right" />
-                                <Area type="monotone" dataKey="ins" name="검사수량" stroke="#3b82f6" strokeWidth={2} fill="url(#colorIns)" />
-                                <Bar dataKey="fail" name="불량수량" fill="#ef4444" barSize={12} radius={[4, 4, 0, 0]} />
-                            </ComposedChart>
-                        </ResponsiveContainer>
+                    <div>
+                        <div className="text-2xl font-black text-blue-600 mb-1 flex items-baseline gap-1">
+                            {kpiData.totalRecords.toLocaleString()} <span className="text-sm font-bold text-slate-400">건</span>
+                        </div>
+                        <div className="text-xs text-slate-500 font-medium flex items-center gap-1">
+                            <Package className="w-3 h-3 text-slate-400" /> {kpiData.inspectedQty.toLocaleString()} EA (수량)
+                        </div>
                     </div>
                 </div>
 
-                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                    <h3 className="font-bold text-slate-800 mb-6 flex items-center gap-2">
-                        <Box className="w-4 h-4 text-orange-500" /> 주요 불량 공정 분포
-                    </h3>
-                    <div className="h-[300px] relative">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                                <Pie
-                                    data={processDefectData}
-                                    innerRadius={70}
-                                    outerRadius={90}
-                                    paddingAngle={5}
-                                    dataKey="value"
-                                >
-                                    {processDefectData.map((entry, idx) => (
-                                        <Cell key={`cell-${idx}`} fill={['#3b82f6', '#f59e0b', '#10b981'][idx % 3]} />
-                                    ))}
-                                </Pie>
-                            </PieChart>
-                        </ResponsiveContainer>
-                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none pb-7">
-                            <p className="text-2xl font-black text-slate-800">{kpiData.failed}</p>
-                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Total EA</p>
+                {/* Card 2: Failure Rate */}
+                <div className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm relative overflow-hidden flex flex-col justify-between">
+                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-orange-500"></div>
+                    <div className="flex justify-between items-start mb-2">
+                        <h3 className="text-xs font-bold text-slate-500 tracking-wider">부적합률 (건수 기준)</h3>
+                        <AlertTriangle className="w-4 h-4 text-orange-400" />
+                    </div>
+                    <div>
+                        <div className="text-2xl font-black text-orange-500 mb-1">
+                            {kpiData.failRateByRecord}%
+                        </div>
+                        <div className="text-[11px] text-orange-600 bg-orange-50 px-2 py-0.5 rounded inline-flex items-center gap-1 font-bold">
+                            <AlertTriangle className="w-3 h-3" /> {kpiData.failedRecords.toLocaleString()}건 발생 / {kpiData.totalRecords.toLocaleString()}건
+                        </div>
+                    </div>
+                </div>
+
+                {/* Card 3: Action Rate */}
+                <div className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm relative overflow-hidden flex flex-col justify-between">
+                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500"></div>
+                    <div className="flex justify-between items-start mb-2">
+                        <h3 className="text-xs font-bold text-slate-500 tracking-wider">처리방안 기입률 (ACTION RATE)</h3>
+                        <ClipboardCheck className="w-5 h-5 text-emerald-200" />
+                    </div>
+                    <div>
+                        <div className="text-2xl font-black text-emerald-500 mb-1">
+                            {kpiData.resolutionRate}%
+                        </div>
+                        <div className="text-xs text-emerald-600 font-medium flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3" /> {kpiData.resolvedRecords.toLocaleString()}건 완료 / {kpiData.failedRecords.toLocaleString()}건 대상
+                        </div>
+                    </div>
+                </div>
+
+                {/* Card 4: Pending Actions */}
+                <div className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm relative overflow-hidden flex flex-col justify-between">
+                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-red-500"></div>
+                    <div className="flex justify-between items-start mb-2">
+                        <h3 className="text-xs font-bold text-slate-500 tracking-wider">미조치 알림 (PENDING ACTIONS)</h3>
+                        <AlertTriangle className="w-4 h-4 text-red-400 fill-red-100" />
+                    </div>
+                    <div>
+                        <div className="text-2xl font-black text-red-500 mb-1 flex items-baseline gap-1">
+                            {kpiData.unresolvedRecords.toLocaleString()} <span className="text-sm font-bold text-slate-400">건</span>
+                        </div>
+                        <div className="text-xs text-red-600 bg-red-50 px-2 py-0.5 rounded inline-flex items-center gap-1 font-bold">
+                            <XCircle className="w-3 h-3" /> 즉각적인 조치 필요
                         </div>
                     </div>
                 </div>
             </div>
 
-            {/* Bottom Row */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 px-4 pb-8">
-                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                    <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-                        <Package className="w-4 h-4 text-indigo-500" /> 모델별 불량 TOP 5
-                    </h3>
-                    <div className="h-[250px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={modelDefectDataConfig.data} layout="vertical">
-                                <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#f1f5f9" />
-                                <XAxis type="number" hide />
-                                <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#475569' }} width={80} />
-                                <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={20}>
-                                    {modelDefectDataConfig.data.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={entry.color} />
-                                    ))}
-                                </Bar>
-                            </BarChart>
-                        </ResponsiveContainer>
+            {/* Main Content Area */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 px-4 pb-8">
+                
+                {/* Left Column: Key Quality Metrics */}
+                <div className="lg:col-span-2">
+                    <div className="mb-4 flex items-center justify-between">
+                        <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                            <TrendingUp className="w-5 h-5 text-blue-600" /> 핵심 품질 지표 시각화 (Key Quality Metrics)
+                        </h2>
+                        <span className="text-xs bg-slate-200 text-slate-500 px-2 py-1 rounded font-mono">Real-time Visualization</span>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {renderGauge(parseFloat(kpiData.failRateByQty), TARGET_PERCENT, false, "수량 기준 부적합률")}
+                        {renderGauge(parseFloat(kpiData.failRateByRecord), TARGET_PERCENT, false, "건수 기준 부적합률")}
+                        {renderGauge(kpiData.ppmByQty, TARGET_PPM, true, "PPM (수량 기준)")}
+                        {renderGauge(kpiData.ppmByRecord, TARGET_PPM, true, "PPM (건수 기준)")}
+                    </div>
+                    
+                    {/* Gauge Legend */}
+                    <div className="bg-white p-4 mt-6 rounded-xl border border-slate-100 flex flex-col gap-3">
+                        <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                            <Target className="w-4 h-4 text-slate-400" /> 게이지 차트 범례 (목표치 대비 상태)
+                        </h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                            <div className="flex items-start gap-2">
+                                <div className="w-2.5 h-2.5 rounded-full bg-[#1e40af] mt-1 shrink-0"></div>
+                                <div>
+                                    <p className="text-xs font-bold text-slate-700">우수 (Blue)</p>
+                                    <p className="text-[10px] text-slate-500 leading-tight mt-0.5">목표치 이하<br/>(매우 안정적인 상태)</p>
+                                </div>
+                            </div>
+                            <div className="flex items-start gap-2">
+                                <div className="w-2.5 h-2.5 rounded-full bg-[#22c55e] mt-1 shrink-0"></div>
+                                <div>
+                                    <p className="text-xs font-bold text-slate-700">정상 (Green)</p>
+                                    <p className="text-[10px] text-slate-500 leading-tight mt-0.5">목표 수준 달성 및 유지</p>
+                                </div>
+                            </div>
+                            <div className="flex items-start gap-2">
+                                <div className="w-2.5 h-2.5 rounded-full bg-[#f59e0b] mt-1 shrink-0"></div>
+                                <div>
+                                    <p className="text-xs font-bold text-slate-700">경고 (Orange)</p>
+                                    <p className="text-[10px] text-slate-500 leading-tight mt-0.5">목표치 초과 위험군<br/>(집중 모니터링 실시)</p>
+                                </div>
+                            </div>
+                            <div className="flex items-start gap-2">
+                                <div className="w-2.5 h-2.5 rounded-full bg-[#ef4444] mt-1 shrink-0"></div>
+                                <div>
+                                    <p className="text-xs font-bold text-slate-700">심각 (Red)</p>
+                                    <p className="text-[10px] text-slate-500 leading-tight mt-0.5">부적합/목표 미달<br/>(즉각 원인분석 필요)</p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                    <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-                        <ClipboardCheck className="w-4 h-4 text-emerald-500" /> 최근 주요 공정 불량 이력
-                    </h3>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-xs">
-                            <thead className="bg-slate-50 text-slate-500 uppercase font-bold border-b border-slate-100">
-                                <tr>
-                                    <th className="py-3 px-3 text-left">모델/공정</th>
-                                    <th className="py-3 px-3 text-center">불량수량</th>
-                                    <th className="py-3 px-3 text-center">조치여부</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {recentDefectsData.map((item, idx) => (
-                                    <tr key={idx} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
-                                        <td className="py-3 px-3">
-                                            <p className="font-bold text-slate-800">{item.model}</p>
-                                            <p className="text-[10px] text-slate-400">{item.workstation}</p>
-                                        </td>
-                                        <td className={`py-3 px-3 text-center font-bold ${item.highlight ? 'text-red-500' : 'text-slate-600'}`}>
-                                            {item.defectQty} EA
-                                        </td>
-                                        <td className="py-3 px-3 text-center">
-                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${item.isResolved ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
-                                                {item.isResolved ? '조치완료' : '검토중'}
-                                            </span>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                {/* Right Column: Status List */}
+                <div className="flex flex-col">
+                    <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-4">
+                        <ClipboardCheck className="w-5 h-5 text-slate-600" /> 품질 관리 상태 (Status)
+                    </h2>
+                    
+                    <div className="bg-white p-1 rounded-2xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex-1">
+                        <div className="h-full flex flex-col p-5 gap-4">
+                            
+                            {/* Status Item 1 */}
+                            <div className="flex justify-between items-center py-2 border-b border-slate-50 last:border-0">
+                                <span className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                                    <div className="w-2 h-2 rounded-full bg-red-400"></div> 전체 부적합률 (수량)
+                                </span>
+                                <span className={`text-[11px] font-bold px-3 py-1 rounded ${parseFloat(kpiData.failRateByQty) > TARGET_PERCENT ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-green-50 text-green-600 border border-green-200'}`}>
+                                    {parseFloat(kpiData.failRateByQty) > TARGET_PERCENT ? `심각 (${Math.round(kpiData.failRateByQty/TARGET_PERCENT)}배)` : '정상'}
+                                </span>
+                            </div>
+
+                            {/* Status Item 2 */}
+                            <div className="flex justify-between items-center py-2 border-b border-slate-50 last:border-0">
+                                <span className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                                    <div className="w-2 h-2 rounded-full bg-red-400"></div> 전체 부적합률 (건수)
+                                </span>
+                                <span className={`text-[11px] font-bold px-3 py-1 rounded ${parseFloat(kpiData.failRateByRecord) > TARGET_PERCENT ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-green-50 text-green-600 border border-green-200'}`}>
+                                   {parseFloat(kpiData.failRateByRecord) > TARGET_PERCENT ? `심각 (${Math.round(kpiData.failRateByRecord/TARGET_PERCENT)}배)` : '정상'}
+                                </span>
+                            </div>
+
+                            {/* Status Item 3 */}
+                            <div className="flex justify-between items-center py-2 border-b border-slate-50 last:border-0">
+                                <span className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                                    <div className="w-2 h-2 rounded-full bg-red-400"></div> PPM 지표 (수량)
+                                </span>
+                                <span className={`text-[11px] font-bold px-3 py-1 rounded ${kpiData.ppmByQty > TARGET_PPM ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-green-50 text-green-600 border border-green-200'}`}>
+                                    {kpiData.ppmByQty > TARGET_PPM ? `심각 (${Math.round(kpiData.ppmByQty/TARGET_PPM)}배)` : '정상'}
+                                </span>
+                            </div>
+
+                            {/* Status Item 4 */}
+                            <div className="flex justify-between items-center py-2 border-b border-slate-50 last:border-0">
+                                <span className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                                    <div className="w-2 h-2 rounded-full bg-red-400"></div> PPM 지표 (건수)
+                                </span>
+                                <span className={`text-[11px] font-bold px-3 py-1 rounded ${kpiData.ppmByRecord > TARGET_PPM ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-green-50 text-green-600 border border-green-200'}`}>
+                                    {kpiData.ppmByRecord > TARGET_PPM ? `심각 (${Math.round(kpiData.ppmByRecord/TARGET_PPM)}배)` : '정상'}
+                                </span>
+                            </div>
+
+                            {/* Status Item 5 */}
+                            <div className="flex justify-between items-center py-2 border-b border-slate-50 last:border-0">
+                                <span className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                                    <div className="w-2 h-2 rounded-full bg-emerald-400"></div> 처리방안 기입률
+                                </span>
+                                <span className={`text-[11px] font-bold px-3 py-1 rounded ${parseFloat(kpiData.resolutionRate) < 100 ? 'bg-orange-50 text-orange-600 border border-orange-200' : 'bg-green-50 text-green-600 border border-green-200'}`}>
+                                    {parseFloat(kpiData.resolutionRate) < 100 ? '심각 (기준 미달)' : '정상'}
+                                </span>
+                            </div>
+
+                            {/* Status Item 6 */}
+                            <div className="flex justify-between items-center py-2 border-b border-slate-50 last:border-0">
+                                <span className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                                    <div className="w-2 h-2 rounded-full bg-red-400"></div> 미조치 건수
+                                </span>
+                                <span className={`text-[11px] font-bold px-3 py-1 rounded ${kpiData.unresolvedRecords > 0 ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-green-50 text-green-600 border border-green-200'}`}>
+                                    {kpiData.unresolvedRecords > 0 ? `경고 (${kpiData.unresolvedRecords}건)` : '정상'}
+                                </span>
+                            </div>
+                            
+                            <div className="mt-auto pt-6 border-t border-slate-100 flex justify-center">
+                                <span className="text-xs text-slate-400 font-medium flex items-center gap-1">
+                                    <Activity className="w-3 h-3" /> 24시간 모니터링 중
+                                </span>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
+
         </div>
     );
 };

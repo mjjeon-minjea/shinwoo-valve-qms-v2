@@ -12,7 +12,7 @@ const NonConformanceStatus = () => {
     const [inspections, setInspections] = useState([]);
     const [items, setItems] = useState([]);
     const [dateRange, setDateRange] = useState({
-        start: '2025-01-01', // Default to 2025 to show data
+        start: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-01`,
         end: new Date().toISOString().split('T')[0]
     });
 
