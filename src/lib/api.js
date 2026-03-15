@@ -63,7 +63,12 @@ export const api = {
             if (error) throw error;
             return {
                 ok: true,
-                json: async () => data[0]
+                json: async () => {
+                    if (pathParts[1] === 'batch') {
+                        return { count: data ? data.length : 0 };
+                    }
+                    return data[0];
+                }
             };
         }
         else if (options.method === 'PUT' || options.method === 'PATCH') {
