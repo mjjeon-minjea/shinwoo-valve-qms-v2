@@ -57,7 +57,8 @@ const ProcessAnalysis = () => {
                 map[key].passed += (row.passedQuantity || 0);
                 map[key].failed += (row.failedQuantity || 0);
                 if (row.failedQuantity > 0) {
-                    if (row.isResolutionEntered === 'Y') map[key].resolved++;
+                    const hasResolution = (row.resolution && row.resolution.trim() !== '') || row.isResolutionEntered === 'Y';
+                    if (hasResolution) map[key].resolved++;
                     else map[key].unresolved++;
                 }
             }

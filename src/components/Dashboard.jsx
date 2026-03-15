@@ -1637,8 +1637,8 @@ const Home = ({ setActiveTab }) => {
         const fetchData = async () => {
             try {
                 const [noticeRes, resourceRes] = await Promise.all([
-                    fetch('/notices'),
-                    fetch('/resources')
+                    api.fetch('/notices'),
+                    api.fetch('/resources')
                 ]);
                 if (noticeRes.ok) {
                     const data = await noticeRes.json();
