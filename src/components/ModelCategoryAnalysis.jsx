@@ -4,8 +4,103 @@ import {
     PackageSearch, RefreshCw, Filter, Search, Table2, Presentation, Calendar, ChevronDown
 } from 'lucide-react';
 import { 
-    BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip, Legend, Cell 
+    ResponsiveContainer,
+    PieChart,
+    Pie,
+    Cell
 } from 'recharts';
+
+const StatCard = ({ title, data }) => {
+    const rate = data.failRate;
+    const isWarning = data.ppm > 100;
+    
+    const statusText = data.inspected === 0 
+        ? "대기중" 
+        : (isWarning ? `[ 기준 초과 ] 현재 ${data.ppm.toLocaleString()} PPM` : `[ 기준 이내 ] 현재 ${data.ppm.toLocaleString()} PPM`);
+    const statusColor = data.inspected === 0 
+        ? "bg-slate-100 text-slate-500" 
+        : (data.ppm > 1000 ? "bg-red-50 text-red-600" : (isWarning ? "bg-yellow-50 text-yellow-600" : "bg-emerald-50 text-emerald-600"));
+    const ringColor = data.inspected === 0 
+        ? "#e2e8f0" 
+        : (data.ppm > 1000 ? "#ef4444" : (isWarning ? "#eab308" : "#10b981"));
+
+    const numericRate = rate > 0 ? parseFloat(rate) : 0;
+    const filledValue = Math.min(numericRate, 100);
+    const emptyValue = Math.max(0, 100 - filledValue);
+
+    const pieData = [
+        { name: '불량', value: filledValue },
+        { name: '정상', value: emptyValue }
+    ];
+
+    return (
+        <div className="bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 flex flex-col overflow-hidden transition-transform duration-300 hover:-translate-y-1">
+            <div className="bg-slate-800 text-center py-2.5 border-b-[3px] border-emerald-500 min-h-[4rem] flex flex-col justify-center">
+                <span className="text-white font-bold tracking-wider text-[13px] line-clamp-1 px-2" title={title}>{title}</span>
+            </div>
+            
+            <div className="px-3 py-4 flex flex-col items-center flex-1">
+                <div className="relative w-28 h-28 mb-4">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                            <Pie
+                                data={pieData}
+                                cx="50%"
+                                cy="50%"
+                                innerRadius={36}
+                                outerRadius={50}
+                                startAngle={90}
+                                endAngle={-270}
+                                dataKey="value"
+                                stroke="none"
+                                isAnimationActive={true}
+                                animationDuration={1500}
+                            >
+                                <Cell fill={ringColor} />
+                                <Cell fill="#f1f5f9" />
+                            </Pie>
+                        </PieChart>
+                    </ResponsiveContainer>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                        <span className="text-[10px] font-bold text-slate-500">불량률</span>
+                        <div className="flex items-baseline">
+                            <span className="text-2xl font-black text-slate-800 tracking-tight">{rate > 0 ? rate : '0'}</span>
+                            <span className="text-xs font-bold text-slate-500 ml-0.5">%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="w-full space-y-2 bg-slate-50 p-3 rounded-xl">
+                    <div className="flex justify-between items-center">
+                        <span className="text-xs font-medium text-slate-500">검사수량</span>
+                        <div className="flex items-baseline gap-1">
+                            <span className="text-sm font-bold text-slate-700">{data.inspected.toLocaleString()}</span>
+                            <span className="text-[10px] font-bold text-slate-400">EA</span>
+                        </div>
+                    </div>
+                    <div className="flex justify-between items-center">
+                        <span className="text-xs font-medium text-slate-500">합격수량</span>
+                        <div className="flex items-baseline gap-1">
+                            <span className="text-sm font-bold text-emerald-600">{data.passed.toLocaleString()}</span>
+                            <span className="text-[10px] font-bold text-emerald-400">EA</span>
+                        </div>
+                    </div>
+                    <div className="flex justify-between items-center">
+                        <span className="text-xs font-medium text-slate-500">불량수량</span>
+                        <div className="flex items-baseline gap-1">
+                            <span className="text-sm font-bold text-red-500">{data.failed.toLocaleString()}</span>
+                            <span className="text-[10px] font-bold text-red-400">EA</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div className={`py-2 text-center text-xs font-bold ${statusColor} mt-auto`}>
+                {statusText}
+            </div>
+        </div>
+    );
+};
 
 const ModelCategoryAnalysis = () => {
     const [data, setData] = useState([]);
@@ -58,13 +153,20 @@ const ModelCategoryAnalysis = () => {
         const result = Object.values(map).map(item => ({
             ...item,
             failRate: item.inspected > 0 ? ((item.failed / item.inspected) * 100).toFixed(1) : '0.0',
+            ppm: item.inspected > 0 ? Math.round((item.failed / item.inspected) * 1000000) : 0,
             resolutionRate: (item.resolved + item.unresolved) > 0 
                 ? ((item.resolved / (item.resolved + item.unresolved)) * 100).toFixed(1) : '0.0'
         }));
         
-        result.sort((a, b) => b.inspected - a.inspected);
+        result.sort((a, b) => Number(b.failRate) - Number(a.failRate) || b.inspected - a.inspected);
         return result;
     }, [data, dateRange]);
+
+    const topMetrics = useMemo(() => {
+        return groupedData
+            .filter(mc => mc.inspected > 0)
+            .slice(0, 10);
+    }, [groupedData]);
 
     return (
         <div className="space-y-6 flex flex-col min-h-screen text-slate-800 animate-fade-in p-2">
@@ -169,34 +271,23 @@ const ModelCategoryAnalysis = () => {
                 </div>
             </div>
 
-            {/* Content Display */}
-            <div className="grid lg:grid-cols-3 gap-6 px-4 pb-8 flex-1">
-                
-                {/* Chart Section */}
-                <div className="lg:col-span-3 bg-white p-6 rounded-3xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
-                    <div className="flex justify-between items-center mb-6">
-                        <h3 className="text-lg font-bold flex items-center gap-2 text-slate-800">
-                            <Presentation className="w-5 h-5 text-indigo-500" />
-                            모델대분류별 검사 vs 불량 분포
-                        </h3>
-                    </div>
-                    <div className="h-[350px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={groupedData.slice(0, 15)} margin={{ top: 20, right: 30, left: 20, bottom: 40 }}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                <XAxis dataKey="modelCatName" angle={-45} textAnchor="end" height={60} interval={0} axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748b' }} />
-                                <YAxis yAxisId="left" orientation="left" stroke="#3b82f6" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
-                                <YAxis yAxisId="right" orientation="right" stroke="#ef4444" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
-                                <Tooltip
-                                    contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }}
-                                />
-                                <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                                <Bar yAxisId="left" dataKey="inspected" name="검사수량" fill="#3b82f6" radius={[6, 6, 0, 0]} maxBarSize={40} />
-                                <Bar yAxisId="right" dataKey="failed" name="부적합수량" fill="#ef4444" radius={[6, 6, 0, 0]} maxBarSize={40} />
-                            </BarChart>
-                        </ResponsiveContainer>
+            {/* Top Stat Cards Section */}
+            {topMetrics.length > 0 && (
+                <div className="px-4">
+                    <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+                        {topMetrics.map((item, index) => (
+                            <StatCard 
+                                key={index}
+                                title={item.modelCatName}
+                                data={item}
+                            />
+                        ))}
                     </div>
                 </div>
+            )}
+
+            {/* Content Display */}
+            <div className="grid lg:grid-cols-3 gap-6 px-4 pb-8 flex-1">
 
                 {/* Table Section */}
                 <div className="lg:col-span-3 bg-white rounded-3xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden">
