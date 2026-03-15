@@ -19,34 +19,42 @@ import {
 } from 'recharts';
 
 const StatCard = ({ title, data }) => {
-    const rate = data.acheivementRate;
-    const isWarning = data.failed > 0 && ((data.failed / data.inspected) * 100) >= 5;
-    const statusText = data.inspected === 0 ? "대기중" : (isWarning ? "주 의 (불량주의)" : "가 동 중 (정상)");
-    const statusColor = data.inspected === 0 ? "bg-slate-100 text-slate-500" : (isWarning ? "bg-red-50 text-red-600" : "bg-emerald-50 text-emerald-600");
-    const ringColor = rate >= 95 ? "#10b981" : (rate >= 80 ? "#eab308" : "#ef4444");
+    const rate = data.failRate;
+    const passRate = data.passRate;
+    const isWarning = data.ppm > 100;
+    
+    const statusText = data.inspected === 0 
+        ? "대기중" 
+        : (isWarning ? `[ 기준 초과 ] 현재 ${data.ppm.toLocaleString()} PPM` : `[ 기준 이내 ] 현재 ${data.ppm.toLocaleString()} PPM`);
+    const statusColor = data.inspected === 0 
+        ? "bg-slate-100 text-slate-500" 
+        : (data.ppm > 1000 ? "bg-red-50 text-red-600" : (isWarning ? "bg-yellow-50 text-yellow-600" : "bg-emerald-50 text-emerald-600"));
+    const ringColor = data.inspected === 0 
+        ? "#e2e8f0" 
+        : (data.ppm > 1000 ? "#ef4444" : (isWarning ? "#eab308" : "#10b981"));
 
     const pieData = [
-        { name: '달성', value: rate },
-        { name: '미달', value: Math.max(0, 100 - rate) }
+        { name: '정상', value: passRate },
+        { name: '불량', value: rate > 0 ? parseFloat(rate) : 0 }
     ];
 
     return (
         <div className="bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 flex flex-col overflow-hidden transition-transform duration-300 hover:-translate-y-1">
-            <div className="bg-slate-800 text-center py-3 border-b-[3px] border-emerald-500">
-                <span className="text-white font-bold tracking-wider text-sm">{title}</span>
-                <div className="text-emerald-400 font-bold text-xs mt-0.5">{data.name}</div>
+            <div className="bg-slate-800 text-center py-2.5 border-b-[3px] border-emerald-500 min-h-[4rem] flex flex-col justify-center">
+                <span className="text-white font-bold tracking-wider text-sm line-clamp-1 px-2">{title}</span>
+                {data.models && <div className="text-emerald-400 font-bold text-xs mt-0.5 px-2 line-clamp-1" title={data.models}>{data.models}</div>}
             </div>
             
-            <div className="px-4 py-5 flex flex-col items-center flex-1">
-                <div className="relative w-32 h-32 mb-4">
+            <div className="px-3 py-4 flex flex-col items-center flex-1">
+                <div className="relative w-28 h-28 mb-4">
                     <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
                             <Pie
                                 data={pieData}
                                 cx="50%"
                                 cy="50%"
-                                innerRadius={42}
-                                outerRadius={58}
+                                innerRadius={36}
+                                outerRadius={50}
                                 startAngle={90}
                                 endAngle={-270}
                                 dataKey="value"
@@ -60,28 +68,28 @@ const StatCard = ({ title, data }) => {
                         </PieChart>
                     </ResponsiveContainer>
                     <div className="absolute inset-0 flex flex-col items-center justify-center">
-                        <span className="text-[10px] text-slate-500 font-medium mb-1">달성률</span>
-                        <span className="text-2xl font-extrabold text-slate-800">{rate}<span className="text-sm font-bold text-slate-500 ml-0.5">%</span></span>
+                        <span className="text-[10px] text-slate-500 font-medium mb-1">불량률</span>
+                        <span className="text-xl font-extrabold text-slate-800">{rate}<span className="text-xs font-bold text-slate-500 ml-0.5">%</span></span>
                     </div>
                 </div>
 
-                <div className="w-full space-y-2 text-sm bg-slate-50/50 p-3 rounded-xl border border-slate-50">
+                <div className="w-full space-y-1.5 text-xs bg-slate-50/50 p-2.5 rounded-xl border border-slate-50">
                     <div className="flex justify-between items-center">
                         <span className="text-slate-500 font-medium">검사수량</span>
-                        <span className="font-bold text-slate-700">{data.inspected.toLocaleString()} <span className="text-[10px] text-slate-400 font-normal">EA</span></span>
+                        <span className="font-bold text-slate-700">{data.inspected.toLocaleString()} <span className="text-[9px] text-slate-400 font-normal">EA</span></span>
                     </div>
                     <div className="flex justify-between items-center">
                         <span className="text-slate-500 font-medium">합격수량</span>
-                        <span className="font-bold text-emerald-600">{data.passed.toLocaleString()} <span className="text-[10px] text-slate-400 font-normal">EA</span></span>
+                        <span className="font-bold text-emerald-600">{data.passed.toLocaleString()} <span className="text-[9px] text-slate-400 font-normal">EA</span></span>
                     </div>
                     <div className="flex justify-between items-center">
                         <span className="text-slate-500 font-medium">불량수량</span>
-                        <span className="font-bold text-red-500">{data.failed.toLocaleString()} <span className="text-[10px] text-slate-400 font-normal">EA</span></span>
+                        <span className="font-bold text-red-500">{data.failed.toLocaleString()} <span className="text-[9px] text-slate-400 font-normal">EA</span></span>
                     </div>
                 </div>
             </div>
             
-            <div className={`py-3 text-center text-sm font-bold border-t border-slate-100 ${statusColor}`}>
+            <div className={`py-2 text-center text-[11px] font-bold border-t border-slate-100 ${statusColor}`}>
                 {statusText}
             </div>
         </div>
@@ -151,47 +159,46 @@ const WorkplaceAnalysis = () => {
 
     const topMetrics = useMemo(() => {
         const processMap = {};
-        const workplaceMap = {};
-        const equipmentMap = {};
-        const modelMap = {};
 
         data.forEach(row => {
             const rowDate = row.inspectionDate || '2025-01-01';
             if (rowDate >= dateRange.start && rowDate <= dateRange.end) {
-                const processKey = row.inspectionType || '공정 미상';
-                const workplaceKey = row.workplace || '작업장 미상';
-                const equipmentKey = row.equipmentName || '설비 미상';
+                const processKey = row.workplaceFull || '작업장 미기재';
                 const modelKey = row.modelCategory || '분류 미상';
 
-                const updateMap = (map, key) => {
-                    if (!map[key]) map[key] = { name: key, inspected: 0, passed: 0, failed: 0 };
-                    map[key].inspected += (row.inspectedQuantity || 0);
-                    map[key].passed += (row.passedQuantity || 0);
-                    map[key].failed += (row.failedQuantity || 0);
+                if (!processMap[processKey]) {
+                    processMap[processKey] = { name: processKey, inspected: 0, passed: 0, failed: 0, modelCounts: {} };
                 }
-
-                updateMap(processMap, processKey);
-                updateMap(workplaceMap, workplaceKey);
-                updateMap(equipmentMap, equipmentKey);
-                updateMap(modelMap, modelKey);
+                
+                processMap[processKey].inspected += (row.inspectedQuantity || 0);
+                processMap[processKey].passed += (row.passedQuantity || 0);
+                processMap[processKey].failed += (row.failedQuantity || 0);
+                
+                if (!processMap[processKey].modelCounts[modelKey]) {
+                    processMap[processKey].modelCounts[modelKey] = 0;
+                }
+                processMap[processKey].modelCounts[modelKey] += (row.inspectedQuantity || 0);
             }
         });
 
-        const getTop = (map) => {
-            const arr = Object.values(map);
-            if (arr.length === 0) return { name: '-', inspected: 0, passed: 0, failed: 0, acheivementRate: 0 };
-            arr.sort((a, b) => b.inspected - a.inspected);
-            const top = arr[0];
-            const rate = top.inspected > 0 ? Math.round((top.passed / top.inspected) * 100) : 0;
-            return { ...top, acheivementRate: rate };
-        };
+        const top10Processes = Object.values(processMap)
+            .sort((a, b) => b.inspected - a.inspected)
+            .slice(0, 10)
+            .map(p => {
+                const topModels = Object.entries(p.modelCounts)
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 2)
+                    .map(m => m[0])
+                    .join(', ');
+                
+                const passRate = p.inspected > 0 ? ((p.passed / p.inspected) * 100) : 0;
+                const failRate = p.inspected > 0 ? ((p.failed / p.inspected) * 100).toFixed(2) : "0.00";
+                const ppm = p.inspected > 0 ? Math.round((p.failed / p.inspected) * 1000000) : 0;
+                
+                return { ...p, models: topModels, passRate, failRate, ppm };
+            });
 
-        return {
-            process: getTop(processMap),
-            workplace: getTop(workplaceMap),
-            equipment: getTop(equipmentMap),
-            model: getTop(modelMap)
-        };
+        return top10Processes;
     }, [data, dateRange]);
 
     return (
@@ -298,11 +305,10 @@ const WorkplaceAnalysis = () => {
             </div>
 
             {/* Top Stat Cards Section */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 px-4 pb-2">
-                <StatCard title="[ 최다 검사 공정 ]" data={topMetrics.process} />
-                <StatCard title="[ 최다 검사 작업장 ]" data={topMetrics.workplace} />
-                <StatCard title="[ 주력 검사 설비 ]" data={topMetrics.equipment} />
-                <StatCard title="[ 주력 검사 분류 ]" data={topMetrics.model} />
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 flex-shrink-0 px-4 pb-2">
+                {topMetrics.map((proc, idx) => (
+                    <StatCard key={idx} title={`[ ${proc.name} ]`} data={proc} />
+                ))}
             </div>
 
             {/* Content Display */}
