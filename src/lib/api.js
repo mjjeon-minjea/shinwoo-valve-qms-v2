@@ -10,15 +10,8 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 // Supabase에 없고 로컬 db.json 에만 있는 리소스들
 // ====================================================
 const LOCAL_JSON_TABLES = [
-    'process_inspections',
-    'inspections',
-    'users',
-    'notices',
-    'resources',
-    'settings',
-    'inquiries',
-    'weekly_reports',
-    'calendar_events',
+    // 모든 테이블을 클라우드(Supabase)로 이관 완료함에 따라, 
+    // 가상의 localhost:3001 서버를 거치지 않게 비워둡니다.
 ];
 
 const LOCAL_SERVER = 'http://localhost:3001';
