@@ -12,8 +12,81 @@ import {
     CartesianGrid, 
     Tooltip, 
     Legend, 
-    ResponsiveContainer 
+    ResponsiveContainer,
+    PieChart,
+    Pie,
+    Cell
 } from 'recharts';
+
+const StatCard = ({ title, data }) => {
+    const rate = data.acheivementRate;
+    const isWarning = data.failed > 0 && ((data.failed / data.inspected) * 100) >= 5;
+    const statusText = data.inspected === 0 ? "대기중" : (isWarning ? "주 의 (불량주의)" : "가 동 중 (정상)");
+    const statusColor = data.inspected === 0 ? "bg-slate-100 text-slate-500" : (isWarning ? "bg-red-50 text-red-600" : "bg-emerald-50 text-emerald-600");
+    const ringColor = rate >= 95 ? "#10b981" : (rate >= 80 ? "#eab308" : "#ef4444");
+
+    const pieData = [
+        { name: '달성', value: rate },
+        { name: '미달', value: Math.max(0, 100 - rate) }
+    ];
+
+    return (
+        <div className="bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 flex flex-col overflow-hidden transition-transform duration-300 hover:-translate-y-1">
+            <div className="bg-slate-800 text-center py-3 border-b-[3px] border-emerald-500">
+                <span className="text-white font-bold tracking-wider text-sm">{title}</span>
+                <div className="text-emerald-400 font-bold text-xs mt-0.5">{data.name}</div>
+            </div>
+            
+            <div className="px-4 py-5 flex flex-col items-center flex-1">
+                <div className="relative w-32 h-32 mb-4">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                            <Pie
+                                data={pieData}
+                                cx="50%"
+                                cy="50%"
+                                innerRadius={42}
+                                outerRadius={58}
+                                startAngle={90}
+                                endAngle={-270}
+                                dataKey="value"
+                                stroke="none"
+                                isAnimationActive={true}
+                                animationDuration={1500}
+                            >
+                                <Cell fill={ringColor} />
+                                <Cell fill="#f1f5f9" />
+                            </Pie>
+                        </PieChart>
+                    </ResponsiveContainer>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                        <span className="text-[10px] text-slate-500 font-medium mb-1">달성률</span>
+                        <span className="text-2xl font-extrabold text-slate-800">{rate}<span className="text-sm font-bold text-slate-500 ml-0.5">%</span></span>
+                    </div>
+                </div>
+
+                <div className="w-full space-y-2 text-sm bg-slate-50/50 p-3 rounded-xl border border-slate-50">
+                    <div className="flex justify-between items-center">
+                        <span className="text-slate-500 font-medium">검사수량</span>
+                        <span className="font-bold text-slate-700">{data.inspected.toLocaleString()} <span className="text-[10px] text-slate-400 font-normal">EA</span></span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                        <span className="text-slate-500 font-medium">합격수량</span>
+                        <span className="font-bold text-emerald-600">{data.passed.toLocaleString()} <span className="text-[10px] text-slate-400 font-normal">EA</span></span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                        <span className="text-slate-500 font-medium">불량수량</span>
+                        <span className="font-bold text-red-500">{data.failed.toLocaleString()} <span className="text-[10px] text-slate-400 font-normal">EA</span></span>
+                    </div>
+                </div>
+            </div>
+            
+            <div className={`py-3 text-center text-sm font-bold border-t border-slate-100 ${statusColor}`}>
+                {statusText}
+            </div>
+        </div>
+    );
+};
 
 const WorkplaceAnalysis = () => {
     const [data, setData] = useState([]);
@@ -74,6 +147,51 @@ const WorkplaceAnalysis = () => {
         result.sort((a, b) => Number(b.failRate) - Number(a.failRate) || b.inspected - a.inspected);
         
         return result;
+    }, [data, dateRange]);
+
+    const topMetrics = useMemo(() => {
+        const processMap = {};
+        const workplaceMap = {};
+        const equipmentMap = {};
+        const modelMap = {};
+
+        data.forEach(row => {
+            const rowDate = row.inspectionDate || '2025-01-01';
+            if (rowDate >= dateRange.start && rowDate <= dateRange.end) {
+                const processKey = row.inspectionType || '공정 미상';
+                const workplaceKey = row.workplace || '작업장 미상';
+                const equipmentKey = row.equipmentName || '설비 미상';
+                const modelKey = row.modelCategory || '분류 미상';
+
+                const updateMap = (map, key) => {
+                    if (!map[key]) map[key] = { name: key, inspected: 0, passed: 0, failed: 0 };
+                    map[key].inspected += (row.inspectedQuantity || 0);
+                    map[key].passed += (row.passedQuantity || 0);
+                    map[key].failed += (row.failedQuantity || 0);
+                }
+
+                updateMap(processMap, processKey);
+                updateMap(workplaceMap, workplaceKey);
+                updateMap(equipmentMap, equipmentKey);
+                updateMap(modelMap, modelKey);
+            }
+        });
+
+        const getTop = (map) => {
+            const arr = Object.values(map);
+            if (arr.length === 0) return { name: '-', inspected: 0, passed: 0, failed: 0, acheivementRate: 0 };
+            arr.sort((a, b) => b.inspected - a.inspected);
+            const top = arr[0];
+            const rate = top.inspected > 0 ? Math.round((top.passed / top.inspected) * 100) : 0;
+            return { ...top, acheivementRate: rate };
+        };
+
+        return {
+            process: getTop(processMap),
+            workplace: getTop(workplaceMap),
+            equipment: getTop(equipmentMap),
+            model: getTop(modelMap)
+        };
     }, [data, dateRange]);
 
     return (
@@ -177,6 +295,14 @@ const WorkplaceAnalysis = () => {
                         </select>
                     </div>
                 </div>
+            </div>
+
+            {/* Top Stat Cards Section */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 px-4 pb-2">
+                <StatCard title="[ 최다 검사 공정 ]" data={topMetrics.process} />
+                <StatCard title="[ 최다 검사 작업장 ]" data={topMetrics.workplace} />
+                <StatCard title="[ 주력 검사 설비 ]" data={topMetrics.equipment} />
+                <StatCard title="[ 주력 검사 분류 ]" data={topMetrics.model} />
             </div>
 
             {/* Content Display */}
