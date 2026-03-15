@@ -184,7 +184,7 @@ const ProcessInspectionDashboard = () => {
                                         height: '0',
                                         borderLeft: '6px solid transparent',
                                         borderRight: '6px solid transparent',
-                                        borderBottom: '100px solid #1e293b', // slate-800, length of needle
+                                        borderBottom: '85px solid #1e293b', // slate-800, length of needle
                                         transform: `rotate(${needleAngle}deg)`,
                                         transition: 'transform 1s cubic-bezier(0.4, 0, 0.2, 1)'
                                     }}
@@ -203,7 +203,7 @@ const ProcessInspectionDashboard = () => {
                 </div>
                 
                 {/* Numeric value beneath the gauge */}
-                <div className="text-center w-full mt-2">
+                <div className="text-center w-full mt-6">
                     <div className="text-4xl font-black text-slate-800 tracking-tight">
                         {displayValue}{!isPPM && '%'}
                     </div>
