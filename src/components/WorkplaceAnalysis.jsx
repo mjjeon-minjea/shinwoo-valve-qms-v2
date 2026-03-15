@@ -34,11 +34,22 @@ const StatCard = ({ title, data }) => {
         { name: '정상', value: emptyValue }
     ];
 
+    // 타이틀 분리 로직: "[ 조립반(A Line)-정수위밸브, 중형 물감압밸브 ]" 형태일 경우 하이픈 기준으로 분리
+    // 먼저 앞뒤 "[]" 괄호 제거
+    const cleanTitle = title.replace(/^\[\s*|\s*\]$/g, '');
+    const titleParts = cleanTitle.split('-');
+    
+    // 첫번째 요소 (예: 조립반(A Line))
+    const mainTitle = `[ ${titleParts[0].trim()} ]`;
+    
+    // 두번째 요소가 있으면 두번째 요소, 없으면 기존 모델 분류
+    const subTitle = titleParts.length > 1 ? titleParts.slice(1).join('-').trim() : data.models;
+
     return (
         <div className="bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 flex flex-col overflow-hidden transition-transform duration-300 hover:-translate-y-1">
             <div className="bg-slate-800 text-center py-2.5 border-b-[3px] border-emerald-500 min-h-[4rem] flex flex-col justify-center">
-                <span className="text-white font-bold tracking-wider text-sm line-clamp-1 px-2">{title}</span>
-                {data.models && <div className="text-emerald-400 font-bold text-xs mt-0.5 px-2 line-clamp-1" title={data.models}>{data.models}</div>}
+                <span className="text-white font-bold tracking-wider text-[13px] line-clamp-1 px-2" title={mainTitle}>{mainTitle}</span>
+                {subTitle && <div className="text-emerald-400 font-bold text-[11px] mt-0.5 px-2 line-clamp-1" title={subTitle}>{subTitle}</div>}
             </div>
             
             <div className="px-3 py-4 flex flex-col items-center flex-1">
