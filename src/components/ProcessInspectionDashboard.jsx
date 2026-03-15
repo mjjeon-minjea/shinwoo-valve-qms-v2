@@ -130,8 +130,8 @@ const ProcessInspectionDashboard = () => {
         ];
 
         return (
-            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col items-center justify-center relative h-[280px]">
-                <div className="w-full h-[120px] relative">
+            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col items-center justify-center relative h-[340px]">
+                <div className="w-full h-[160px] relative mt-4">
                     <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
                             {/* Background track */}
@@ -145,7 +145,8 @@ const ProcessInspectionDashboard = () => {
                                 outerRadius="100%"
                                 paddingAngle={0}
                                 dataKey="value"
-                                stroke="none"
+                                stroke="white"
+                                strokeWidth={2}
                             >
                                 {bgData.map((entry, index) => (
                                     <Cell key={`cell-${index}`} fill={entry.color} />
@@ -172,23 +173,29 @@ const ProcessInspectionDashboard = () => {
                             <div 
                                 className="absolute bottom-0 left-1/2 z-10"
                             >
-                                {/* The Pointer */}
+                                {/* The Pointer (Speedometer style triangle) */}
                                 <div 
-                                    className="w-[4px] h-[75px] bg-slate-800 origin-bottom shadow-sm"
+                                    className="origin-bottom drop-shadow-md"
                                     style={{
                                         position: 'absolute',
                                         bottom: '0',
-                                        left: '-2px', // half width
+                                        left: '-6px', // half of base width
+                                        width: '0',
+                                        height: '0',
+                                        borderLeft: '6px solid transparent',
+                                        borderRight: '6px solid transparent',
+                                        borderBottom: '100px solid #1e293b', // slate-800, length of needle
                                         transform: `rotate(${needleAngle}deg)`,
-                                        borderRadius: '4px 4px 0 0',
                                         transition: 'transform 1s cubic-bezier(0.4, 0, 0.2, 1)'
                                     }}
                                 >
-                                    {/* The Pivot Dot */}
-                                    <div 
-                                        className="w-4 h-4 rounded-full bg-slate-800 absolute bottom-0 left-1/2 pointer-events-none"
-                                        style={{ transform: 'translate(-50%, 50%)' }}
-                                    ></div>
+                                </div>
+                                {/* The Pivot Dot (Prominent Center Circle) */}
+                                <div 
+                                    className="w-8 h-8 rounded-full bg-slate-800 absolute bottom-0 left-1/2 flex items-center justify-center shadow-lg pointer-events-none"
+                                    style={{ transform: 'translate(-50%, 50%)' }}
+                                >
+                                    <div className="w-3 h-3 rounded-full bg-white border border-slate-300"></div>
                                 </div>
                             </div>
                         );
