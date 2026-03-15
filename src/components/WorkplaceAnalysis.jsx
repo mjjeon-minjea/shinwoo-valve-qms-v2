@@ -1,17 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import { api } from '../lib/api';
 import { 
-    Factory, RefreshCw, Filter, Search, Table2, Presentation, Calendar, ChevronDown
+    Factory, RefreshCw, Filter, Search, Table2, Calendar, ChevronDown
 } from 'lucide-react';
 import { 
-    ComposedChart, 
-    Bar, 
-    Line,
-    XAxis, 
-    YAxis, 
-    CartesianGrid, 
-    Tooltip, 
-    Legend, 
     ResponsiveContainer,
     PieChart,
     Pie,
@@ -182,7 +174,13 @@ const WorkplaceAnalysis = () => {
         });
 
         const top10Processes = Object.values(processMap)
-            .sort((a, b) => b.inspected - a.inspected)
+            .filter(p => p.inspected > 0)
+            .sort((a, b) => {
+                const rateA = a.failed / a.inspected;
+                const rateB = b.failed / b.inspected;
+                if (rateB !== rateA) return rateB - rateA;
+                return b.inspected - a.inspected;
+            })
             .slice(0, 10)
             .map(p => {
                 const topModels = Object.entries(p.modelCounts)
@@ -314,32 +312,6 @@ const WorkplaceAnalysis = () => {
             {/* Content Display */}
             <div className="grid lg:grid-cols-3 gap-6 px-4 pb-8 flex-1">
                 
-                {/* Chart Section */}
-                <div className="lg:col-span-3 bg-white p-6 rounded-3xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
-                    <div className="flex justify-between items-center mb-6">
-                        <h3 className="text-lg font-bold flex items-center gap-2 text-slate-800">
-                            <Presentation className="w-5 h-5 text-indigo-500" />
-                            작업장별 검사 vs 불량 분포
-                        </h3>
-                    </div>
-                    <div className="h-[350px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <ComposedChart data={groupedData.slice(0, 10)} margin={{ top: 20, right: 30, left: 20, bottom: 40 }}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                <XAxis dataKey="workplaceName" angle={-45} textAnchor="end" height={60} interval={0} axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748b' }} />
-                                <YAxis yAxisId="left" orientation="left" stroke="#3b82f6" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
-                                <YAxis yAxisId="right" orientation="right" stroke="#ef4444" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
-                                <Tooltip
-                                    contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }}
-                                />
-                                <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                                <Bar yAxisId="left" dataKey="inspected" name="검사수량" fill="#3b82f6" radius={[6, 6, 0, 0]} maxBarSize={40} />
-                                <Line yAxisId="right" type="monotone" dataKey="failed" name="부적합수량" stroke="#ef4444" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }} />
-                            </ComposedChart>
-                        </ResponsiveContainer>
-                    </div>
-                </div>
-
                 {/* Table Section */}
                 <div className="lg:col-span-3 bg-white rounded-3xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden">
                     <div className="p-6 border-b border-slate-50 flex justify-between items-center bg-gradient-to-r from-slate-50 to-white">
