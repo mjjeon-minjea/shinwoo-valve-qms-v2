@@ -4,7 +4,15 @@ import {
     Factory, RefreshCw, Filter, Search, Table2, Presentation, Calendar, ChevronDown
 } from 'lucide-react';
 import { 
-    BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip, Legend, Cell 
+    ComposedChart, 
+    Bar, 
+    Line,
+    XAxis, 
+    YAxis, 
+    CartesianGrid, 
+    Tooltip, 
+    Legend, 
+    ResponsiveContainer 
 } from 'recharts';
 
 const WorkplaceAnalysis = () => {
@@ -184,7 +192,7 @@ const WorkplaceAnalysis = () => {
                     </div>
                     <div className="h-[350px] w-full">
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={groupedData.slice(0, 10)} margin={{ top: 20, right: 30, left: 20, bottom: 40 }}>
+                            <ComposedChart data={groupedData.slice(0, 10)} margin={{ top: 20, right: 30, left: 20, bottom: 40 }}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                                 <XAxis dataKey="workplaceName" angle={-45} textAnchor="end" height={60} interval={0} axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748b' }} />
                                 <YAxis yAxisId="left" orientation="left" stroke="#3b82f6" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
@@ -194,8 +202,8 @@ const WorkplaceAnalysis = () => {
                                 />
                                 <Legend wrapperStyle={{ paddingTop: '20px' }} />
                                 <Bar yAxisId="left" dataKey="inspected" name="검사수량" fill="#3b82f6" radius={[6, 6, 0, 0]} maxBarSize={40} />
-                                <Bar yAxisId="right" dataKey="failed" name="부적합수량" fill="#ef4444" radius={[6, 6, 0, 0]} maxBarSize={40} />
-                            </BarChart>
+                                <Line yAxisId="right" type="monotone" dataKey="failed" name="부적합수량" stroke="#ef4444" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }} />
+                            </ComposedChart>
                         </ResponsiveContainer>
                     </div>
                 </div>
