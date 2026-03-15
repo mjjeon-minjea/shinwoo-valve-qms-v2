@@ -25,9 +25,13 @@ const StatCard = ({ title, data }) => {
         ? "#e2e8f0" 
         : (data.ppm > 1000 ? "#ef4444" : (isWarning ? "#eab308" : "#10b981"));
 
+    const numericRate = rate > 0 ? parseFloat(rate) : 0;
+    const filledValue = Math.min(numericRate, 100);
+    const emptyValue = Math.max(0, 100 - filledValue);
+
     const pieData = [
-        { name: '정상', value: passRate },
-        { name: '불량', value: rate > 0 ? parseFloat(rate) : 0 }
+        { name: '불량', value: filledValue },
+        { name: '정상', value: emptyValue }
     ];
 
     return (
