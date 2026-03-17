@@ -548,7 +548,6 @@ const InboundHistory = () => {
                     const defectQty = parseNum(findVal(['불량수량(EA)', '불량수량', '불량']));
 
                     return {
-                        id: `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
                         date: formatDate(findVal(['입고일', '입고일자', '날짜'])),
                         supplier: findVal(['입고업체', '업체명', '공급사']) || 'Unknown',
                         itemName: findVal(['제품명', '품명', '품목명']) || 'Unknown',
@@ -645,7 +644,7 @@ const InboundHistory = () => {
             await api.fetch('/inspections', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: { id: String(Date.now()), ...data }
+                body: data
             });
         }
         setIsModalOpen(false);
@@ -1407,8 +1406,9 @@ const MemberManagement = ({ members, onDeleteMember, onEditMember, onAddMember, 
                                 <input name="email" defaultValue={editingUser.email} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500" />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">비밀번호</label>
-                                <input name="password" defaultValue={editingUser.password} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500" />
+                                <label className="block text-sm font-medium text-slate-700 mb-1">비밀번호 (초기화)</label>
+                                <input name="password" minLength="6" defaultValue={editingUser.password} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500" placeholder="6자리 이상 입력 (예: 123456)" />
+                                <p className="text-xs text-slate-500 mt-1">※ 기존 회원이 로그인하지 못할 때 6자리 이상 임시 비밀번호로 설정해주세요.</p>
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1">상태</label>

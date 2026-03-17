@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { api } from '../lib/api';
 import { 
-    Wrench, RefreshCw, Filter, Search, Table2, Presentation, Calendar, ChevronDown
+    Wrench, RefreshCw, Table2
 } from 'lucide-react';
 import { 
     ResponsiveContainer,

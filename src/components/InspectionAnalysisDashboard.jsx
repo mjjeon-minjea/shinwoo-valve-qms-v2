@@ -3,7 +3,7 @@ import {
     PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer,
     BarChart, Bar, XAxis, YAxis, CartesianGrid
 } from 'recharts';
-import { api } from '../lib/api';
+import { api, supabase } from '../lib/api';
 
 const InspectionAnalysisDashboard = () => {
     const [loading, setLoading] = useState(true);
@@ -23,7 +23,8 @@ const InspectionAnalysisDashboard = () => {
 
     useEffect(() => {
         fetchData();
-    }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedYear, selectedMonth]);
 
     // Re-process data when filter changes, but we need the raw data first.
     // So let's store raw data in state too.
@@ -32,25 +33,49 @@ const InspectionAnalysisDashboard = () => {
     useEffect(() => {
         if (rawData.inspections.length > 0) {
             processData(rawData.inspections, rawData.items);
+        } else {
+            processData([], rawData.items);
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [selectedYear, selectedMonth, rawData]);
+    }, [rawData]);
 
     const fetchData = async () => {
+        setLoading(true);
         try {
+            const yearStr = String(selectedYear);
+            let startDateStr, endDateStr;
+
+            if (selectedMonth === 'all') {
+                startDateStr = `${yearStr}-01-01`;
+                endDateStr = `${yearStr}-12-31`;
+            } else {
+                const monthStr = String(selectedMonth).padStart(2, '0');
+                startDateStr = `${yearStr}-${monthStr}-01`;
+                const lastDay = new Date(selectedYear, selectedMonth, 0).getDate();
+                endDateStr = `${yearStr}-${monthStr}-${String(lastDay).padStart(2, '0')}`;
+            }
+
+            // Direct Supabase query to prevent downloading 100,000+ rows
+            const inspPromise = supabase
+                .from('inspections')
+                .select('*')
+                .gte('date', startDateStr)
+                .lte('date', endDateStr);
+
             const [inspRes, itemRes] = await Promise.all([
-                api.fetch('/inspections'),
+                inspPromise,
                 api.fetch('/item_master')
             ]);
             
-            if (inspRes.ok) {
-                const inspections = await inspRes.json();
+            if (!inspRes.error) {
+                const inspections = inspRes.data || [];
                 let items = [];
                 if (itemRes.ok) {
                     items = await itemRes.json();
                 }
                 setRawData({ inspections, items });
-                // processData is triggered by useEffect
+            } else {
+                console.error("Supabase error:", inspRes.error);
             }
         } catch (error) {
             console.error("Failed to fetch dashboard data:", error);

@@ -3,34 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
-
-// ====================================================
-// 로컬 JSON 서버(3001포트)를 사용하는 테이블 목록
-// Supabase에 없고 로컬 db.json 에만 있는 리소스들
-// ====================================================
-const LOCAL_JSON_TABLES = [
-    // 모든 테이블을 클라우드(Supabase)로 이관 완료함에 따라, 
-    // 가상의 localhost:3001 서버를 거치지 않게 비워둡니다.
-];
-
-const LOCAL_SERVER = 'http://localhost:3001';
-
-// 로컬 JSON 서버 전용 fetch 래퍼
-const localFetch = async (url, options = {}) => {
-    const fullUrl = `${LOCAL_SERVER}${url}`;
-    const fetchOptions = {
-        method: options.method || 'GET',
-        headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
-    };
-    if (options.body !== undefined) {
-        fetchOptions.body = typeof options.body === 'string'
-            ? options.body
-            : JSON.stringify(options.body);
-    }
-    const res = await fetch(fullUrl, fetchOptions);
-    return res;
-};
+export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 export const api = {
     fetch: async (url, options = {}) => {
@@ -38,13 +11,6 @@ export const api = {
         const endpoint = url.split('?')[0];
         const pathParts = endpoint.split('/').filter(p => p !== '');
         const table = pathParts[0]; // e.g., 'process_inspections'
-
-        // ── 로컬 JSON 서버 라우팅 ──────────────────────────────────
-        // LOCAL_JSON_TABLES 목록에 있는 테이블은 로컬 서버를 사용
-        if (LOCAL_JSON_TABLES.includes(table)) {
-            return localFetch(url, options);
-        }
-        // ─────────────────────────────────────────────────────────
 
         console.log(`[Supabase API] ${options.method || 'GET'} ${table}`);
 

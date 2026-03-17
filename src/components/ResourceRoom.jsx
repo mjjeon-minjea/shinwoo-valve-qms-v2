@@ -92,7 +92,7 @@ const ResourceRoom = () => {
                 await api.fetch('/resources', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ id: String(Date.now()), ...payload, views: 0 })
+                    body: JSON.stringify({ ...payload, views: 0 })
                 });
             }
             setIsModalOpen(false);

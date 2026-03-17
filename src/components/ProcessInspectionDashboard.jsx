@@ -10,13 +10,11 @@ import { api } from '../lib/api';
 
 const ProcessInspectionDashboard = () => {
     const [mesData, setMesData] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const [, setLoading] = useState(true);
     const [dateRange, setDateRange] = useState({
         start: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-01`,
         end: new Date().toISOString().split('T')[0]
     });
-    const [groupBy, setGroupBy] = useState('month'); // 'day', 'month', 'year'
-
     const fetchData = async () => {
         setLoading(true);
         try {

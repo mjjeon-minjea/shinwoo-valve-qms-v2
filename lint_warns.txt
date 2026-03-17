@@ -1,0 +1,9 @@
+C:\Users\mjjeon\Desktop\QMS 프로젝트\shinwoo-valve-qms\check_status.js
+C:\Users\mjjeon\Desktop\QMS 프로젝트\shinwoo-valve-qms\src\App.jsx
+C:\Users\mjjeon\Desktop\QMS 프로젝트\shinwoo-valve-qms\src\components\EquipmentAnalysis.jsx
+C:\Users\mjjeon\Desktop\QMS 프로젝트\shinwoo-valve-qms\src\components\ModelCategoryAnalysis.jsx
+C:\Users\mjjeon\Desktop\QMS 프로젝트\shinwoo-valve-qms\src\components\ProcessAnalysis.jsx
+C:\Users\mjjeon\Desktop\QMS 프로젝트\shinwoo-valve-qms\src\components\ProcessHistory.jsx
+C:\Users\mjjeon\Desktop\QMS 프로젝트\shinwoo-valve-qms\src\components\ProcessInspectionDashboard.jsx
+C:\Users\mjjeon\Desktop\QMS 프로젝트\shinwoo-valve-qms\src\components\WorkplaceAnalysis.jsx
+C:\Users\mjjeon\Desktop\QMS 프로젝트\shinwoo-valve-qms\src\contexts\UserContext.jsx

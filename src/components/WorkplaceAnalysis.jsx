@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { api } from '../lib/api';
 import { 
-    Factory, RefreshCw, Filter, Search, Table2, Calendar, ChevronDown
+    Factory, RefreshCw, Table2
 } from 'lucide-react';
 import { 
     ResponsiveContainer,
@@ -12,7 +12,6 @@ import {
 
 const StatCard = ({ title, data }) => {
     const rate = data.failRate;
-    const passRate = data.passRate;
     const isWarning = data.ppm > 100;
     
     const statusText = data.inspected === 0 
@@ -204,11 +203,10 @@ const WorkplaceAnalysis = () => {
                     .map(m => m[0])
                     .join(', ');
                 
-                const passRate = p.inspected > 0 ? ((p.passed / p.inspected) * 100) : 0;
                 const failRate = p.inspected > 0 ? ((p.failed / p.inspected) * 100).toFixed(2) : "0.00";
                 const ppm = p.inspected > 0 ? Math.round((p.failed / p.inspected) * 1000000) : 0;
                 
-                return { ...p, models: topModels, passRate, failRate, ppm };
+                return { ...p, models: topModels, failRate, ppm };
             });
 
         return top10Processes;

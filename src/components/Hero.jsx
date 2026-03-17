@@ -1,28 +1,147 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 // eslint-disable-next-line no-unused-vars
-import { ArrowRight, User, Lock, Mail, Building, Eye, EyeOff, MessageSquare, Youtube, Play, Award } from 'lucide-react';
+import { ArrowRight, User, Lock, Mail, Building, Eye, EyeOff, MessageSquare, Youtube, Play, Award, X } from 'lucide-react';
 
-const Hero = ({ onLogin, onSignup }) => {
+const PasswordResetModal = ({ email, onMigrate, onCancel }) => {
+    const [oldPassword, setOldPassword] = useState('');
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmNewPassword, setConfirmNewPassword] = useState('');
+    const [error, setError] = useState('');
+    const [showOldPassword, setShowOldPassword] = useState(false);
+    const [showNewPassword, setShowNewPassword] = useState(false);
+    const [showConfirmNewPassword, setShowConfirmNewPassword] = useState(false);
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setError('');
+        if (newPassword.length < 6) return setError('안전한 비밀번호 설정방법: 영문, 숫자, 특수문자 조합하여 6~16자');
+        if (newPassword !== confirmNewPassword) return setError('새 비밀번호가 일치하지 않습니다.');
+        if (oldPassword === newPassword) return setError('현재 비밀번호와 동일합니다.');
+
+        try {
+            await onMigrate(email, newPassword);
+        } catch (err) {
+            setError(err.message || '비밀번호 변경에 실패했습니다.');
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+            <div className="bg-white rounded-lg shadow-2xl w-full max-w-md overflow-hidden animate-scale-in">
+                <div className="bg-white border-b border-slate-100 p-6 text-center relative pointer-events-auto">
+                    <div className="absolute top-4 right-4">
+                        <button onClick={onCancel} className="text-slate-400 hover:text-slate-600 focus:outline-none">
+                            <X className="w-5 h-5" />
+                        </button>
+                    </div>
+                    <div className="w-14 h-14 bg-white border-2 border-slate-300 rounded-full flex items-center justify-center mx-auto mb-4 relative mt-2">
+                        <Lock className="w-6 h-6 text-slate-400" />
+                        <div className="absolute -top-1 right-0 w-6 h-6 bg-red-400 rounded-full flex items-center justify-center border-2 border-white">
+                            <Lock className="w-3 h-3 text-white" />
+                        </div>
+                    </div>
+                    <h2 className="text-[17px] font-bold text-slate-800 tracking-tight mt-2">개인정보 보안 강화</h2>
+                    <h3 className="text-xl font-bold text-[#e65c5c] mt-1 mb-2">비밀번호 변경</h3>
+                </div>
+                
+                <div className="p-6 pt-4">
+                    <div className="text-center mb-6">
+                        <p className="text-[14px] text-slate-600 mb-2 leading-relaxed font-medium tracking-tight">
+                            현재 F12(개발자 도구)를 누를 줄 아는 사람이면 누구나 해킹할 수 있습니다.<br/>
+                            대응방안으로 Supabase 인증 시스템을 적용하고, DB 자체에 접근 권한 보안을 추가하여 원천 차단 예정입니다.<br/>
+                            이에 따라 비밀번호 체계 또한 강화 되어 아래 내용에 따라 비밀번호 변경을 요청드립니다.
+                        </p>
+                        <p className="text-[14px] text-slate-600 mb-4 font-medium tracking-tight">
+                            연속적인 숫자, 생일, 전화번호, 아이디와 비슷한 설정을 제외하여<br/>
+                            <span className="font-bold text-slate-800">비밀번호를 변경해주세요.</span>
+                        </p>
+                        <div className="mt-2 text-[13px] font-bold text-[#e65c5c]">
+                            [ 안전한 비밀번호 설정방법 ]<br/>
+                            <span className="text-slate-500 font-medium tracking-tight">영문, 숫자, 특수문자 조합하여 6~16자</span>
+                        </div>
+                    </div>
+
+                    <form onSubmit={handleSubmit} className="space-y-4">
+                        {error && <div className="p-3 bg-red-50 text-red-600 text-sm rounded-lg border border-red-100 text-center font-bold tracking-tight">{error}</div>}
+                        
+                        <div className="space-y-[1px]">
+                            <div className="relative">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <Lock className="h-5 w-5 text-slate-300" />
+                                </div>
+                                <input 
+                                    type={showOldPassword ? "text" : "password"} required 
+                                    className="block w-full pl-10 pr-10 py-3 bg-[#fafafa] border border-slate-200 focus:bg-white focus:outline-none focus:ring-1 focus:ring-red-500 focus:border-red-500 text-sm placeholder:text-slate-400 rounded-t-sm transition-colors" 
+                                    placeholder="현재 비밀번호"
+                                    value={oldPassword} onChange={e => setOldPassword(e.target.value)}
+                                />
+                                <button type="button" onClick={() => setShowOldPassword(!showOldPassword)} className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 focus:outline-none">
+                                    {showOldPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                </button>
+                            </div>
+
+                            <div className="relative">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <Lock className="h-5 w-5 border border-slate-300 rounded-[3px] p-[2px] text-slate-300" />
+                                </div>
+                                <input 
+                                    type={showNewPassword ? "text" : "password"} required minLength="6"
+                                    className="block w-full pl-10 pr-10 py-3 bg-[#fafafa] border-l border-r border-b border-t-0 border-slate-200 focus:bg-white focus:outline-none focus:ring-1 focus:ring-red-500 focus:border-red-500 text-sm placeholder:text-slate-400 transition-colors" 
+                                    placeholder="신규 비밀번호 6~16자"
+                                    value={newPassword} onChange={e => setNewPassword(e.target.value)}
+                                />
+                                <button type="button" onClick={() => setShowNewPassword(!showNewPassword)} className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 focus:outline-none">
+                                    {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                </button>
+                            </div>
+
+                            <div className="relative">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <Lock className="h-5 w-5 border border-slate-300 rounded-[3px] p-[2px] text-slate-300" />
+                                </div>
+                                {/* overlay check icon inside the standard lock */}
+                                <div className="absolute inset-y-0 left-0 pl-[16px] flex items-center pointer-events-none">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="w-[10px] h-[10px] text-slate-300 mt-[2px] -ml-[0.5px]">
+                                        <polyline points="20 6 9 17 4 12"></polyline>
+                                    </svg>
+                                </div>
+                                <input 
+                                    type={showConfirmNewPassword ? "text" : "password"} required minLength="6"
+                                    className="block w-full pl-10 pr-10 py-3 bg-[#fafafa] border-l border-r border-b border-t-0 border-slate-200 focus:bg-white focus:outline-none focus:ring-1 focus:ring-red-500 focus:border-red-500 text-sm placeholder:text-slate-400 rounded-b-sm transition-colors" 
+                                    placeholder="신규 비밀번호 확인"
+                                    value={confirmNewPassword} onChange={e => setConfirmNewPassword(e.target.value)}
+                                />
+                                <button type="button" onClick={() => setShowConfirmNewPassword(!showConfirmNewPassword)} className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 focus:outline-none">
+                                    {showConfirmNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="flex gap-2 pt-2 !mt-5">
+                            <button type="submit" className="flex-1 py-[14px] bg-[#DE534E] text-white font-bold text-[15px] hover:bg-[#c74540] transition-colors border border-transparent rounded-[4px] tracking-wide">
+                                변경하기
+                            </button>
+                            <button type="button" onClick={onCancel} className="flex-1 py-[14px] bg-white border border-slate-300 text-slate-700 font-bold text-[15px] hover:bg-slate-50 transition-colors rounded-[4px] tracking-wide">
+                                홈으로 가기
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const Hero = ({ onLogin, onSignup, migrationState, onMigrate, onCancelMigration }) => {
     const [authMode, setAuthMode] = useState('login'); // 'login', 'signup', 'admin'
-    const [adminId, setAdminId] = useState('');
-    const [adminPassword, setAdminPassword] = useState('');
+    
     const [showPassword, setShowPassword] = useState(false);
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-    const handleAdminLogin = (e) => {
-        e.preventDefault();
-        const cleanId = adminId.trim();
-        const cleanPw = adminPassword.trim();
-
-        if (cleanId === 'jmj4007' && cleanPw === '880228') {
-            onLogin(true);
-        } else {
-            alert('아이디 또는 비밀번호가 올바르지 않습니다.');
-        }
-    };
+    
 
     return (
         <div className="relative min-h-screen flex items-center justify-center overflow-hidden bg-slate-50 pt-16">
@@ -111,21 +230,14 @@ const Hero = ({ onLogin, onSignup }) => {
                             >
                                 회원가입
                             </button>
-                            <button
-                                onClick={() => setAuthMode('admin')}
-                                className={`flex-1 py-2 text-sm font-medium rounded-md transition-all duration-200 ${authMode === 'admin'
-                                    ? 'bg-white text-slate-900 shadow-sm'
-                                    : 'text-slate-500 hover:text-slate-700'
-                                    }`}
-                            >
-                                관리자
-                            </button>
+                            
                         </div>
 
                         {authMode === 'login' ? (
                             <form onSubmit={(e) => {
                                 e.preventDefault();
-                                const email = e.target.email.value + '@shinwoovalve.com';
+                                const rawEmail = e.target.email.value;
+                                const email = rawEmail.includes('@') ? rawEmail : rawEmail + '@shinwoovalve.com';
                                 const password = e.target.password.value;
                                 onLogin(email, password);
                             }} className="space-y-5">
@@ -195,7 +307,7 @@ const Hero = ({ onLogin, onSignup }) => {
                                     company: e.target.company.value,
                                     rank: e.target.rank.value,
                                     role: 'employee', // Default role for new signups
-                                    email: e.target.email.value + '@shinwoovalve.com',
+                                    email: e.target.email.value.includes('@') ? e.target.email.value : e.target.email.value + '@shinwoovalve.com',
                                     password: password
                                 };
                                 onSignup(formData);
@@ -253,10 +365,11 @@ const Hero = ({ onLogin, onSignup }) => {
                                             name="password"
                                             type={showPassword ? "text" : "password"}
                                             required
+                                            minLength="6"
                                             value={password}
                                             onChange={(e) => setPassword(e.target.value)}
                                             className="block w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                                            placeholder="비밀번호 생성"
+                                            placeholder="비밀번호 생성 (최소 6자)"
                                         />
                                         <button
                                             type="button"
@@ -277,10 +390,11 @@ const Hero = ({ onLogin, onSignup }) => {
                                             name="confirmPassword"
                                             type={showConfirmPassword ? "text" : "password"}
                                             required
+                                            minLength="6"
                                             value={confirmPassword}
                                             onChange={(e) => setConfirmPassword(e.target.value)}
                                             className="block w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                                            placeholder="비밀번호 확인"
+                                            placeholder="비밀번호 재확인 (최소 6자)"
                                         />
                                         <button
                                             type="button"
@@ -303,56 +417,7 @@ const Hero = ({ onLogin, onSignup }) => {
                                     계정 생성
                                 </button>
                             </form>
-                        ) : (
-                            <form onSubmit={handleAdminLogin} className="space-y-5">
-                                <div className="p-4 bg-red-50 border border-red-100 rounded-lg mb-4">
-                                    <p className="text-xs text-red-600 font-medium text-center">
-                                        <Lock className="w-4 h-4 inline-block mr-1 mb-0.5" />
-                                        관리자 전용 로그인 페이지입니다.
-                                    </p>
-                                </div>
-                                <div>
-                                    <label htmlFor="adminId" className="block text-sm font-medium text-slate-700 mb-1">아이디</label>
-                                    <div className="relative">
-                                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                            <User className="h-5 w-5 text-slate-400" />
-                                        </div>
-                                        <input
-                                            type="text"
-                                            id="adminId"
-                                            required
-                                            value={adminId}
-                                            onChange={(e) => setAdminId(e.target.value)}
-                                            className="block w-full pl-10 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
-                                            placeholder="관리자 ID"
-                                        />
-                                    </div>
-                                </div>
-                                <div>
-                                    <label htmlFor="adminPassword" className="block text-sm font-medium text-slate-700 mb-1">비밀번호</label>
-                                    <div className="relative">
-                                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                            <Lock className="h-5 w-5 text-slate-400" />
-                                        </div>
-                                        <input
-                                            type="password"
-                                            id="adminPassword"
-                                            required
-                                            value={adminPassword}
-                                            onChange={(e) => setAdminPassword(e.target.value)}
-                                            className="block w-full pl-10 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
-                                            placeholder="관리자 비밀번호"
-                                        />
-                                    </div>
-                                </div>
-                                <button
-                                    type="submit"
-                                    className="w-full flex items-center justify-center px-4 py-3 border border-transparent text-sm font-medium rounded-lg text-white bg-slate-800 hover:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500 transition-all shadow-lg"
-                                >
-                                    관리자 로그인
-                                </button>
-                            </form>
-                        )}
+                        ) : null}
 
                         <div className="mt-6">
                             <p className="text-xs text-center text-slate-500">
@@ -386,6 +451,14 @@ const Hero = ({ onLogin, onSignup }) => {
                     <MessageSquare className="w-7 h-7 fill-current" />
                 </a>
             </div>
+            {/* Password Reset Modal */}
+            {migrationState && (
+                <PasswordResetModal 
+                    email={migrationState.email} 
+                    onMigrate={onMigrate} 
+                    onCancel={onCancelMigration} 
+                />
+            )}
         </div>
     );
 };

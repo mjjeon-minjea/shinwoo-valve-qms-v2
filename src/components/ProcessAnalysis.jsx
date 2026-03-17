@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { api } from '../lib/api';
 import { 
-    Activity, RefreshCw, Filter, Search, Table2, Presentation, Calendar, ChevronDown
+    Activity, RefreshCw, Table2
 } from 'lucide-react';
 import { 
     ResponsiveContainer,
@@ -332,7 +332,7 @@ const ProcessAnalysis = () => {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-50">
-                                {groupedData.map((row, i) => (
+                                {groupedData.map((row) => (
                                     <tr key={row.processName} className="hover:bg-slate-50/50 transition-colors">
                                         <td className="px-6 py-4 font-bold text-slate-800">{row.processName}</td>
                                         <td className="px-6 py-4 text-right text-slate-500 font-medium">{row.records.toLocaleString()}건</td>

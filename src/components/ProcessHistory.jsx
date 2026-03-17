@@ -237,8 +237,7 @@ const ProcessHistory = () => {
                     return '';
                 };
 
-                const mapped = rawRows.map((row, idx) => ({
-                    id: `pi_${Date.now()}_${idx}`,
+                const mapped = rawRows.map((row) => ({
                     workOrderNo: String(findVal(row, ['지시번호']) || ''),
                     processCode: String(findVal(row, ['공정']) || ''),
                     workplaceFull: String(findVal(row, ['작업장명']) || ''),
@@ -304,7 +303,7 @@ const ProcessHistory = () => {
                 await api.fetch('/process_inspections', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: { id: `pi_${Date.now()}`, ...formData }
+                    body: formData
                 });
             }
             setIsModalOpen(false);
@@ -341,7 +340,6 @@ const ProcessHistory = () => {
     };
 
     // ---- Filtering ----
-    const FILTER_COLUMNS = ['modelName', 'workplaceFull', 'isResolutionEntered'];
 
     const getUniqueValues = (key) => {
         const vals = records.map(r => r[key] || '(미지정)');
@@ -546,7 +544,7 @@ const ProcessHistory = () => {
                                 <tr><td colSpan={COLUMNS.length + 2} className="py-16 text-center text-slate-400">
                                     <ClipboardList className="w-10 h-10 mx-auto mb-3 text-slate-200" />
                                     <p className="font-medium">데이터가 없습니다.</p>
-                                    <p className="text-xs mt-1">'엑셀 일괄 등록' 버튼으로 MES 데이터를 업로드하세요.</p>
+                                    <p className="text-xs mt-1">&quot;엑셀 일괄 등록&quot; 버튼으로 MES 데이터를 업로드하세요.</p>
                                 </td></tr>
                             ) : (
                                 currentItems.map((item, idx) => (
