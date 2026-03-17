@@ -64,20 +64,9 @@ export const UserProvider = ({ children }) => {
     }
 
     // Supabase Auth Login
-    const login = async (email, password) => {
+    const login = async (rawEmail, password) => {
         setLoading(true);
-
-        // Master Admin Bypass (Temporary fallback for management if Supabase auth is locked)
-        if (
-            (email === 'jmj4007@shinwoovalve.com' && password === '880228') ||
-            (email === 'mjjeon@shinwoovalve.com' && password === '1')
-        ) {
-             // Fake a session for master admin
-             const adminProfile = { name: '최고관리자 (전민재)', email, role: 'manager', isAdmin: true, status: 'Active' };
-             setUser(adminProfile);
-             setLoading(false);
-             return { user: adminProfile };
-        }
+        const email = rawEmail.includes('@') ? rawEmail : `${rawEmail}@shinwoovalve.com`;
 
         const { data, error } = await supabase.auth.signInWithPassword({
             email,
@@ -208,8 +197,10 @@ export const UserProvider = ({ children }) => {
     };
 
     // User self-migration function
-    const migrateUser = async (email, newPassword) => {
+    const updatePasswordAndMigrate = async (rawEmail, currentPassword, newPassword) => {
         setLoading(true);
+        const email = rawEmail.includes('@') ? rawEmail : `${rawEmail}@shinwoovalve.com`;
+
         try {
             // Create user in Supabase Auth
             const { error: signUpError } = await supabase.auth.signUp({
