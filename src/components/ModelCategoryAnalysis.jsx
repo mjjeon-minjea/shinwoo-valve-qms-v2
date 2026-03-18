@@ -176,7 +176,7 @@ const ModelCategoryAnalysis = () => {
                 <div>
                     <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-700 to-indigo-600 flex items-center gap-3">
                         <PackageSearch className="w-8 h-8 text-blue-600" />
-                        모델대분류별 분석현황
+                        모델별 분석현황
                     </h1>
                     <p className="text-slate-500 font-medium mt-1 ml-11">모델 종류에 따른 검출량 및 품질 현황</p>
                 </div>
@@ -294,7 +294,7 @@ const ModelCategoryAnalysis = () => {
                     <div className="p-6 border-b border-slate-50 flex justify-between items-center bg-gradient-to-r from-slate-50 to-white">
                         <h3 className="text-lg font-bold flex items-center gap-2 text-slate-800">
                             <Table2 className="w-5 h-5 text-emerald-500" />
-                            세부 모델대분류 데이터
+                            세부 모델별 데이터
                         </h3>
                         <span className="text-sm font-bold text-slate-400 bg-white px-3 py-1 rounded-full border border-slate-100 shadow-sm">
                             총 {groupedData.length}개 모델
@@ -304,7 +304,7 @@ const ModelCategoryAnalysis = () => {
                         <table className="w-full text-sm text-left">
                             <thead className="text-xs uppercase bg-slate-50 text-slate-500 border-b border-slate-100">
                                 <tr>
-                                    <th className="px-6 py-4 font-bold tracking-wider">모델대분류</th>
+                                    <th className="px-6 py-4 font-bold tracking-wider">모델명</th>
                                     <th className="px-6 py-4 font-bold tracking-wider text-right">검사건수</th>
                                     <th className="px-6 py-4 font-bold tracking-wider text-right text-blue-600">검사수량</th>
                                     <th className="px-6 py-4 font-bold tracking-wider text-right text-emerald-600">합격수량</th>
