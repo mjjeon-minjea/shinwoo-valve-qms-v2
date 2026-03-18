@@ -199,21 +199,48 @@ export const UserProvider = ({ children }) => {
     // User self-migration function
     const updatePasswordAndMigrate = async (rawEmail, currentPassword, newPassword) => {
         setLoading(true);
+        // Ensure email format
         const email = rawEmail.includes('@') ? rawEmail : `${rawEmail}@shinwoovalve.com`;
 
         try {
-            // Create user in Supabase Auth
-            const { error: signUpError } = await supabase.auth.signUp({
+            // First, login with old password to verify their identity AGAIN before allowing change
+            const { data: verifyData, error: verifyError } = await supabase.auth.signInWithPassword({
                 email,
-                password: newPassword
+                password: currentPassword
             });
-            if (signUpError) {
-                if (!signUpError.message.includes('already registered')) {
-                     throw signUpError;
-                }
+
+            // If old login fails and it's NOT a required migration error, stop
+            if (verifyError && !verifyError.message.includes('Invalid login credentials')) {
+                 throw new Error("기존 비밀번호 검증 실패: " + verifyError.message);
             }
+
+            // Update user in Supabase Auth (This works if they are already logged in or migrated)
+            let signInError = null;
+            const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
             
-            // Sync new password to public.users table just in case they revert
+            // If they are not logged in (e.g., first time migration), we need to create them or update them via admin/RPC
+            // Since we can't use updateUser without session, we use signUp as a hack to set password if they don't exist
+            if (updateError) {
+                 const { error: signUpError } = await supabase.auth.signUp({
+                     email,
+                     password: newPassword
+                 });
+                 // If already registered, we can't signUp. 
+                 if (signUpError && signUpError.message.includes('already registered')) {
+                      // Attempt to sign in with new password just in case it was already changed
+                      const { error: testSignInError } = await supabase.auth.signInWithPassword({
+                          email,
+                          password: newPassword
+                      });
+                      if (testSignInError) {
+                           throw new Error("비밀번호 변경 권한이 없습니다. (이미 마이그레이션된 계정이거나, 관리자 문의 필요)");
+                      }
+                 } else if (signUpError) {
+                      throw signUpError;
+                 }
+            }
+
+            // Sync new password to public.users table just in case they revert/forget
             await supabase.from('users').update({ password: newPassword }).eq('email', email);
             
             // Login with new password to get active session
@@ -224,6 +251,9 @@ export const UserProvider = ({ children }) => {
             if (error) throw error;
             
             return data;
+        } catch (err) {
+            console.error("Migration Error: ", err);
+            throw err;
         } finally {
             setLoading(false);
         }
