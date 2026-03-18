@@ -220,19 +220,22 @@ export const UserProvider = ({ children }) => {
             
             // If they are not logged in (e.g., first time migration), we need to create them or update them via admin/RPC
             // Since we can't use updateUser without session, we use signUp as a hack to set password if they don't exist
-            if (updateError) {
+             if (updateError) {
                  const { error: signUpError } = await supabase.auth.signUp({
                      email,
                      password: newPassword
                  });
-                 // If already registered, we can't signUp. 
+
+                 // Supabase returns 'already registered' or throws invalid login if email confirmation is required and user hasn't clicked link.
+                 // We will bypass the strict sign in here and rely on the fact we just signed them up or they exist.
                  if (signUpError && signUpError.message.includes('already registered')) {
                       // Attempt to sign in with new password just in case it was already changed
                       const { error: testSignInError } = await supabase.auth.signInWithPassword({
                           email,
                           password: newPassword
                       });
-                      if (testSignInError) {
+                      // If email confirmation is ON, signIn will fail with "Email not confirmed". We handle this below.
+                      if (testSignInError && !testSignInError.message.includes('Email not confirmed')) {
                            throw new Error("비밀번호 변경 권한이 없습니다. (이미 마이그레이션된 계정이거나, 관리자 문의 필요)");
                       }
                  } else if (signUpError) {
