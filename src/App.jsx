@@ -40,7 +40,7 @@ const AppContent = () => {
         if (user?.isAdmin) {
              fetchAllUsers();
         }
-    }, [user]);
+    }, [user?.id, user?.isAdmin]);
 
     const handleLogin = async (email, password) => {
         if (loginAttempts >= 5) {

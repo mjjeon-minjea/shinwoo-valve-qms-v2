@@ -10,6 +10,11 @@ export const UserProvider = ({ children }) => {
 
     // Initial auth state check and listener setup
     useEffect(() => {
+        // Emergency Failsafe: 토큰 로딩 중 Supabase 통신이 3초 이상 멈추면 무한 로딩 강제 해제
+        const emergencyTimer = setTimeout(() => {
+            setLoading(false);
+        }, 3000);
+
         // Get initial session
         supabase.auth.getSession().then(({ data: { session } }) => {
             if (session?.user) {
@@ -36,7 +41,10 @@ export const UserProvider = ({ children }) => {
             }
         );
 
-        return () => subscription.unsubscribe();
+        return () => {
+            clearTimeout(emergencyTimer);
+            subscription.unsubscribe();
+        };
     }, []);
 
     // Fetch extra profile data from 'users' table based on Auth UID or email

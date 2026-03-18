@@ -73,8 +73,8 @@ export const api = {
             };
         }
         else {
-            // GET
-            const { data, error } = await supabase.from(table).select('*');
+            // GET: 메모리 프리징 및 버벅임(Lag) 방지를 위해 최신 데이터 3,000건 제한 필터 부여
+            const { data, error } = await supabase.from(table).select('*').order('id', { ascending: false }).limit(3000);
             if (error) throw error;
             return {
                 ok: true,
