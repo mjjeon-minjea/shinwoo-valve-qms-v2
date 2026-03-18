@@ -5,7 +5,7 @@ const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
     auth: {
-        storageKey: 'shinwoo-qms-auth-token-v2'
+        storageKey: 'qms-auth-v2'
     }
 });
 
