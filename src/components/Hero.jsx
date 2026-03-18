@@ -20,7 +20,7 @@ const PasswordResetModal = ({ email, onMigrate, onCancel }) => {
         if (oldPassword === newPassword) return setError('현재 비밀번호와 동일합니다.');
 
         try {
-            await onMigrate(email, newPassword);
+            await onMigrate(email, oldPassword, newPassword);
         } catch (err) {
             setError(err.message || '비밀번호 변경에 실패했습니다.');
         }
