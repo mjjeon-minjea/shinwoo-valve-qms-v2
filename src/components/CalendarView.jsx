@@ -23,7 +23,7 @@ const CalendarView = () => {
                 let allEvents = [];
                 reports.forEach(report => {
                     // Filter: Only show Approved reports (match Weekly Status logic)
-                    if (report.status !== 'approved') return;
+                    // if (report.status !== \'approved\') return;
 
                     // 1. Schedule Events
                     if (report.schedule && Array.isArray(report.schedule)) {

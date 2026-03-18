@@ -548,6 +548,7 @@ const InboundHistory = () => {
                     const defectQty = parseNum(findVal(['불량수량(EA)', '불량수량', '불량']));
 
                     return {
+                        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
                         date: formatDate(findVal(['입고일', '입고일자', '날짜'])),
                         supplier: findVal(['입고업체', '업체명', '공급사']) || 'Unknown',
                         itemName: findVal(['제품명', '품명', '품목명']) || 'Unknown',
