@@ -21,8 +21,15 @@ const PasswordResetModal = ({ email, onMigrate, onCancel }) => {
 
         try {
             await onMigrate(email, oldPassword, newPassword);
+            window.alert('비밀번호 변경이 정상적으로 완료되었습니다!\n이후 화면은 다시 로그인할 필요 없이 즉시 메인 화면으로 진입합니다.');
+            onCancel(); // 성공 시 모달 해제
         } catch (err) {
-            setError(err.message || '비밀번호 변경에 실패했습니다.');
+            const msg = err.message || '비밀번호 변경에 실패했습니다.';
+            if (msg.includes('rate limit')) {
+                setError('보안 조치로 인해 일시적으로 접속이 차단되었습니다. 잠시 후(약 1시간 뒤) 다시 시도해주세요.');
+            } else {
+                setError(msg);
+            }
         }
     };
 

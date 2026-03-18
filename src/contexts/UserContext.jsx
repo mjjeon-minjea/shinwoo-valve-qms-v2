@@ -198,7 +198,8 @@ export const UserProvider = ({ children }) => {
 
     // User self-migration function
     const updatePasswordAndMigrate = async (rawEmail, currentPassword, newPassword) => {
-        setLoading(true);
+        // 글로벌 로딩 제거 (모달 유지)
+        
         // Ensure email format
         const email = rawEmail.includes('@') ? rawEmail : `${rawEmail}@shinwoovalve.com`;
 
@@ -243,22 +244,25 @@ export const UserProvider = ({ children }) => {
                  }
             }
 
-            // Sync new password to public.users table just in case they revert/forget
-            await supabase.from('users').update({ password: newPassword }).eq('email', email);
-            
-            // Login with new password to get active session
+            // Login with new password to get active session FIRST
             const { data, error } = await supabase.auth.signInWithPassword({
                 email,
                 password: newPassword
             });
             if (error) throw error;
+
+            // Now that session is active (RLS passes), sync new password to public.users table
+            await supabase.from('users').update({ password: newPassword }).eq('email', email);
             
+            // 🔥 마이그레이션 처리 후 명시적 Auth 상태 갱신 (무한루프/정체 방지) 🔥
+            if (data?.user) {
+                await fetchUserProfile(data.user);
+            }
+
             return data;
         } catch (err) {
             console.error("Migration Error: ", err);
             throw err;
-        } finally {
-            setLoading(false);
         }
     };
 

@@ -21,6 +21,9 @@ const AppContent = () => {
     // Migration state
     const [migrationState, setMigrationState] = useState(null);
 
+    // Login attempts state
+    const [loginAttempts, setLoginAttempts] = useState(0);
+
     const fetchAllUsers = async () => {
         try {
             const { data, error } = await supabase.from('users').select('*').order('id', { ascending: true });
@@ -40,13 +43,26 @@ const AppContent = () => {
     }, [user]);
 
     const handleLogin = async (email, password) => {
+        if (loginAttempts >= 5) {
+            alert('비밀번호 5회 연속 오류로 인해 보안상 로그인이 차단되었습니다.\n부서 관리자에게 문의해 주세요.');
+            return;
+        }
+
         try {
             await login(email, password);
+            setLoginAttempts(0); // Reset on success
         } catch (err) {
             if (err.code === 'MIGRATION_REQUIRED') {
                 setMigrationState({ email: err.legacyEmail });
             } else {
-                alert('로그인 실패: ' + (err.message || '이메일 또는 비밀번호가 올바르지 않습니다.'));
+                setLoginAttempts(prev => prev + 1);
+                const remaining = Math.max(0, 4 - loginAttempts);
+                
+                if (remaining === 0) {
+                    alert('비밀번호를 5회 잘못 입력하셨습니다.\n보안 조치로 인해 로그인이 일시 차단됩니다. 관리자에게 문의해주세요.');
+                } else {
+                    alert(`로그인 실패: ${err.message || '이메일 또는 비밀번호가 올바르지 않습니다.'}\n\n⚠️ 주의: 앞으로 ${remaining}회 더 실패 시 계정이 차단됩니다.`);
+                }
             }
         }
     };
