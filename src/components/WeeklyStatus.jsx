@@ -77,7 +77,7 @@ const WeeklyStatus = () => {
 
                     // Filter for Approved reports in the current week
                     const weekReports = reportsData.filter(r => 
-                        r.weekStartDate === weekKey && r.status === 'approved'
+                        r.weekStartDate === weekKey
                     );
                     
                     setReports(weekReports);

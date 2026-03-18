@@ -238,6 +238,7 @@ const ProcessHistory = () => {
                 };
 
                 const mapped = rawRows.map((row) => ({
+                    id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
                     workOrderNo: String(findVal(row, ['지시번호']) || ''),
                     processCode: String(findVal(row, ['공정']) || ''),
                     workplaceFull: String(findVal(row, ['작업장명']) || ''),
@@ -300,10 +301,14 @@ const ProcessHistory = () => {
                     body: { ...editingItem, ...formData }
                 });
             } else {
+                const newPayload = { 
+                    ...formData, 
+                    id: Date.now().toString() + Math.random().toString(36).substr(2, 9) 
+                };
                 await api.fetch('/process_inspections', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: formData
+                    body: newPayload
                 });
             }
             setIsModalOpen(false);
