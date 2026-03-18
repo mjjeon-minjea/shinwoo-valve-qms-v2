@@ -18,6 +18,10 @@ export const UserProvider = ({ children }) => {
                 setUser(null);
                 setLoading(false);
             }
+        }).catch(err => {
+            console.error('Session retrieval error:', err);
+            setUser(null);
+            setLoading(false);
         });
 
         // Listen for auth changes (login, logout)
