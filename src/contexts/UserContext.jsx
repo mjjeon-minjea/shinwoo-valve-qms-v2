@@ -78,12 +78,16 @@ export const UserProvider = ({ children }) => {
     // Supabase Auth Login
     const login = async (rawEmail, password) => {
         setLoading(true);
-        const email = rawEmail.includes('@') ? rawEmail : `${rawEmail}@shinwoovalve.com`;
+        // 로그인 서버 렉 방지용 긴급 타이머 장착 (5초 후 강제 해제)
+        const loginTimer = setTimeout(() => { setLoading(false); }, 5000);
+        
+        try {
+            const email = rawEmail.includes('@') ? rawEmail : `${rawEmail}@shinwoovalve.com`;
 
-        const { data, error } = await supabase.auth.signInWithPassword({
-            email,
-            password
-        });
+            const { data, error } = await supabase.auth.signInWithPassword({
+                email,
+                password
+            });
         
         let sessionData = data;
         let sessionError = error;
@@ -149,11 +153,20 @@ export const UserProvider = ({ children }) => {
                 await supabase.auth.signOut();
                 setUser(null);
                 setLoading(false);
+                clearTimeout(loginTimer);
                 throw new Error("승인 대기 중이거나 비활성 상태의 계정입니다. 관리자 승인 후 로그인해 주세요.");
             }
         }
 
+        clearTimeout(loginTimer);
+        // API 직접 수동 로그인 후에는 fetchUserProfile이 트리거 될 때까지 대기하지 않고 직접 false로 풀어줍니다.
+        setLoading(false);
         return authData;
+        } catch (err) {
+            clearTimeout(loginTimer);
+            setLoading(false);
+            throw err;
+        }
     };
 
     // Supabase Auth Logout
