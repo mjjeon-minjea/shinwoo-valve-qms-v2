@@ -10,7 +10,7 @@ export const UserProvider = ({ children }) => {
 
     // Initial auth state check from localStorage
     useEffect(() => {
-        const savedSession = localStorage.getItem('qms-legacy-user');
+        const savedSession = sessionStorage.getItem('qms-legacy-user');
         if (savedSession) {
             try {
                 const sessionData = JSON.parse(savedSession);
@@ -57,7 +57,7 @@ export const UserProvider = ({ children }) => {
         } catch (err) {
             console.error('Failed to load user profile:', err);
             setUser(null);
-            localStorage.removeItem('qms-legacy-user');
+            sessionStorage.removeItem('qms-legacy-user');
         } finally {
             setLoading(false);
         }
@@ -86,8 +86,8 @@ export const UserProvider = ({ children }) => {
                     isAdmin: loggedInUser.role === 'manager' || loggedInUser.role === 'director'
                 };
                 
-                // localStorage에 이메일만 저장해두어 새로고침 시 세션 유지
-                localStorage.setItem('qms-legacy-user', JSON.stringify({ email: loggedInUser.email }));
+                // sessionStorage에 이메일만 저장해두어 새로고침 시 세션 유지 (브라우저 종료 시 만료)
+                sessionStorage.setItem('qms-legacy-user', JSON.stringify({ email: loggedInUser.email }));
                 setUser(finalUser);
                 setLoading(false);
                 return { user: finalUser };
@@ -103,7 +103,7 @@ export const UserProvider = ({ children }) => {
     // Logout
     const logout = async () => {
         setLoading(true);
-        localStorage.removeItem('qms-legacy-user');
+        sessionStorage.removeItem('qms-legacy-user');
         setUser(null);
         setLoading(false);
     };
