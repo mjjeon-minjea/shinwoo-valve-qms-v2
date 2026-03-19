@@ -26,7 +26,11 @@ const NoticeBoard = () => {
             const res = await api.fetch('/notices');
             if (res.ok) {
                 const data = await res.json();
-                setNotices(data.sort((a, b) => b.id - a.id));
+                // 날짜 내림차순(최신순) 정렬, 날짜가 같으면 ID 내림차순
+                setNotices(data.sort((a, b) => {
+                    if (b.date !== a.date) return b.date.localeCompare(a.date);
+                    return b.id.localeCompare(a.id);
+                }));
             }
         } catch (error) {
             console.error('Failed to fetch notices:', error);
@@ -41,24 +45,29 @@ const NoticeBoard = () => {
         return author;
     };
 
-    // 넘버링 체계 생성: [구분코드]-[작성자코드]-[YYMMDD]-[순번]
+    // 넘버링 체계 생성: [구분코드][작성자ID코드][YYMMDD][순번]
     const generateNoticeNo = (type, authorName, date) => {
         const typeMap = { '공지': 'A', 'MES': 'B', '인사': 'C', '품질': 'D', '업데이트': 'E' };
         const prefix = typeMap[type] || 'Z';
         
-        // 작성자 코드 (관리자면 ADM, 아니면 이름 첫 3자리)
+        // 작성자 코드 (관리자면 ADM, 아니면 이메일 ID 앞부분)
         let authorCode = 'ADM';
         if (authorName !== '관리자' && authorName !== '시스템 관리자') {
-            authorCode = authorName ? authorName.substring(0, 3).toUpperCase() : 'NON';
+            // 현재 로그인 유저의 이메일 ID 사용
+            if (user && user.email) {
+                authorCode = user.email.split('@')[0].toUpperCase();
+            } else {
+                authorCode = authorName ? authorName.substring(0, 3).toUpperCase() : 'NON';
+            }
         }
 
         const dateStr = date.replace(/-/g, '').substring(2); // YYMMDD
         
         // 해당 날짜의 기존 공지 수 파악하여 순번 부여
-        const todayCount = notices.filter(n => n.date === date).length;
-        const seq = String(todayCount + 1).padStart(3, '0');
+        const todayNotices = notices.filter(n => n.date === date);
+        const seq = String(todayNotices.length + 1).padStart(3, '0');
         
-        return `${prefix}-${authorCode}-${dateStr}-${seq}`;
+        return `${prefix}${authorCode}${dateStr}${seq}`;
     };
 
     const handleSave = async (e) => {
@@ -77,7 +86,7 @@ const NoticeBoard = () => {
                     body: JSON.stringify({ ...currentNotice, ...payload })
                 });
             } else {
-                // 신규 작성 시 새로운 넘버링 체계 적용
+                // 신규 작성 시 새로운 넘버링 체계 적용 (하이픈 제거)
                 const newId = generateNoticeNo(formData.type, unifiedAuthor, date);
                 await api.fetch('/notices', {
                     method: 'POST',
@@ -164,6 +173,7 @@ const NoticeBoard = () => {
                                 <h1 className="text-2xl font-bold text-slate-800">{currentNotice.title}</h1>
                             </div>
                             <div className="flex gap-4 text-sm text-slate-500">
+                                <span>번호: {currentNotice.id}</span>
                                 <span>작성자: {getUnifiedAuthor(currentNotice.author)}</span>
                                 <span>작성일: {currentNotice.date}</span>
                                 <span>조회수: {currentNotice.views || 0}</span>
@@ -217,7 +227,7 @@ const NoticeBoard = () => {
                     <table className="min-w-full divide-y divide-slate-200">
                         <thead className="bg-slate-50">
                             <tr>
-                                <th className="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase w-16">No</th>
+                                <th className="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase w-40 whitespace-nowrap">No</th>
                                 <th className="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase w-24">구분</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">제목</th>
                                 <th className="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase w-32">작성자</th>
@@ -233,7 +243,7 @@ const NoticeBoard = () => {
                             ) : (
                                 currentItems.map((notice) => (
                                     <tr key={notice.id} className="hover:bg-slate-50 cursor-pointer transition-colors" onClick={() => openDetail(notice)}>
-                                        <td className="px-6 py-4 text-center text-xs text-slate-400">{notice.id}</td>
+                                        <td className="px-6 py-4 text-center text-xs text-slate-400 font-mono whitespace-nowrap">{notice.id}</td>
                                         <td className="px-6 py-4 text-center whitespace-nowrap">
                                             <span className={`px-2 py-1 text-xs rounded-full font-medium ${notice.type === 'MES' ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-600'}`}>
                                                 {notice.type}
