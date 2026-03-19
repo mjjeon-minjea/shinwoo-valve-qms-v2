@@ -55,27 +55,41 @@ const InspectionAnalysisDashboard = () => {
                 endDateStr = `${yearStr}-${monthStr}-${String(lastDay).padStart(2, '0')}`;
             }
 
-            // Direct Supabase query to prevent downloading 100,000+ rows
-            const inspPromise = supabase
-                .from('inspections')
-                .select('*')
-                .gte('date', startDateStr)
-                .lte('date', endDateStr);
+            // Direct Supabase query (Paginated to bypass 1000 rows limit)
+            let inspections = [];
+            let from = 0;
+            const step = 1000;
+            let hasMore = true;
 
-            const [inspRes, itemRes] = await Promise.all([
-                inspPromise,
+            while (hasMore && inspections.length < 15000) {
+                const { data, error } = await supabase
+                    .from('inspections')
+                    .select('*')
+                    .gte('date', startDateStr)
+                    .lte('date', endDateStr)
+                    .order('id', { ascending: false })
+                    .range(from, from + step - 1);
+                
+                if (error) throw error;
+                inspections = [...inspections, ...data];
+                
+                if (data.length < step) {
+                    hasMore = false;
+                } else {
+                    from += step;
+                }
+            }
+
+            const [itemRes] = await Promise.all([
                 api.fetch('/item_master')
             ]);
             
-            if (!inspRes.error) {
-                const inspections = inspRes.data || [];
+            if (inspections.length >= 0) {
                 let items = [];
                 if (itemRes.ok) {
                     items = await itemRes.json();
                 }
                 setRawData({ inspections, items });
-            } else {
-                console.error("Supabase error:", inspRes.error);
             }
         } catch (error) {
             console.error("Failed to fetch dashboard data:", error);

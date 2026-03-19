@@ -73,12 +73,37 @@ export const api = {
             };
         }
         else {
-            // GET: 메모리 프리징 및 버벅임(Lag) 방지를 위해 최신 데이터 3,000건 제한 필터 부여
-            const { data, error } = await supabase.from(table).select('*').order('id', { ascending: false }).limit(3000);
-            if (error) throw error;
+            // GET: 서버의 Max Rows 제한(기본 1000건)을 우회하기 위해 재귀적으로 모든 데이터를 가져옵니다.
+            let allData = [];
+            let from = 0;
+            const step = 1000;
+            let hasMore = true;
+            
+            console.log(`[Supabase API] Fetching ALL pages for ${table}...`);
+            
+            while (hasMore && allData.length < 20000) { // 안전을 위해 최대 20,000건으로 제한
+                const { data, error } = await supabase
+                    .from(table)
+                    .select('*')
+                    .order('id', { ascending: false })
+                    .range(from, from + step - 1);
+                
+                if (error) throw error;
+                
+                allData = [...allData, ...data];
+                
+                if (data.length < step) {
+                    hasMore = false;
+                } else {
+                    from += step;
+                }
+            }
+            
+            console.log(`[Supabase API] Fetched total ${allData.length} records for ${table}`);
+            
             return {
                 ok: true,
-                json: async () => data
+                json: async () => allData
             };
         }
     }
