@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react';
 // eslint-disable-next-line no-unused-vars
 import { Search, Plus, Edit, Trash2, X, ChevronLeft, ChevronRight, Eye, AlertTriangle } from 'lucide-react';
 import { api } from '../lib/api';
+import { useUser } from '../contexts/UserContext';
 
 const NoticeBoard = () => {
+    const { user } = useUser();
     const [notices, setNotices] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -33,10 +35,39 @@ const NoticeBoard = () => {
         }
     };
 
+    // 작성자 명칭 단일화 (시스템 관리자 -> 관리자)
+    const getUnifiedAuthor = (author) => {
+        if (author === '시스템 관리자' || author === '관리자') return '관리자';
+        return author;
+    };
+
+    // 넘버링 체계 생성: [구분코드]-[작성자코드]-[YYMMDD]-[순번]
+    const generateNoticeNo = (type, authorName, date) => {
+        const typeMap = { '공지': 'A', 'MES': 'B', '인사': 'C', '품질': 'D', '업데이트': 'E' };
+        const prefix = typeMap[type] || 'Z';
+        
+        // 작성자 코드 (관리자면 ADM, 아니면 이름 첫 3자리)
+        let authorCode = 'ADM';
+        if (authorName !== '관리자' && authorName !== '시스템 관리자') {
+            authorCode = authorName ? authorName.substring(0, 3).toUpperCase() : 'NON';
+        }
+
+        const dateStr = date.replace(/-/g, '').substring(2); // YYMMDD
+        
+        // 해당 날짜의 기존 공지 수 파악하여 순번 부여
+        const todayCount = notices.filter(n => n.date === date).length;
+        const seq = String(todayCount + 1).padStart(3, '0');
+        
+        return `${prefix}-${authorCode}-${dateStr}-${seq}`;
+    };
+
     const handleSave = async (e) => {
         e.preventDefault();
         const date = new Date().toISOString().split('T')[0];
-        const payload = { ...formData, date, views: currentNotice?.views || 0 };
+        
+        // 작성자 단일화 적용
+        const unifiedAuthor = getUnifiedAuthor(formData.author);
+        const payload = { ...formData, author: unifiedAuthor, date, views: currentNotice?.views || 0 };
 
         try {
             if (currentNotice?.id) {
@@ -46,10 +77,12 @@ const NoticeBoard = () => {
                     body: JSON.stringify({ ...currentNotice, ...payload })
                 });
             } else {
+                // 신규 작성 시 새로운 넘버링 체계 적용
+                const newId = generateNoticeNo(formData.type, unifiedAuthor, date);
                 await api.fetch('/notices', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ id: String(Date.now()), ...payload, views: 0 })
+                    body: JSON.stringify({ id: newId, ...payload, views: 0 })
                 });
             }
             setIsModalOpen(false);
@@ -77,10 +110,12 @@ const NoticeBoard = () => {
     const openModal = (notice = null) => {
         if (notice) {
             setCurrentNotice(notice);
-            setFormData({ title: notice.title, type: notice.type, author: notice.author, content: notice.content });
+            setFormData({ title: notice.title, type: notice.type, author: getUnifiedAuthor(notice.author), content: notice.content });
         } else {
             setCurrentNotice(null);
-            setFormData({ title: '', type: '공지', author: '', content: '' });
+            // 신규 작성 시 현재 로그인 사용자 정보를 기본값으로 세팅
+            const defaultAuthor = user?.isAdmin ? '관리자' : (user?.name || '');
+            setFormData({ title: '', type: '공지', author: defaultAuthor, content: '' });
         }
         setIsModalOpen(true);
     };
@@ -129,7 +164,7 @@ const NoticeBoard = () => {
                                 <h1 className="text-2xl font-bold text-slate-800">{currentNotice.title}</h1>
                             </div>
                             <div className="flex gap-4 text-sm text-slate-500">
-                                <span>작성자: {currentNotice.author}</span>
+                                <span>작성자: {getUnifiedAuthor(currentNotice.author)}</span>
                                 <span>작성일: {currentNotice.date}</span>
                                 <span>조회수: {currentNotice.views || 0}</span>
                             </div>
@@ -205,7 +240,7 @@ const NoticeBoard = () => {
                                             </span>
                                         </td>
                                         <td className="px-6 py-4 text-sm font-medium text-slate-900">{notice.title}</td>
-                                        <td className="px-6 py-4 text-center text-sm text-slate-600">{notice.author}</td>
+                                        <td className="px-6 py-4 text-center text-sm text-slate-600">{getUnifiedAuthor(notice.author)}</td>
                                         <td className="px-6 py-4 text-center text-xs text-slate-400">{notice.date}</td>
                                         <td className="px-6 py-4 text-center text-xs text-slate-400">{notice.views || 0}</td>
                                     </tr>
@@ -246,6 +281,7 @@ const NoticeBoard = () => {
                                         <option value="MES">MES</option>
                                         <option value="인사">인사</option>
                                         <option value="품질">품질</option>
+                                        <option value="업데이트">업데이트</option>
                                     </select>
                                 </div>
                                 <div className="col-span-3">
