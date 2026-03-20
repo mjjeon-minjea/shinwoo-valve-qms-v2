@@ -3,6 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import { executeQuery } from './db_connector.js';
 import { startScheduler } from './sync_service.js';
+import { sendWeeklyReportEmail } from './mail_service.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -26,6 +27,18 @@ app.get('/api/view/:viewName', async (req, res) => {
     res.json({ success: true, view: viewName, count: data.length, data });
   } catch (error) {
     console.error("❌ [Server] Error fetching data:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// API Step 2: Send Weekly Report Email
+app.post('/api/send-report', async (req, res) => {
+  const { to, data, weekRange } = req.body;
+  try {
+    const result = await sendWeeklyReportEmail(to, data, weekRange);
+    res.json({ success: true, result });
+  } catch (error) {
+    console.error("❌ [Server] Error sending email:", error);
     res.status(500).json({ success: false, error: error.message });
   }
 });

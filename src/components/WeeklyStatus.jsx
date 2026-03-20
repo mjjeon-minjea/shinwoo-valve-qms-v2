@@ -55,6 +55,17 @@ const WeeklyStatus = () => {
     });
     const [loading, setLoading] = useState(true);
 
+    const [showEmailModal, setShowEmailModal] = useState(false);
+    const [recipientEmail, setRecipientEmail] = useState('');
+
+    useEffect(() => {
+        if (user?.email) {
+            setRecipientEmail(user.email);
+        } else {
+            setRecipientEmail('mjjeon@shinwoovalve.com');
+        }
+    }, [user]);
+
     const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
     const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
     const weekKey = format(weekStart, 'yyyy-MM-dd');
@@ -162,6 +173,43 @@ const WeeklyStatus = () => {
         window.print();
     };
 
+    const confirmSendEmail = async () => {
+        const weekRange = `${format(weekStart, 'yyyy-MM-dd')} ~ ${format(weekEnd, 'MM/dd')}`;
+        
+        if (!recipientEmail || !recipientEmail.includes('@')) {
+            alert('올바른 이메일 주소를 입력해 주세요.');
+            return;
+        }
+
+        try {
+            setLoading(true);
+            const response = await fetch('http://localhost:3000/api/send-report', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    to: recipientEmail,
+                    data: aggregatedData,
+                    weekRange: weekRange
+                }),
+            });
+
+            const result = await response.json();
+            if (result.success) {
+                alert('✅ 메일이 성공적으로 발송되었습니다!');
+                setShowEmailModal(false);
+            } else {
+                throw new Error(result.error);
+            }
+        } catch (error) {
+            console.error('Error sending email:', error);
+            alert(`❌ 메일 발송 실패: ${error.message}`);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     if (loading) return <div className="p-8 text-center">로딩 중...</div>;
 
     return (
@@ -178,12 +226,58 @@ const WeeklyStatus = () => {
                         <span className="px-4 font-bold text-gray-700">{format(weekStart, 'yyyy-MM-dd')} ~ {format(weekEnd, 'MM/dd')}</span>
                         <button onClick={() => setCurrentDate(addWeeks(currentDate, 1))} className="p-2 hover:bg-gray-100 rounded"><ChevronRight className="w-5 h-5"/></button>
                     </div>
-                    <button onClick={handlePrint} className="flex items-center px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 shadow-sm transition-colors">
+                    <button onClick={handlePrint} className="flex items-center px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 shadow-sm transition-colors border border-gray-300">
                         <Printer className="w-4 h-4 mr-2" />
                         출력하기
                     </button>
+                    <button onClick={() => setShowEmailModal(true)} className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow-sm transition-colors">
+                        <CalendarIcon className="w-4 h-4 mr-2" />
+                        메일 발송
+                    </button>
                 </div>
             </div>
+
+            {/* Email Modal */}
+            {showEmailModal && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden animate-in fade-in zoom-in duration-200">
+                        <div className="bg-indigo-600 p-6 text-white text-center">
+                            <div className="bg-white/20 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 backdrop-blur-sm">
+                                <FileText className="w-8 h-8" />
+                            </div>
+                            <h3 className="text-xl font-bold">주간 보고서 메일 발송</h3>
+                            <p className="text-indigo-100 mt-1 opacity-90">선택한 주간의 통합 보고서를 발송합니다.</p>
+                        </div>
+                        <div className="p-8">
+                            <div className="mb-6">
+                                <label className="block text-sm font-bold text-gray-700 mb-2 ml-1">수신 이메일 주소</label>
+                                <input 
+                                    type="email" 
+                                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none text-gray-800"
+                                    value={recipientEmail} 
+                                    onChange={(e) => setRecipientEmail(e.target.value)}
+                                    placeholder="example@shinwoovalve.com"
+                                />
+                                <p className="text-xs text-gray-400 mt-2 ml-1">기본값은 로그인된 사용자의 이메일 주소입니다.</p>
+                            </div>
+                            <div className="flex space-x-3">
+                                <button 
+                                    onClick={() => setShowEmailModal(false)}
+                                    className="flex-1 py-3 text-gray-600 font-bold hover:bg-gray-50 rounded-xl transition-colors border border-gray-200"
+                                >
+                                    취소
+                                </button>
+                                <button 
+                                    onClick={confirmSendEmail}
+                                    className="flex-1 py-3 bg-indigo-600 text-white font-bold hover:bg-indigo-700 rounded-xl shadow-lg shadow-indigo-200 transition-all active:scale-95"
+                                >
+                                    보내기
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Print Header - Visible only on Print */}
             <div className="hidden print:block mb-8 text-center border-b-2 border-gray-800 pb-4">
@@ -204,16 +298,26 @@ const WeeklyStatus = () => {
                         color="blue"
                         items={aggregatedData.projects}
                         renderItem={(item) => (
-                            <div className="flex flex-col sm:flex-row sm:items-center py-2 border-b border-gray-50 last:border-0 hover:bg-gray-50 transition-colors">
-                                <div className="w-40 flex-shrink-0 mb-1 sm:mb-0">
+                            <div className="flex flex-col sm:flex-row sm:items-start py-3 border-b border-gray-50 last:border-0 hover:bg-gray-50/80 transition-colors group">
+                                <div className="w-40 flex-shrink-0 mb-1 sm:mb-0 pt-0.5">
                                     <NameBadge name={item.name} rank={item.rank} />
                                 </div>
                                 <div className="flex-1">
-                                    <span className="font-bold text-gray-800 mr-2">{item.title}</span>
-                                    <span className="text-sm text-gray-500">- {item.content}</span>
+                                    <div className="flex items-center flex-wrap gap-x-2">
+                                        <span className="font-bold text-gray-800">{item.title}</span>
+                                        {item.note && (
+                                            <span className="text-sm text-gray-600 flex items-center">
+                                                <span className="mx-1 text-indigo-500 font-serif">☞</span> {item.note}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="text-sm text-gray-500 mt-1.5 flex items-start pl-1">
+                                        <span className="mr-2 text-gray-400 font-mono">ㄴ</span>
+                                        <span className="leading-relaxed">{item.content}</span>
+                                    </div>
                                 </div>
-                                <div className="w-24 text-right flex-shrink-0 mt-1 sm:mt-0">
-                                    <span className="text-xs px-2 py-1 bg-gray-100 rounded text-gray-600">{item.status}</span>
+                                <div className="w-24 text-right flex-shrink-0 mt-2 sm:mt-1">
+                                    <span className="text-xs px-2 py-1 bg-gray-100 rounded text-gray-600 font-medium">{item.status}</span>
                                 </div>
                             </div>
                         )}
@@ -226,15 +330,25 @@ const WeeklyStatus = () => {
                         color="red"
                         items={aggregatedData.issues}
                         renderItem={(item) => (
-                            <div className="flex flex-col sm:flex-row sm:items-center py-2 border-b border-gray-50 last:border-0 hover:bg-gray-50 transition-colors">
-                                <div className="w-40 flex-shrink-0 mb-1 sm:mb-0">
+                            <div className="flex flex-col sm:flex-row sm:items-start py-3 border-b border-gray-50 last:border-0 hover:bg-gray-50/80 transition-colors group">
+                                <div className="w-40 flex-shrink-0 mb-1 sm:mb-0 pt-0.5">
                                     <NameBadge name={item.name} rank={item.rank} />
                                 </div>
                                 <div className="flex-1">
-                                    <span className="font-bold text-red-700 mr-2">⚠ {item.title}</span>
-                                    <span className="text-sm text-gray-500">- {item.content}</span>
+                                    <div className="flex items-center flex-wrap gap-x-2">
+                                        <span className="font-bold text-red-700">⚠ {item.title}</span>
+                                        {item.note && (
+                                            <span className="text-sm text-gray-600 flex items-center">
+                                                <span className="mx-1 text-red-400 font-serif">☞</span> {item.note}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="text-sm text-gray-500 mt-1.5 flex items-start pl-1">
+                                        <span className="mr-2 text-gray-400 font-mono">ㄴ</span>
+                                        <span className="leading-relaxed">{item.content}</span>
+                                    </div>
                                 </div>
-                                <div className="w-24 text-right flex-shrink-0 mt-1 sm:mt-0">
+                                <div className="w-24 text-right flex-shrink-0 mt-2 sm:mt-1">
                                     <span className={`text-xs px-2 py-1 rounded font-bold
                                         ${item.status === '발생' ? 'bg-red-100 text-red-700' : 
                                           item.status === '완료' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`
