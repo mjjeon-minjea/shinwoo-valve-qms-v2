@@ -4,162 +4,131 @@ import { supabase } from '../lib/api';
 const UserContext = createContext();
 
 export const UserProvider = ({ children }) => {
-    // Session state
-    const [user, setUser] = useState(null); // Auth user + profile table data
+    const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
 
-    // Initial auth state check from localStorage
+    // [핵심 변경] 로컬스토리지 야매 폐기, 공식 세션 리스너(onAuthStateChange) 부활!
     useEffect(() => {
-        const savedSession = sessionStorage.getItem('qms-legacy-user');
-        if (savedSession) {
-            try {
-                const sessionData = JSON.parse(savedSession);
-                if (sessionData && sessionData.email) {
-                    fetchUserProfile({ email: sessionData.email });
-                } else {
-                    setUser(null);
-                    setLoading(false);
-                }
-            } catch (err) {
-                console.error("Local session parsing error", err);
-                setUser(null);
-                setLoading(false);
-            }
-        } else {
-            setUser(null);
-            setLoading(false);
-        }
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            if (session) fetchUserProfile(session.user);
+            else { setUser(null); setLoading(false); }
+        });
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            if (session) fetchUserProfile(session.user);
+            else { setUser(null); setLoading(false); }
+        });
+
+        return () => subscription.unsubscribe();
     }, []);
 
-    // Fetch extra profile data from 'users' table
     async function fetchUserProfile(authUser) {
         setLoading(true);
         try {
-            const { data, error } = await supabase
-                .from('users')
-                .select('*')
-                .eq('email', authUser.email)
-                .single();
-
-            if (error) {
-                console.error('Error fetching user profile:', error);
-                throw error;
-            }
-
+            const { data } = await supabase.from('users').select('*').eq('email', authUser.email).single();
             const profile = data || { name: '알수없음', email: authUser.email, role: '사원', status: 'Pending' };
-            
             const finalUser = {
                 ...profile,
+                id: authUser.id, // 진짜 Auth ID 부여
                 isAdmin: profile.role === 'manager' || profile.role === 'director'
             };
-
             setUser(finalUser);
         } catch (err) {
-            console.error('Failed to load user profile:', err);
             setUser(null);
-            sessionStorage.removeItem('qms-legacy-user');
         } finally {
             setLoading(false);
         }
     }
 
-    // Direct DB Login (초고속 DB 직접 대조)
     const login = async (rawEmail, password) => {
         setLoading(true);
-        try {
-            const email = rawEmail.includes('@') ? rawEmail : `${rawEmail}@shinwoovalve.com`;
+        const email = rawEmail.includes('@') ? rawEmail : `${rawEmail}@shinwoovalve.com`;
+        
+        // 1. 진짜 Auth 서버 정문 돌파 시도
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        
+        if (error) {
+            // 2. Seamless(무혈입성) 마이그레이션: Auth에 실패했지만, 구버전 DB에 비번까지 일치하는 유저인지 확인
+            if (error.message.includes('Invalid login credentials')) {
+                 const { data: oldUser } = await supabase.from('users')
+                     .select('*')
+                     .eq('email', email)
+                     .eq('password', password) // 패스워드까지 완벽히 일치하는지 백그라운드 교차 검증
+                     .single();
 
-            // DB에서 이메일과 비밀번호가 정확히 일치하는 행을 직접 찾습니다
-            const { data, error } = await supabase.from('users').select('*').eq('email', email).eq('password', password);
-            
-            if (error) throw error;
-
-            if (data && data.length > 0) {
-                const loggedInUser = data[0];
-                
-                if (loggedInUser.status !== 'Active') {
-                    throw new Error("승인 대기 중이거나 비활성 상태의 계정입니다. 관리자 승인 후 로그인해 주세요.");
-                }
-                
-                const finalUser = {
-                    ...loggedInUser,
-                    isAdmin: loggedInUser.role === 'manager' || loggedInUser.role === 'director'
-                };
-                
-                // sessionStorage에 이메일만 저장해두어 새로고침 시 세션 유지 (브라우저 종료 시 만료)
-                sessionStorage.setItem('qms-legacy-user', JSON.stringify({ email: loggedInUser.email }));
-                setUser(finalUser);
-                setLoading(false);
-                return { user: finalUser };
-            } else {
-                throw new Error("Invalid login credentials"); // Hero.jsx 알림창 호환을 위해 에러 메시지 유지
+                 if (oldUser) {
+                      // 당첨! 유저 몰래 그 자리에서 즉시 Auth 서버로 강제 이관 (회원가입 자동화)
+                      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+                          email,
+                          password
+                      });
+                      
+                      if (signUpError) {
+                          setLoading(false);
+                          throw signUpError; // 만약 Supabase Auth Rate Limit 등 에러가 나면 뱉어냄
+                      }
+                      
+                      // 이메일 인증 옵션(Confirm email)이 꺼져 있으므로 signUp 호출 즉시 가입 완료 & 세션 자동 발급!
+                      // 유저는 마이그레이션 모달 따위 볼 필요 없이 로그인 버튼 1번 클릭으로 대시보드 홈에 꽂힘.
+                      return { user: signUpData.user };
+                 } else {
+                     setLoading(false);
+                     throw new Error("아이디 또는 비밀번호가 올바르지 않습니다.");
+                 }
             }
-        } catch (err) {
             setLoading(false);
-            throw err;
+            throw error;
         }
+        return { user: data.user };
     };
 
-    // Logout
     const logout = async () => {
         setLoading(true);
-        sessionStorage.removeItem('qms-legacy-user');
+        await supabase.auth.signOut();
         setUser(null);
         setLoading(false);
     };
 
-    // Direct DB SignUp (Auth 락(Rate Limit) 우회용 직접 가입)
+    // 진짜 신규 가입 (Auth 서버 + public.users 쌍방향 주입)
     const signup = async (rawEmail, password, profileData) => {
         setLoading(true);
-        try {
-            const email = rawEmail.includes('@') ? rawEmail : `${rawEmail}@shinwoovalve.com`;
-            
-            // 1. 중복 확인
-            const { data: existing } = await supabase.from('users').select('id').eq('email', email);
-            if (existing && existing.length > 0) {
-                throw new Error("이미 등록된 이메일 또는 사번입니다.");
-            }
+        const email = rawEmail.includes('@') ? rawEmail : `${rawEmail}@shinwoovalve.com`;
+        
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+            email, password, options: { data: { name: profileData.name } }
+        });
+        if (authError) { setLoading(false); throw authError; }
 
-            // 2. Insert into users DB مباشرة
-            const newUserProfile = {
-                email: email,
-                password: password,
-                name: profileData.name,
-                company: profileData.company || '품질보증부',
-                rank: profileData.rank || '사원',
-                role: 'user', 
-                status: 'Pending',
-                date: new Date().toISOString().split('T')[0]
-            };
-
-            const { error: dbError } = await supabase.from('users').insert([newUserProfile]);
-            
-            if (dbError) {
-                console.error("Error creating user profile:", dbError);
-                throw dbError;
-            }
-
-            setLoading(false);
-            return { user: newUserProfile };
-        } catch (err) {
-            setLoading(false);
-            throw err;
-        }
+        const newUserProfile = {
+            email, name: profileData.name,
+            company: profileData.company || '품질보증부',
+            rank: profileData.rank || '사원',
+            role: 'user', status: 'Pending',
+            date: new Date().toISOString().split('T')[0]
+        };
+        const { error: dbError } = await supabase.from('users').upsert([newUserProfile]);
+        
+        setLoading(false);
+        if (dbError) throw dbError;
+        return { user: authData.user };
     };
 
-    // 더미 함수 (기존 App.jsx 및 모달창 에러 방지용)
-    const updatePasswordAndMigrate = async () => {
-        return null;
+    // 구버전 유저가 뜨는 Auth 이관 비상 탈출구 (App.jsx의 비밀번호 재설정 모달과 연결됨)
+    const migrateUser = async (email, newPassword) => {
+         setLoading(true);
+         const { error } = await supabase.auth.signUp({ email, password: newPassword });
+         setLoading(false);
+         if (error) throw error;
+         alert('시스템 보안 업데이트가 반영되었습니다. 새 비밀번호로 다시 로그인해 주세요.');
     };
 
     return (
-        <UserContext.Provider value={{ user, login, logout, signup, migrateUser: updatePasswordAndMigrate, loading }}>
+        <UserContext.Provider value={{ user, login, logout, signup, migrateUser, loading }}>
             {children}
         </UserContext.Provider>
     );
 };
 
-// eslint-disable-next-line react-refresh/only-export-components
 export const useUser = () => {
     const context = useContext(UserContext);
     if (!context) {

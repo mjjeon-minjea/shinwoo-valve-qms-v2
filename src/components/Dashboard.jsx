@@ -17,6 +17,9 @@ import ProgressModal from './ProgressModal';
 import * as XLSX from 'xlsx';
 import popupImage from '../assets/popup.png';
 import NoticeBoard from './NoticeBoard';
+import DevNotes from './DevNotes';
+import Suggestions from './Suggestions';
+import PostApproval from './PostApproval';
 import ResourceRoom from './ResourceRoom';
 import WeeklyReport from './WeeklyReport';
 import WeeklyStatus from './WeeklyStatus';
@@ -1773,6 +1776,39 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
     const [adminExpanded, setAdminExpanded] = useState(true);
     const [showPopup, setShowPopup] = useState(false);
 
+    // [QA 적용본] 이탈 방지용 깃발 및 히스토리 제어 로직 
+    const isPopStateRef = useRef(false);
+
+    useEffect(() => {
+        // [이중 잠금] 관리자도 아닌데 강제 상태 변조 시 홈으로 튕겨냄
+        if (activeTab === 'post_approval' && !isAdmin) {
+            console.warn("Unauthorized access to post_approval blocked.");
+            setActiveTab('home');
+            return;
+        }
+
+        // 1. 뒤로가기가 아니면 정상적으로 히스토리 스택 추가
+        if (!isPopStateRef.current) {
+            window.history.pushState({ tab: activeTab }, '', `#${activeTab}`);
+        } else {
+            // 뒤로가기로 왔으면 푸시 금지 후 플래그 리셋
+            isPopStateRef.current = false;
+        }
+
+        const handlePopState = (event) => {
+            isPopStateRef.current = true; // 뒤로가기 발생 플래그 켜기
+            if (event.state && event.state.tab) {
+                setActiveTab(event.state.tab);
+            } else {
+                setActiveTab('home');
+                window.history.replaceState({ tab: 'home' }, '', '#home');
+            }
+        };
+
+        window.addEventListener('popstate', handlePopState);
+        return () => window.removeEventListener('popstate', handlePopState);
+    }, [activeTab, isAdmin]);
+
     useEffect(() => {
         const checkPopup = async () => {
             const today = new Date().toISOString().split('T')[0];
@@ -1821,7 +1857,9 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
             case 'process_by_model_category': return <ModelCategoryAnalysis />;
             case 'process_history': return <ProcessHistory />;
             case 'final': return <PlaceholderView title="최종검사 현황" icon={CheckCircle} />;
-            case 'inquiries': return <InquiryManagement isAdmin={isAdmin} user={user} />;
+            case 'dev_notes': return <DevNotes user={user} />;
+            case 'suggestions': return <Suggestions user={user} />;
+            case 'post_approval': return isAdmin ? <PostApproval user={user} /> : null;
             case 'members': return <MemberManagement members={members} onDeleteMember={onDeleteMember} onEditMember={onEditMember} onAddMember={onAddMember} onRefresh={onRefresh} />;
             case 'settings_home': return <HomepageSettings />;
             case 'weekly_report': return <WeeklyReport user={user} />;
@@ -1844,13 +1882,13 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
                         <div>
                             <button
                                 onClick={() => { setActiveTab('home'); setMainExpanded(!mainExpanded); }}
-                                className={`w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium rounded-lg transition-colors ${activeTab === 'home' || activeTab === 'notices' || activeTab === 'resources'
+                                className={`w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium rounded-lg transition-colors ${['home', 'notices', 'resources', 'dev_notes', 'suggestions'].includes(activeTab)
                                     ? 'bg-primary-50 text-primary-700'
                                     : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                                     }`}
                             >
                                 <div className="flex items-center">
-                                    <LayoutDashboard className={`mr-3 h-5 w-5 ${activeTab === 'home' || activeTab === 'notices' || activeTab === 'resources' ? 'text-primary-600' : 'text-slate-400'}`} />
+                                    <LayoutDashboard className={`mr-3 h-5 w-5 ${['home', 'notices', 'resources', 'dev_notes', 'suggestions'].includes(activeTab) ? 'text-primary-600' : 'text-slate-400'}`} />
                                     메인화면
                                 </div>
                                 <ChevronDown className={`w-4 h-4 transition-transform ${mainExpanded ? 'transform rotate-180' : ''} ${activeTab === 'home' ? 'text-primary-500' : 'text-slate-400'}`} />
@@ -1871,10 +1909,22 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
                                         공지사항
                                     </button>
                                     <button
+                                        onClick={() => setActiveTab('dev_notes')}
+                                        className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === 'dev_notes' ? 'text-primary-600 bg-white shadow-sm' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'}`}
+                                    >
+                                        개발자 노트
+                                    </button>
+                                    <button
                                         onClick={() => setActiveTab('resources')}
                                         className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === 'resources' ? 'text-primary-600 bg-white shadow-sm' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'}`}
                                     >
                                         자료실
+                                    </button>
+                                    <button
+                                        onClick={() => setActiveTab('suggestions')}
+                                        className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === 'suggestions' ? 'text-primary-600 bg-white shadow-sm' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'}`}
+                                    >
+                                        건의사항
                                     </button>
                                 </div>
                             )}
@@ -2003,37 +2053,33 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
                             </div>
                         </button>
 
-                        <button
-                            onClick={() => setActiveTab('inquiries')}
-                            className={`w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium rounded-lg transition-colors ${activeTab === 'inquiries'
-                                ? 'bg-primary-50 text-primary-700'
-                                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                                }`}
-                        >
-                            <div className="flex items-center">
-                                <HelpCircle className={`mr-3 h-5 w-5 ${activeTab === 'inquiries' ? 'text-primary-600' : 'text-slate-400'}`} />
-                                문의사항
-                            </div>
-                        </button>
-
                         {isAdmin && (
                             <div>
                                 <button
                                     onClick={() => setAdminExpanded(!adminExpanded)}
-                                    className={`w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium rounded-lg transition-colors ${activeTab === 'members' || activeTab === 'settings_home'
+                                    className={`w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium rounded-lg transition-colors ${['members', 'settings_home', 'post_approval'].includes(activeTab)
                                         ? 'bg-primary-50 text-primary-700'
                                         : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                                         }`}
                                 >
                                     <div className="flex items-center">
-                                        <Settings className={`mr-3 h-5 w-5 ${activeTab === 'members' || activeTab === 'settings_home' ? 'text-primary-600' : 'text-slate-400'}`} />
+                                        <Settings className={`mr-3 h-5 w-5 ${['members', 'settings_home', 'post_approval'].includes(activeTab) ? 'text-primary-600' : 'text-slate-400'}`} />
                                         관리자 설정
                                     </div>
-                                    <ChevronDown className={`w-4 h-4 transition-transform ${adminExpanded ? 'transform rotate-180' : ''} ${activeTab === 'members' || activeTab === 'settings_home' ? 'text-primary-500' : 'text-slate-400'}`} />
+                                    <ChevronDown className={`w-4 h-4 transition-transform ${adminExpanded ? 'transform rotate-180' : ''} ${['members', 'settings_home', 'post_approval'].includes(activeTab) ? 'text-primary-500' : 'text-slate-400'}`} />
                                 </button>
 
                                 {adminExpanded && (
                                     <div className="mt-1 space-y-1 pl-11">
+                                        <button
+                                            onClick={() => setActiveTab('post_approval')}
+                                            className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === 'post_approval'
+                                                ? 'text-primary-600 bg-white shadow-sm'
+                                                : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                                                }`}
+                                        >
+                                            게시물 승인 관리
+                                        </button>
                                         <button
                                             onClick={() => setActiveTab('members')}
                                             className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === 'members'

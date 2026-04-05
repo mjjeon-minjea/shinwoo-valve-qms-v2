@@ -1,32 +1,35 @@
-# AI 상호작용 규칙 (AI Interaction Rules)
+# 🤖 신우밸브 QMS AI 통합 룰셋 (버전 : V2.1 / 260405)
 
-1.  **언어 (Language)**:
-    - 모든 대화와 문서(Task, Plan, Log 등)는 **반드시 한국어**로 작성한다.
-    - 영어로 된 기술 용어는 필요 시 괄호 병기하되, 설명은 한국어로 한다.
-    - 예외: 코드 내 주석이나 커밋 메시지는 프로젝트 컨벤션을 따른다.
+## 📌 제1장. 기본 헌법 및 통제 (Core Protocols)
 
-2.  **검증 (Verification)**:
-    - 모든 계획(Plan)은 사용자에게 제시하기 전에 **"내가 한 말이 맞나?"** 다시 한번 자가 검증한다.
-    - 특히 실행 계획이 실제로 구현 가능한지(파일 경로, API 존재 여부 등) 사전에 확인한다.
+- **언어 및 태도 강제**: 모든 응답, 상태창, 보고는 100% 한국어로 출력. 답변 끝에는 언제나 "실시!" 또는 "보고합니다!"로 다음 지시 대기.
+- **에러 대응 및 추측 금지**: 에러 발생 시 임의로 원인을 추측하여 멀쩡한 시스템 코드를 엎지 않음. 반드시 브라우저 콘솔(F12)이나 네트워크 탭(팩트) 확인을 차장님께 최우선으로 요청하여 진단할 것.
+- **코드/경로 명시 규칙**: 코드 수정 시 "여기서부터 알아서 하세요(...)"식의 생략 기법 절대 금지. 복사-붙여넣기 가능한 완제 코드와 최상단 파일 경로(예: `src/components/...`) 명시 필수.
+- **[DB 절대 격리 원칙]**: 로컬(Local)과 테스트웹(Staging) 작업 시에는 무조건 테스트용 DB만 연동/수정하며, 메인 상용 DB(Production)의 스키마 및 데이터는 차장님의 최종 승인 없이 절대 직접 타격하지 않는다.
 
-3.  **오류 방지 및 재발 방지 (Prevention)**:
-    - 동일한 실수가 2회 이상 반복되면, 즉시 작업을 멈추고 원인을 분석하여 사용자에게 보고한다.
-    - "죄송합니다"만 반복하지 않고, 구체적인 개선책(Rule 업데이트 등)을 실행한다.
 
-This file documents the preferences and rules for AI assistants interacting with this codebase.
+## 📌 제2장. 시스템 버전 통제 (Versioning Rules - v0.x.y)
+모든 개발자 노트 및 시스템 업데이트는 반드시 차장님이 허가한 시맨틱 버전 체계를 따른다. 시작 번호 임의 상승 절대 불가.
 
-## 1. Language & Communication
+- **v1.0.0 (최종 라이브)**: 메인 상용 서버(Production) 결함 0% 확정 전까지 1점대, 2점대 부여 절대 봉인.
+- **x (Minor - 신규 기능)**: 뚜렷한 새로운 기능(새 UI, 승인 파이프라인 신설, DB 테이블 구조 변경) 개발 완료 시 숫자를 1 올리고 y를 0으로 초기화. (예: `v0.19.0` ➔ `v0.20.0`)
+- **y (Patch - 핫픽스/버그)**: 기존 기능의 단순 버그 픽스, 오타 교정, 정렬 에러 해결, 단순 키값 교체 시 숫자를 올림. (예: `v0.19.0` ➔ `v0.19.1`)
 
-- **Primary Language**: All responses, explanations, and conversation must be in **Korean (한국어)**.
-- **Exceptions**: Code comments, commit messages, and variable names should remain in English (or as per existing codebase patterns), but the explanation _about_ them must be in Korean.
-- **Tone**: Professional, concise, and helpful.
+## 📌 제3장. 무인 자동화 SOP (Trigger Commands)
 
-## 2. Project Context
+- **트리거 👉 "시스템 시작"**: 해당 명령어 감지 즉시 수동 개입 없이 아래 명시된 루틴을 100% 순차 자동 수행.
+  1. 백그라운드 터미널에 `npm run dev` 기동 (이미 실행 중이면 생략)
+  2. `browser_subagent` 툴을 활용하여 로컬(`localhost:5173`) 접속
+  3. 로그인 폼 인식하여 ID(`mjjeon`) / PW(`1`) 입력 후 자동 로그인 테스트
+  4. 로그인 성공, 메인 대시보드 화면 및 DB 연동 정상 여부 캡처
+  5. 캡처 결과와 서버 상태를 `qms_daily_log.md` (작업 일지)에 기록
+  6. 차장님께 "**서버 시작 및 Staging DB 연결 완료. 브라우저에서 화면 확인하십시오.**" 보고
 
-- **Project**: QMS (Quality Management System) for Shinwoo Valve.
-- **Stack**: React, Node.js, JSON Server / Supabase.
+## 📌 제4장. 3단계 격리 환경 보고 체계 (3-Tier Reporting)
+데이터베이스와 서버 분리 원칙에 따라, AI는 공정 완료 시 **[머리말]**을 부착하여 상태를 명확히 고지한다.
 
-## 3. Workflow
+- **[로컬(Local) 공정 완료]**: 로컬 코드 수정 및 Draft DB 데이터 삽입 시 적용. (목표: 차장님 로컬 검토 및 승인 대기)
+- **[테스트(Staging) 배포 완료]**: 차장님 단말 승인 후 테스트 웹 서버(Vercel 등) 반영 시 적용. (목표: 기능 오류 없는지 최종 웹 기능 검증)
+- **[운영(Production) 최종 배포 완료]**: 모든 검증 완료 후 메인 상용 서버 배포 성공 시 적용.
 
-- Always check `task.md` (if active) for current progress.
-- Respect existing file structure.
+*(본 규칙은 AI가 새 세션에 진입할 때마다 최우선 컨텍스트로 읽혀 망각을 원천 차단한다.)*
