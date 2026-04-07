@@ -69,8 +69,13 @@ export const UserProvider = ({ children }) => {
                           throw signUpError; // 만약 Supabase Auth Rate Limit 등 에러가 나면 뱉어냄
                       }
                       
-                      // 이메일 인증 옵션(Confirm email)이 꺼져 있으므로 signUp 호출 즉시 가입 완료 & 세션 자동 발급!
-                      // 유저는 마이그레이션 모달 따위 볼 필요 없이 로그인 버튼 1번 클릭으로 대시보드 홈에 꽂힘.
+                      // [중요 로직 결함 수정] 신규 Supabase 프로젝트는 '이메일 확인(Confirm email)'이 켜져있어 세션 발급이 안 되고 무한로딩 걸리는 현상 방지!
+                      if (!signUpData.session && signUpData.user) {
+                          setLoading(false);
+                          throw new Error("Supabase 설정 오류: 'Confirm email' 기능이 켜져 있어 로그인이 대기 중입니다. 관리자 대시보드(Authentication -> Providers -> Email)에서 이 기능을 꺼주세요!");
+                      }
+                      
+                      setLoading(false);
                       return { user: signUpData.user };
                  } else {
                      setLoading(false);
@@ -80,6 +85,8 @@ export const UserProvider = ({ children }) => {
             setLoading(false);
             throw error;
         }
+        
+        setLoading(false); // 성공 시에도 반드시 로딩 해제
         return { user: data.user };
     };
 
