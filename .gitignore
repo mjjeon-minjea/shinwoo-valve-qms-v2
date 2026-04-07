@@ -121,3 +121,8 @@ Desktop.ini
 dist-ssr
 .vercel
 .env*.local
+
+# Database Backups & Parsed Data
+DB_BACKUPS/
+DB_PARSED/
+
