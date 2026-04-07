@@ -10,14 +10,6 @@ export const UserProvider = ({ children }) => {
     // [핵심 변경] 로컬스토리지 야매 폐기, 공식 세션 리스너(onAuthStateChange) 부활!
     // [핵심 변경] 로컬스토리지 야매 폐기, 공식 세션 리스너(onAuthStateChange) 부활!
     useEffect(() => {
-        // [긴급 우회로] Supabase Auth 500 에러를 피하기 위한 야매 세션 로더
-        const override = localStorage.getItem('qms_override_session');
-        if (override) {
-            const sessionUser = JSON.parse(override);
-            fetchUserProfile(sessionUser);
-            return;
-        }
-
         supabase.auth.getSession().then(({ data: { session } }) => {
             if (session) fetchUserProfile(session.user);
             else { setUser(null); setLoading(false); }
@@ -58,8 +50,7 @@ export const UserProvider = ({ children }) => {
         
         if (error) {
             // 2. Seamless(무혈입성) 마이그레이션: Auth에 실패했지만, 구버전 DB에 비번까지 일치하는 유저인지 확인
-            // 추가: Supabase 500 Database error querying schema 에러도 함께 캐치해서 프리패스!
-            if (error.message.includes('Invalid login credentials') || error.message.includes('Database error')) {
+            if (error.message.includes('Invalid login credentials')) {
                  const { data: oldUser } = await supabase.from('users')
                      .select('*')
                      .eq('email', email)
@@ -67,10 +58,20 @@ export const UserProvider = ({ children }) => {
                      .single();
 
                  if (oldUser) {
-                      // 당첨! 유저 몰래 야매 세션을 생성해서 localStorage에 구워버립니다.
-                      const overrideUser = { id: oldUser.id, email: oldUser.email };
-                      localStorage.setItem('qms_override_session', JSON.stringify(overrideUser));
-                      return { user: overrideUser };
+                      // 당첨! 유저 몰래 그 자리에서 즉시 Auth 서버로 강제 이관 (회원가입 자동화)
+                      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+                          email,
+                          password
+                      });
+                      
+                      if (signUpError) {
+                          setLoading(false);
+                          throw signUpError; // 만약 Supabase Auth Rate Limit 등 에러가 나면 뱉어냄
+                      }
+                      
+                      // 이메일 인증 옵션(Confirm email)이 꺼져 있으므로 signUp 호출 즉시 가입 완료 & 세션 자동 발급!
+                      // 유저는 마이그레이션 모달 따위 볼 필요 없이 로그인 버튼 1번 클릭으로 대시보드 홈에 꽂힘.
+                      return { user: signUpData.user };
                  } else {
                      setLoading(false);
                      throw new Error("아이디 또는 비밀번호가 올바르지 않습니다.");
@@ -84,7 +85,6 @@ export const UserProvider = ({ children }) => {
 
     const logout = async () => {
         setLoading(true);
-        localStorage.removeItem('qms_override_session');
         await supabase.auth.signOut();
         setUser(null);
         setLoading(false);
