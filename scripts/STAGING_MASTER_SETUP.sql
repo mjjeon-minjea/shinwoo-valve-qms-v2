@@ -27,6 +27,7 @@ DROP TABLE IF EXISTS public.users CASCADE;
 -- 3. 핵심 테이블: public.users (무혈 입성용 베이스캠프)
 CREATE TABLE public.users (
   id text PRIMARY KEY, -- 임시 ID 허용
+  auth_id uuid, -- [P2 추가] Supabase Auth UUID 1:1 전담 매핑
   email text UNIQUE NOT NULL,
   password text NOT NULL, -- 자동 마이그레이션용 비밀번호 (해시 전)
   name text,
