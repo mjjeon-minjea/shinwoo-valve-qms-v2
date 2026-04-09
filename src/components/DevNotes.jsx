@@ -4,15 +4,21 @@ import { supabase } from '../lib/api';
 
 // ✅ 시맨틱 버전(vX.Y.Z) 정렬용 헬퍼 함수
 const compareVersions = (a, b) => {
-    const parse = (v) => (v || 'v0.0.0').replace(/[^\d.]/g, '').split('.').map(Number);
+    // 1. 숫자가 아닌 배열 요소가 나오면 무조건 0으로 덮어씀 (안전장치)
+    const parse = (v) => {
+        const parts = (v || 'v0.0.0').replace(/[^\d.]/g, '').split('.').map(x => parseInt(x, 10) || 0);
+        return [parts[0] || 0, parts[1] || 0, parts[2] || 0]; 
+    };
+    
     const [ma, mia, pa] = parse(a.version);
     const [mb, mib, pb] = parse(b.version);
     
+    // 2. 메이저 -> 마이너 -> 패치 순으로 숫자값 철저 평가 (최신이 위로 = 내림차순)
     if (ma !== mb) return mb - ma;
     if (mia !== mib) return mib - mia;
     if (pa !== pb) return pb - pa;
     
-    // 버전이 같으면 날짜순
+    // 3. 완전히 똑같은 버전일 경우 -> 최신 날짜가 무조건 위로 오도록 설계
     return new Date(b.created_at || b.date) - new Date(a.created_at || a.date);
 };
 
