@@ -4,6 +4,10 @@ const jsonServer = require('json-server');
 const path = require('path');
 const fs = require('fs');
 
+// .env.local 환경변수 로드 (SUPABASE_SERVICE_ROLE_KEY 접근용)
+const dotenv = require('dotenv');
+dotenv.config({ path: '.env.local' });
+
 import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -140,6 +144,106 @@ server.delete('/process_inspections', (req, res) => {
     } catch (error) {
         console.error('[Process Batch Delete Error]', error);
         res.status(500).send(error.message);
+    }
+});
+
+// =====================================================
+// [P3] 관리자 전용 비밀번호/정보 변경 API
+// POST /api/admin-update-member
+// 호출자의 JWT 검증 → rank='차장' 확인 → Supabase Admin으로 passwd 강제 갱신
+// =====================================================
+server.post('/api/admin-update-member', async (req, res) => {
+    const { createClient } = await import('@supabase/supabase-js');
+
+    const supabaseUrl = process.env.VITE_SUPABASE_URL;
+    const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceKey) {
+        return res.status(500).json({ error: '서버 환경변수 누락. .env.local을 확인하십시오.' });
+    }
+
+    // 1. Authorization 헤더에서 JWT 추출
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ error: '인증 토큰이 없습니다.' });
+    }
+    const token = authHeader.split(' ')[1];
+
+    // 2. 일반 클라이언트로 JWT 해독하여 요청자 식별
+    const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey);
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+        auth: { autoRefreshToken: false, persistSession: false }
+    });
+
+    try {
+        const { data: { user }, error: userError } = await supabaseAuth.auth.getUser(token);
+        if (userError || !user) {
+            return res.status(401).json({ error: '유효하지 않거나 만료된 세션입니다.' });
+        }
+
+        // 3. 요청자가 '차장' 직급인지 DB 교차 검증
+        const { data: callerData, error: callerError } = await supabaseAdmin
+            .from('users')
+            .select('rank, role')
+            .eq('auth_id', user.id)
+            .single();
+
+        if (callerError || !callerData) {
+            return res.status(403).json({ error: '권한 검증 실패: 사용자 정보를 찾을 수 없습니다.' });
+        }
+
+        if (callerData.rank !== '차장' && callerData.role !== 'director') {
+            return res.status(403).json({ error: '접근 불가: 관리자(차장급) 전용 기능입니다.' });
+        }
+
+        // 4. 업데이트 대상 데이터 수신
+        const { auth_id, password, name, role, rank, company, status } = req.body;
+
+        if (!auth_id) {
+            return res.status(400).json({ error: '대상 직원의 auth_id가 누락되었습니다.' });
+        }
+
+        // 5. Supabase Auth 비밀번호 강제 갱신 (Service Role 권한 사용)
+        const authUpdates = {};
+        if (password && password.trim()) authUpdates.password = password.trim();
+        if (name) authUpdates.user_metadata = { name };
+
+        if (Object.keys(authUpdates).length > 0) {
+            const { error: authErr } = await supabaseAdmin.auth.admin.updateUserById(auth_id, authUpdates);
+            if (authErr) {
+                console.error('[Admin Update] Auth 갱신 오류:', authErr);
+                return res.status(500).json({ error: `Auth 서버 오류: ${authErr.message}` });
+            }
+        }
+
+        // 6. public.users 정보 동기화
+        const dbPayload = {};
+        if (name !== undefined) dbPayload.name = name;
+        if (role !== undefined) dbPayload.role = role;
+        if (rank !== undefined) dbPayload.rank = rank;
+        if (company !== undefined) dbPayload.company = company;
+        if (status !== undefined) dbPayload.status = status;
+        if (password && password.trim()) dbPayload.password = password.trim(); // 레거시 컬럼 동기화
+
+        if (Object.keys(dbPayload).length > 0) {
+            const { error: dbErr } = await supabaseAdmin
+                .from('users')
+                .update(dbPayload)
+                .eq('auth_id', auth_id);
+
+            if (dbErr) {
+                console.error('[Admin Update] DB 갱신 오류:', dbErr);
+                return res.status(500).json({ error: `DB 오류: ${dbErr.message}` });
+            }
+        }
+
+        console.log(`[Admin Update] auth_id(${auth_id}) 정보/비밀번호 갱신 완료.`);
+        return res.status(200).json({ success: true, message: '직원 정보가 성공적으로 변경되었습니다.' });
+
+    } catch (err) {
+        console.error('[Admin Update] 예상치 못한 오류:', err);
+        return res.status(500).json({ error: '서버 내부 오류가 발생했습니다.' });
     }
 });
 

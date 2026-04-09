@@ -169,7 +169,7 @@ const WeeklyReport = ({ user: propUser }) => {
         const updatedReport = {
             ...report,
             status: status,
-            [user.role === 'manager' ? 'reviewerComment' : 'approverComment']: comment
+            [status === 'reviewed' ? 'reviewerComment' : 'approverComment']: comment
         };
 
         try {
@@ -297,7 +297,7 @@ const WeeklyReport = ({ user: propUser }) => {
 
     // Render logic based on Role
     // Manager/Director View
-    if (user && (user.role === 'manager' || user.role === 'director')) {
+    if (user && (user.role === 'manager' || user.role === 'director' || user.role === 'admin')) {
         // Simple list view for managers to select report
         // For now, let's keep it simple: If looking at own report -> Edit mode
         // If clicking on team member report -> Review mode
@@ -361,9 +361,9 @@ const WeeklyReport = ({ user: propUser }) => {
 
     const isReadOnly = report && report.status !== 'draft' && report.status !== 'rejected' && String(report.authorId) === String(user.id);
     const isReviewMode = report && String(report.authorId) !== String(user.id);
-    const canReview = user.role === 'manager' && report?.status === 'submitted';
+    const canReview = (user.role === 'manager' || user.role === 'admin') && report?.status === 'submitted';
     // Allow Director to approve. Manager Self-Approval is removed.
-    const canApprove = user.role === 'director' && (report?.status === 'reviewed' || report?.status === 'submitted');
+    const canApprove = (user.role === 'director' || user.role === 'admin') && (report?.status === 'reviewed' || report?.status === 'submitted');
 
     return (
         <div className="p-6 max-w-7xl mx-auto bg-gray-50 min-h-screen">

@@ -20,7 +20,8 @@ export default defineConfig(({ mode }) => {
         '/upload': 'http://localhost:3001',
         '/uploads': 'http://localhost:3001',
         '/settings': 'http://localhost:3001',
-        '/item_master': 'http://localhost:3001'
+        '/item_master': 'http://localhost:3001',
+        '/api': 'http://localhost:3001'
       }
     }
   }
