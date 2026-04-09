@@ -1769,7 +1769,11 @@ const Home = ({ setActiveTab }) => {
 const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAddMember, onRefresh }) => {
     // eslint-disable-next-line no-unused-vars
     const navigate = useNavigate();
-    const [activeTab, setActiveTab] = useState('home'); // Default to home
+    const getInitialTab = () => {
+        const hash = window.location.hash.replace('#', '');
+        return hash ? hash : 'home';
+    };
+    const [activeTab, setActiveTab] = useState(getInitialTab); // Default to home (or current hash)
     // eslint-disable-next-line no-unused-vars
     const [isMenuOpen, setIsMenuOpen] = useState(true);
     const [mainExpanded, setMainExpanded] = useState(true);

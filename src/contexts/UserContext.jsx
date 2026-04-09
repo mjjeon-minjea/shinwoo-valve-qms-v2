@@ -15,16 +15,22 @@ export const UserProvider = ({ children }) => {
             else { setUser(null); setLoading(false); }
         });
 
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-            if (session) fetchUserProfile(session.user);
-            else { setUser(null); setLoading(false); }
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+            if (session) {
+                // TOKEN_REFRESHED나 유저가 이미 있는 상태에서의 갱신은 로딩바 없이 백그라운드에서 처리
+                const skip = (event === 'TOKEN_REFRESHED' || !!user);
+                fetchUserProfile(session.user, skip);
+            } else {
+                setUser(null);
+                setLoading(false);
+            }
         });
 
         return () => subscription.unsubscribe();
     }, []);
 
-    async function fetchUserProfile(authUser) {
-        setLoading(true);
+    async function fetchUserProfile(authUser, skipLoading = false) {
+        if (!skipLoading) setLoading(true);
         try {
             // [P2 완성] auth_id 컬럼 기반 조회로 전환 (email 의존 제거)
             let { data } = await supabase.from('users').select('*').eq('auth_id', authUser.id).single();
@@ -41,9 +47,11 @@ export const UserProvider = ({ children }) => {
             };
             setUser(finalUser);
         } catch (err) {
-            setUser(null);
+            console.error('Error fetching user profile:', err);
+            // If it's a background refresh failure, don't necessarily log out the user
+            if (!skipLoading) setUser(null); 
         } finally {
-            setLoading(false);
+            if (!skipLoading) setLoading(false);
         }
     }
 
