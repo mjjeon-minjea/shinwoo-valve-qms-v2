@@ -26,12 +26,18 @@ export const UserProvider = ({ children }) => {
     async function fetchUserProfile(authUser) {
         setLoading(true);
         try {
-            const { data } = await supabase.from('users').select('*').eq('email', authUser.email).single();
+            // [P2 완성] auth_id 컬럼 기반 조회로 전환 (email 의존 제거)
+            let { data } = await supabase.from('users').select('*').eq('auth_id', authUser.id).single();
+            // fallback: 혹시 auth_id 미매핑된 경우를 대비해 email로 2차 시도
+            if (!data) {
+                const fallback = await supabase.from('users').select('*').eq('email', authUser.email).single();
+                data = fallback.data;
+            }
             const profile = data || { name: '알수없음', email: authUser.email, role: '사원', status: 'Pending' };
             const finalUser = {
                 ...profile,
-                id: authUser.id, // 진짜 Auth ID 부여
-                isAdmin: profile.role === 'manager' || profile.role === 'director'
+                id: authUser.id, // 진짜 Auth UUID 부여
+                isAdmin: profile.role === 'manager' || profile.role === 'admin' || profile.role === 'director'
             };
             setUser(finalUser);
         } catch (err) {
@@ -108,6 +114,7 @@ export const UserProvider = ({ children }) => {
         if (authError) { setLoading(false); throw authError; }
 
         const newUserProfile = {
+            auth_id: authData.user?.id, // [P2] Auth UUID 즉시 매핑
             email, name: profileData.name,
             company: profileData.company || '품질보증부',
             rank: profileData.rank || '사원',

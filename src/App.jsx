@@ -126,11 +126,47 @@ const AppContent = () => {
 
     const handleEditUser = async (updatedUser) => {
         try {
-            // Remove the 'id' before update to avoid mutating primary key
-            const { id, ...updatePayload } = updatedUser;
-            const { error } = await supabase.from('users').update(updatePayload).eq('id', id);
-            if (error) throw error;
+            // 비밀번호 변경 여부 파악 (빈 문자열이 아니면 변경 대상)
+            const isPasswordChange = updatedUser.password && updatedUser.password.trim() !== '';
+
+            if (isPasswordChange) {
+                // 1. 현재 관리자의 세션 토큰 취득
+                const { data: { session } } = await supabase.auth.getSession();
+                if (!session) throw new Error("유효한 세션이 없습니다.");
+                
+                // 2. 로컬 Express API 서버(server.js POST /api/admin-update-member) 호출
+                const response = await fetch('/api/admin-update-member', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${session.access_token}`
+                    },
+                    body: JSON.stringify({
+                        auth_id: updatedUser.auth_id,
+                        email: updatedUser.email,
+                        password: updatedUser.password.trim(),
+                        name: updatedUser.name,
+                        role: updatedUser.role,
+                        rank: updatedUser.rank,
+                        company: updatedUser.company,
+                        status: updatedUser.status
+                    })
+                });
+                
+                const responseData = await response.json();
+                if (!response.ok) {
+                    throw new Error(responseData.error || 'Serverless API 요청 중 오류가 발생했습니다.');
+                }
+            } else {
+                // 비밀번호 변경이 없는 일반 정보 수정은 기존처럼 DB만 직접 업데이트
+                // eslint-disable-next-line no-unused-vars
+                const { id, auth_id, password, ...updatePayload } = updatedUser;
+                const { error } = await supabase.from('users').update(updatePayload).eq('id', id);
+                if (error) throw error;
+            }
+
             await fetchAllUsers();
+            alert('회원 정보가 성공적으로 수정되었습니다.');
         } catch (error) {
             alert('수정 실패: ' + error.message);
         }

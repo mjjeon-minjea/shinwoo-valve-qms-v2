@@ -1321,11 +1321,13 @@ const MemberManagement = ({ members, onDeleteMember, onEditMember, onAddMember, 
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap">
                                     <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                        member.role === 'admin' ? 'bg-indigo-100 text-indigo-800' :
                                         member.role === 'director' ? 'bg-purple-100 text-purple-800' :
                                         member.role === 'manager' ? 'bg-blue-100 text-blue-800' :
                                         'bg-slate-100 text-slate-800'
                                     }`}>
-                                        {member.role === 'director' ? '작성+검토+승인' : 
+                                        {member.role === 'admin' ? '최고 관리자 (통합 승인)' : 
+                                         member.role === 'director' ? '작성+검토+승인' : 
                                          member.role === 'manager' ? '작성+검토' : '작성'}
                                     </span>
                                 </td>

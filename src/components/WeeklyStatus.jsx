@@ -112,7 +112,7 @@ const WeeklyStatus = () => {
 
         reports.forEach(report => {
             // Find user to get current rank - Ensure ID comparison is string safe
-            const author = usersList.find(u => String(u.id) === String(report.authorId)) || {};
+            const author = usersList.find(u => u.auth_id === report.authorId) || {};
             const userRank = author?.rank || report?.rank || '사원';
 
             const authorInfo = {
@@ -183,7 +183,7 @@ const WeeklyStatus = () => {
 
         try {
             setLoading(true);
-            const response = await fetch('http://localhost:3000/api/send-report', {
+            const response = await fetch('/api/send-report', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -230,10 +230,12 @@ const WeeklyStatus = () => {
                         <Printer className="w-4 h-4 mr-2" />
                         출력하기
                     </button>
+                    {/* Vercel 배포 시 혼란 방지를 위해 임시 숨김 처리 (백엔드 미구현)
                     <button onClick={() => setShowEmailModal(true)} className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow-sm transition-colors">
                         <CalendarIcon className="w-4 h-4 mr-2" />
                         메일 발송
                     </button>
+                    */}
                 </div>
             </div>
 
