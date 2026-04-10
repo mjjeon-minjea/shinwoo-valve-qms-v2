@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/api';
 
 const UserContext = createContext();
@@ -6,6 +6,12 @@ const UserContext = createContext();
 export const UserProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
+
+    // 🚨 [HOTFIX] 탭 전환 시 Stale Closure로 인한 로딩(Unmount) 붕괴 방지 물리 메모리
+    const userRef = useRef(null);
+    useEffect(() => {
+        userRef.current = user;
+    }, [user]);
 
     // [핵심 변경] 로컬스토리지 야매 폐기, 공식 세션 리스너(onAuthStateChange) 부활!
     // [핵심 변경] 로컬스토리지 야매 폐기, 공식 세션 리스너(onAuthStateChange) 부활!
@@ -17,8 +23,8 @@ export const UserProvider = ({ children }) => {
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
             if (session) {
-                // TOKEN_REFRESHED나 유저가 이미 있는 상태에서의 갱신은 로딩바 없이 백그라운드에서 처리
-                const skip = (event === 'TOKEN_REFRESHED' || !!user);
+                // 🚨 [HOTFIX] user 변수 대신 userRef.current 물리 메모리를 참조하여 무조건 로딩 바운스(Skip) 방어
+                const skip = (event === 'TOKEN_REFRESHED' || !!userRef.current);
                 fetchUserProfile(session.user, skip);
             } else {
                 setUser(null);
