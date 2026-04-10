@@ -5,16 +5,23 @@ import Dashboard from './components/Dashboard';
 import Chatbot from './components/Chatbot';
 import { supabase } from './lib/api';
 
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, useNavigate } from 'react-router-dom';
 import InspectionAnalysisDashboard from './components/InspectionAnalysisDashboard';
 import QualificationExam from './components/QualificationExam';
+import PasswordChangeModal from './components/PasswordChangeModal';
 
 import { UserProvider, useUser } from './contexts/UserContext';
 
 // AppContent uses the UserContext to manage UI state
 const AppContent = () => {
     const { user, login, logout, signup, loading: authLoading, migrateUser } = useUser();
+    const navigate = useNavigate();
     
+    // 🚨 Session Storage 연동: F5 새로고침 우회 원천 차단
+    const [forcePasswordChange, setForcePasswordChange] = useState(() => {
+        return sessionStorage.getItem('force_pw_change') === 'true';
+    });
+
     // User management state for Dashboard admin view
     const [users, setUsers] = useState([]);
 
@@ -51,6 +58,12 @@ const AppContent = () => {
         try {
             await login(email, password);
             setLoginAttempts(0); // Reset on success
+            
+            // 🚨 초기비밀번호('123456') 감지 시 브라우저 메모리에 각인
+            if (password === '123456') {
+                sessionStorage.setItem('force_pw_change', 'true');
+                setForcePasswordChange(true);
+            }
         } catch (err) {
             if (err.code === 'MIGRATION_REQUIRED') {
                 setMigrationState({ email: err.legacyEmail });
@@ -83,6 +96,13 @@ const AppContent = () => {
         } catch (err) {
             console.error('Logout error:', err);
         }
+    };
+
+    const handlePasswordChangeComplete = async () => {
+        await handleLogout();
+        sessionStorage.removeItem('force_pw_change');
+        setForcePasswordChange(false);
+        navigate('/', { replace: true }); 
     };
 
     const handleUpdateProfile = async (updatedData) => {
@@ -182,6 +202,8 @@ const AppContent = () => {
 
     return (
         <div className="min-h-screen flex flex-col">
+            {forcePasswordChange && <PasswordChangeModal onComplete={handlePasswordChangeComplete} />}
+
             <Routes>
                 <Route path="/exam" element={<QualificationExam />} />
                 <Route path="/" element={
