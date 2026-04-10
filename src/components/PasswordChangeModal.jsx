@@ -29,29 +29,19 @@ const PasswordChangeModal = ({ onComplete }) => {
         e.preventDefault();
         if (!allValid) return;
 
-        // 1. Auth 서버 1차 업데이트 (동시에 갱신된 user 데이터 즉시 획득)
-        const { data: authData, error: authError } = await supabase.auth.updateUser({ 
-            password: newPassword 
-        });
-        
+        // 1. Auth 서버 업데이트
+        const { data: authData, error: authError } = await supabase.auth.updateUser({ password: newPassword });
         if (authError) { 
             alert('오류: ' + authError.message); 
             return; 
         }
 
-        // 2. 관리자 모니터링용 Users 테이블 쌍방향 동기화 추가 (불필요한 getUser 반복 호출 제거)
-        const { error: dbError } = await supabase
-            .from('users')
-            .update({ password: newPassword })
-            .eq('email', authData.user.email);
-            
-        if (dbError) {
-            console.error('DB 동기화 업데이트 실패:', dbError.message);
-            alert('인증 비밀번호는 변경되었으나, 데이터 역동기화에 실패했습니다. 관리자에게 문의하세요.');
-            return;
+        // 2. 관리자 로그아웃 전 DB 이중 동기화 (console 로그 제거)
+        if (!authError) {
+            await supabase.from('users').update({ password: newPassword }).eq('email', authData.user.email);
         }
 
-        // 3. 완전 동기화 검증 성공
+        // 3. 완료
         alert("비밀번호가 안전하게 변경되었습니다. 다시 로그인해 주십시오.");
         onComplete();
     };
