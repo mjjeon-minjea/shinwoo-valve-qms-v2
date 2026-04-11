@@ -35,24 +35,20 @@ const DevNotes = ({ user }) => {
 
     const loadNotes = async () => {
         try {
-            // ✅ status가 'published'이거나 null/undefined인 데이터 모두 표시
-            // (RLS 통과 안되는 경우를 대비해 filter는 클라이언트 단에서 처리)
-            const { data, error } = await supabase
-                .from('dev_notes')
-                .select('*')
-                .or('status.eq.published,status.is.null')
-                .order('created_at', { ascending: false });
+            // ✅ 실서버(Supabase) 대신 로컬망(3001) 데이터 소스로 전환
+            const res = await fetch('http://localhost:3001/dev_notes');
+            if (!res.ok) throw new Error('네트워크 응답이 올바르지 않습니다.');
+            const data = await res.json();
 
-            if (error) {
-                console.error('dev_notes 로드 오류:', error.message);
-                setNotes([]);
-            } else {
-                // ✅ 버전 번호 기준 논리적 내림차순 정렬 (v0.19.0 > v0.18.3)
-                const sorted = (data || []).sort(compareVersions);
-                setNotes(sorted);
-            }
+            // ✅ 차장님이 승인한(published) 데이터만 필터링하여 게시판에 노출
+            const publishedNotes = (data || []).filter(item => item.status === 'published');
+            
+            // ✅ 버전 번호 기준 논리적 내림차순 정렬 (v0.19.0 > v0.18.3)
+            const sorted = publishedNotes.sort(compareVersions);
+            setNotes(sorted);
         } catch (error) {
-            console.error("데이터 로드 실패:", error);
+            console.error("로컬 데이터 로드 실패:", error);
+            setNotes([]);
         }
     };
 
