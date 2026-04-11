@@ -42,6 +42,30 @@ const upload = multer({ storage: storage });
 server.use(middlewares);
 server.use(jsonServer.bodyParser);
 
+// =====================================================
+// [DNAS Validator] 개발자 노트 필수 포맷 검증 통제망
+// =====================================================
+server.use((req, res, next) => {
+    if ((req.method === 'POST' || req.method === 'PATCH' || req.method === 'PUT') && 
+        (req.path === '/dev_notes' || req.path.startsWith('/dev_notes/'))) {
+        
+        // 데이터 본문(content) 수정이 포함된 요청에만 DNAS 포맷 검증 수행
+        if (req.body.content !== undefined) {
+            const content = req.body.content || '';
+            const requiredKeywords = ['원인', '대책', '결과', '물리적 증빙'];
+            const missing = requiredKeywords.filter(kw => !content.includes(kw));
+
+            if (missing.length > 0) {
+                console.error(`🚨 [DNAS Validator 발동] 데이터 변이 감지. 누락된 키워드: ${missing.join(', ')}`);
+                return res.status(400).json({ 
+                    error: `[시스템 락] DNAS 포맷 위반. 필수 키워드 누락: ${missing.join(', ')}` 
+                });
+            }
+        }
+    }
+    next();
+});
+
 // Serve uploads statically
 server.use('/uploads', require('express').static(uploadDir));
 
