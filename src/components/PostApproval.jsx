@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Settings, CheckCircle, Clock, Hash, XCircle, Eye, Cloud } from 'lucide-react';
-import { supabase } from '../lib/api';
+import { api, supabase } from '../lib/api';
 
 // ✅ 시맨틱 버전(vX.Y.Z) 정렬용 헬퍼 함수
 const compareVersions = (a, b) => {
@@ -24,9 +24,17 @@ const PostApproval = ({ user }) => {
 
     const loadData = async () => {
         try {
-            const res = await fetch('http://localhost:3001/dev_notes');
-            if (!res.ok) throw new Error('네트워크 응답이 올바르지 않습니다.');
-            const data = await res.json();
+            let data;
+            // ✅ 하이브리드 로직: 실서버(Vercel)는 Supabase에서, 로컬(개발환경)은 db.json에서
+            if (import.meta.env.DEV) {
+                const res = await fetch('http://localhost:3001/dev_notes');
+                if (!res.ok) throw new Error('네트워크 응답이 올바르지 않습니다.');
+                data = await res.json();
+            } else {
+                const res = await api.fetch('/dev_notes');
+                if (!res.ok) throw new Error('Supabase 응답 에러');
+                data = await res.json();
+            }
 
             const all = (data || []).sort(compareVersions);
             setDrafts(all.filter(n => !n.status || n.status === 'draft' || n.status === 'rejected'));
@@ -40,6 +48,10 @@ const PostApproval = ({ user }) => {
 
     // ✅ 차장님 승인 → 로컬 DB 상태 변경
     const handleApprove = async (id) => {
+        if (!import.meta.env.DEV) {
+            alert('승인 및 시스템 관리 권한은 로컬 인트라넷(localhost) 환경에서만 수행 가능합니다.');
+            return;
+        }
         if (!window.confirm('이 개발자 노트를 승인하여 로컬 게시판에 공개하시겠습니까?')) return;
         setLoading(true);
         try {
@@ -68,6 +80,10 @@ const PostApproval = ({ user }) => {
 
     // ✅ 실서버(Supabase)로 데이터 전송 (Sync to Cloud)
     const handleCloudSync = async (note) => {
+        if (!import.meta.env.DEV) {
+            alert('클라우드 자동 동기화는 로컬 인트라넷(localhost) 시스템 서버에서만 실행 가능합니다.');
+            return;
+        }
         if (!window.confirm('이 개발자 노트를 실서버(Supabase) 게시판에 즉시 배포하시겠습니까?')) return;
         setLoading(true);
         try {
