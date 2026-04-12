@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { LayoutDashboard, Search, ChevronLeft, ChevronRight, Hash } from 'lucide-react';
-import { supabase } from '../lib/api';
+import { api, supabase } from '../lib/api';
 
 // ✅ 시맨틱 버전(vX.Y.Z) 정렬용 헬퍼 함수
 const compareVersions = (a, b) => {
@@ -35,10 +35,17 @@ const DevNotes = ({ user }) => {
 
     const loadNotes = async () => {
         try {
-            // ✅ 실서버(Supabase) 대신 로컬망(3001) 데이터 소스로 전환
-            const res = await fetch('http://localhost:3001/dev_notes');
-            if (!res.ok) throw new Error('네트워크 응답이 올바르지 않습니다.');
-            const data = await res.json();
+            let data;
+            // ✅ 하이브리드 로직: 실서버(Vercel)는 Supabase에서, 로컬(개발환경)은 db.json에서
+            if (import.meta.env.DEV) {
+                const res = await fetch('http://localhost:3001/dev_notes');
+                if (!res.ok) throw new Error('네트워크 응답이 올바르지 않습니다.');
+                data = await res.json();
+            } else {
+                const res = await api.fetch('/dev_notes');
+                if (!res.ok) throw new Error('Supabase 응답 에러');
+                data = await res.json();
+            }
 
             // ✅ 차장님이 승인한(published) 데이터만 필터링하여 게시판에 노출
             const publishedNotes = (data || []).filter(item => item.status === 'published');
