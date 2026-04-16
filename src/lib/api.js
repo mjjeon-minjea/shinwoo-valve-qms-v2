@@ -29,7 +29,11 @@ export const api = {
         }
 
         if (options.method === 'POST') {
-            const { data, error } = await supabase.from(table).insert(requestBody).select();
+            // UPSERT: id가 있으면 UPDATE, 없으면 INSERT 자동 처리 (중복키 409 에러 방지)
+            const { data, error } = await supabase
+                .from(table)
+                .upsert(requestBody, { onConflict: 'id', ignoreDuplicates: false })
+                .select();
             if (error) throw error;
             return {
                 ok: true,
