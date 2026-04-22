@@ -1,6 +1,6 @@
 # Shinwoo Valve QMS Homepage
 
-> **Note for AI Assistants**: Please refer to `AI_INTERACTION_RULES.md` for communication preferences (Korean language enforcement) and project guidelines.
+> **Note for AI Assistants**: Please refer to `GEMINI.md` and the `.agent/rules/` directory for communication preferences (Korean language enforcement) and project guidelines.
 
 A modern, responsive homepage for Shinwoo Valve's Quality Management System (QMS), built with React, Vite, and Tailwind CSS.
 
