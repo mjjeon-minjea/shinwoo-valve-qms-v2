@@ -34,7 +34,11 @@ export const api = {
                 .from(table)
                 .upsert(requestBody, { onConflict: 'id', ignoreDuplicates: false })
                 .select();
-            if (error) throw error;
+            if (error) {
+                alert(`[Supabase Error] Code: ${error.code}\nMessage: ${error.message}\nDetails: ${error.details || 'N/A'}`);
+                console.error('[Supabase Error]', error);
+                throw error;
+            }
             return {
                 ok: true,
                 json: async () => {
