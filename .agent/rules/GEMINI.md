@@ -23,15 +23,15 @@ QMS 프로젝트의 기술 및 정책 룰은 `.agent/rules/` 트리를 따른다
 
 > 🛡️ **[안전장치 필수: 배포 전 3단 검증]**
 > 테스트 배포 및 실서버 배포를 위한 `git push` 명령어를 실행하기 직전에, 에이전트는 반드시 아래 3가지 항목을 차장님께 보고하고 **승인(맞아, 진행해 등)**을 받아야 한다.
-> 1. **현재 연결된 Git 주소 확인:** `git remote -v` 결과가 `shinwoo-valve-qms-v2.git`가 맞는지 확인
-> 2. **타겟 브랜치 확인:** 테스트 배포면 `test`, 실서버 배포면 `main` 브랜치가 맞는지 확인
-> 3. **반영될 최종 웹 주소:** (Test: Preview 임시 주소 / Main: shinwoo-valve-qms-v2.vercel.app)
+> 1. **현재 연결된 Git 주소 확인:** 배포 목적지에 따라 정확한 깃허브 주소가 맞는지 확인 (Test: `qms.git` / Main: `qms-v2.git`)
+> 2. **타겟 브랜치 확인:** `main` 브랜치가 맞는지 확인
+> 3. **반영될 최종 웹 주소:** (Test: shinwoo-valve-qms.vercel.app / Main: shinwoo-valve-qms-v2.vercel.app)
 
 1. **로컬 개발 (지시 예: "로컬에서 만들어줘")**
    - 브랜치 변경 및 Commit/Push 없이 로컬 파일만 수정 (`npm run dev`용)
 2. **테스트 배포 (지시 예: "테스트 웹에 올려봐")**
-   - `test` 브랜치 체크아웃 ➔ Commit ➔ **(배포 전 3단 검증 보고 및 승인 대기)** ➔ `git push origin test` 실행
-   - Vercel의 Preview DB(구형)와 연결된 임시 테스트 주소가 생성됨
+   - 타겟 원격 저장소(`test-origin`: `shinwoo-valve-qms.git`)로 연결 ➔ Commit ➔ **(배포 전 3단 검증 보고 및 승인 대기)** ➔ `git push test-origin main` 실행
+   - 차장님 전용의 독립된 테스트 웹 사이트에 반영됨
 3. **실서버 배포 (지시 예: "메인 웹에 반영해")**
-   - `main` 브랜치로 Merge ➔ Commit ➔ **(배포 전 3단 검증 보고 및 승인 대기)** ➔ `git push origin main` 실행
-   - Vercel의 Production DB(신규)와 연결된 실제 운영 주소가 업데이트됨
+   - 타겟 원격 저장소(`origin`: `shinwoo-valve-qms-v2.git`)로 연결 ➔ Commit ➔ **(배포 전 3단 검증 보고 및 승인 대기)** ➔ `git push origin main` 실행
+   - 실제 운영 중인 V2 메인 웹 사이트에 반영됨
