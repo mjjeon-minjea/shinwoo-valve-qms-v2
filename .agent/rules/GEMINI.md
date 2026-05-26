@@ -1,8 +1,5 @@
 # [신우밸브 QMS 전용 아키텍처 인덱스]
 
-> **🚨 [절대 조항]**
-> 차장이 명시적으로 [보고 생략]을 지시하지 않는 이상, 단순 텍스트 수정이든 스킬 이식이든 무조건 3단계 문서(implementation_plan, task, walkthrough)를 발행하여 결재를 받아야 한다. 자의적 판단에 의한 생략은 절대 금지한다.
-
 ## 1. Rules (수동적 제약사항 가이드라인)
 QMS 프로젝트의 기술 및 정책 룰은 `.agent/rules/` 트리를 따른다.
 
@@ -20,3 +17,21 @@ QMS 프로젝트의 기술 및 정책 룰은 `.agent/rules/` 트리를 따른다
 | `verify-implementation` | 프로젝트의 모든 verify 스킬을 순차 실행하여 통합 검증 보고서를 생성합니다 |
 | `manage-skills` | 세션 변경사항을 분석하고, 검증 스킬을 생성/업데이트하며, GEMINI.md를 관리합니다 |
 | `merge-worktree` | 현재 worktree 브랜치를 main(또는 지정 대상) 브랜치로 squash-merge하고 포괄적인 커밋 메시지를 생성합니다 |
+
+## 3. GitHub (Commit / Push) 배포 파이프라인 지침
+에이전트는 차장님의 지시에 따라 아래 3가지 환경에 맞추어 작업을 분리하여 수행하고 배포해야 한다.
+
+> 🛡️ **[안전장치 필수: 배포 전 3단 검증]**
+> 테스트 배포 및 실서버 배포를 위한 `git push` 명령어를 실행하기 직전에, 에이전트는 반드시 아래 3가지 항목을 차장님께 보고하고 **승인(맞아, 진행해 등)**을 받아야 한다.
+> 1. **현재 연결된 Git 주소 확인:** `git remote -v` 결과가 `shinwoo-valve-qms-v2.git`가 맞는지 확인
+> 2. **타겟 브랜치 확인:** 테스트 배포면 `test`, 실서버 배포면 `main` 브랜치가 맞는지 확인
+> 3. **반영될 최종 웹 주소:** (Test: Preview 임시 주소 / Main: shinwoo-valve-qms-v2.vercel.app)
+
+1. **로컬 개발 (지시 예: "로컬에서 만들어줘")**
+   - 브랜치 변경 및 Commit/Push 없이 로컬 파일만 수정 (`npm run dev`용)
+2. **테스트 배포 (지시 예: "테스트 웹에 올려봐")**
+   - `test` 브랜치 체크아웃 ➔ Commit ➔ **(배포 전 3단 검증 보고 및 승인 대기)** ➔ `git push origin test` 실행
+   - Vercel의 Preview DB(구형)와 연결된 임시 테스트 주소가 생성됨
+3. **실서버 배포 (지시 예: "메인 웹에 반영해")**
+   - `main` 브랜치로 Merge ➔ Commit ➔ **(배포 전 3단 검증 보고 및 승인 대기)** ➔ `git push origin main` 실행
+   - Vercel의 Production DB(신규)와 연결된 실제 운영 주소가 업데이트됨
