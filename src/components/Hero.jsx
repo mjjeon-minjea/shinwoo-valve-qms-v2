@@ -152,273 +152,280 @@ const Hero = ({ onLogin, onSignup, migrationState, onMigrate, onCancelMigration 
         <div className="relative min-h-screen flex items-center justify-center overflow-hidden bg-slate-50 pt-16">
             {/* Background decoration */}
             <div className="absolute inset-0 z-0">
-                <div className="absolute top-0 -left-4 w-72 h-72 bg-primary-200 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob"></div>
-                <div className="absolute top-0 -right-4 w-72 h-72 bg-blue-200 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-2000"></div>
-                <div className="absolute -bottom-8 left-20 w-72 h-72 bg-indigo-200 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-4000"></div>
+                <div className="absolute top-0 -left-4 w-72 h-72 bg-slate-200 rounded-full mix-blend-multiply filter blur-xl opacity-60 animate-blob"></div>
+                <div className="absolute top-0 -right-4 w-72 h-72 bg-blue-100 rounded-full mix-blend-multiply filter blur-xl opacity-50 animate-blob animation-delay-2000"></div>
+                <div className="absolute -bottom-8 left-20 w-72 h-72 bg-slate-100 rounded-full mix-blend-multiply filter blur-xl opacity-60 animate-blob animation-delay-4000"></div>
             </div>
 
-            <div className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid lg:grid-cols-2 gap-12 items-center">
-
-                {/* Left Side: Text Content */}
-                <div className="text-center lg:text-left space-y-8">
-                    <div className="space-y-4">
-                        <h2 className="text-primary-600 font-semibold tracking-wide uppercase text-sm">
-                            품질 관리 시스템
-                        </h2>
-                        <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-slate-900 leading-tight">
-                            모든 공정의 <br />
-                            <span className="text-primary-600">완벽함을 추구합니다.</span>
-                        </h1>
-                        <p className="text-lg text-slate-600 max-w-2xl mx-auto lg:mx-0 leading-relaxed">
-                            신우밸브의 차세대 QMS 플랫폼은 간소화된 워크플로우와 통합 데이터 관리로 신뢰할 수 있는 환경을 제공합니다.
-                        </p>
-                    </div>
-
-                    <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
-                        <a
-                            href="https://www.swvis.com/"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center justify-center px-8 py-3 text-base font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors shadow-lg shadow-primary-500/30"
-                        >
-                            신우밸브 홈페이지
-                            <ArrowRight className="ml-2 w-5 h-5" />
-                        </a>
-                        <Link
-                            to="/exam"
-                            className="inline-flex items-center justify-center px-8 py-3 text-base font-medium text-primary-700 bg-primary-100 hover:bg-primary-200 rounded-lg transition-colors"
-                        >
-                            자격인증 시험
-                            <Award className="ml-2 w-5 h-5" />
-                        </Link>
-                    </div>
-
-                    <div className="pt-8 border-t border-slate-200/60 hidden lg:block">
-                        <div className="grid grid-cols-3 gap-8">
+            <div className="relative z-10 w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div className="bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden grid lg:grid-cols-12 min-h-[600px]">
+                    
+                    {/* Left Side: Dark-Grey Premium Info Panel */}
+                    <div className="lg:col-span-5 bg-gradient-to-br from-[#1e293b] to-[#0f172a] p-10 lg:p-12 text-white flex flex-col justify-between relative overflow-hidden">
+                        {/* Decorative background grid pattern */}
+                        <div className="absolute inset-0 opacity-5 pointer-events-none bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:16px_16px]"></div>
+                        
+                        <div className="space-y-8 relative z-10">
                             <div>
-                                <p className="text-3xl font-bold text-slate-900">40+</p>
-                                <p className="text-sm text-slate-500 mt-1">년 이상의 경험</p>
+                                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-blue-500/10 text-blue-300 border border-blue-400/20 tracking-wider uppercase mb-4">
+                                    SHINWOO QMS V2
+                                </span>
+                                <h1 className="text-3xl sm:text-4xl font-extrabold text-white leading-tight tracking-tight">
+                                    품질 보증부의<br/>
+                                    <span className="bg-gradient-to-r from-blue-400 via-indigo-300 to-slate-200 bg-clip-text text-transparent">
+                                        새로운 도약
+                                    </span>
+                                </h1>
                             </div>
-
-                            <div>
-                                <p className="text-3xl font-bold text-slate-900">100%</p>
-                                <p className="text-sm text-slate-500 mt-1">품질 보증</p>
-                            </div>
-
-                            <div>
-                                <p className="text-3xl font-bold text-slate-900">100PPM</p>
-                                <p className="text-sm text-slate-500 mt-1">목표불량률</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Right Side: Auth Form */}
-                <div className="w-full max-w-md mx-auto lg:ml-auto">
-                    <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/50 p-8 border border-white/50 backdrop-blur-sm">
-                        <div className="flex space-x-1 bg-slate-100 p-1 rounded-lg mb-8">
-                            <button
-                                onClick={() => setAuthMode('login')}
-                                className={`flex-1 py-2 text-sm font-medium rounded-md transition-all duration-200 ${authMode === 'login'
-                                    ? 'bg-white text-slate-900 shadow-sm'
-                                    : 'text-slate-500 hover:text-slate-700'
-                                    }`}
-                            >
-                                로그인
-                            </button>
-                            <button
-                                onClick={() => setAuthMode('signup')}
-                                className={`flex-1 py-2 text-sm font-medium rounded-md transition-all duration-200 ${authMode === 'signup'
-                                    ? 'bg-white text-slate-900 shadow-sm'
-                                    : 'text-slate-500 hover:text-slate-700'
-                                    }`}
-                            >
-                                회원가입
-                            </button>
                             
+                            <p className="text-slate-300 text-[15px] leading-relaxed font-light tracking-wide">
+                                신우밸브 차세대 품질보증 시스템(QMS)은 더욱 단단해진 보안 체계와 단방향 아키텍처 제약(Harness)을 탑재하여 완벽한 품질 정합성을 실현합니다.
+                            </p>
+
+                            <div className="space-y-4 pt-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-blue-400"></div>
+                                    <p className="text-sm text-slate-300 font-medium tracking-tight">Supabase 기반 강력한 인증 구조</p>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-blue-400"></div>
+                                    <p className="text-sm text-slate-300 font-medium tracking-tight">ESLint Boundaries 아키텍처 제약망</p>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-blue-400"></div>
+                                    <p className="text-sm text-slate-300 font-medium tracking-tight">자율 오작동 제어 하네스 엔진 탑재</p>
+                                </div>
+                            </div>
                         </div>
 
-                        {authMode === 'login' ? (
-                            <form onSubmit={(e) => {
-                                e.preventDefault();
-                                const rawEmail = e.target.email.value;
-                                const email = rawEmail.includes('@') ? rawEmail : rawEmail + '@shinwoovalve.com';
-                                const password = e.target.password.value;
-                                onLogin(email, password);
-                            }} className="space-y-5">
-                                <div>
-                                    <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-1">아이디</label>
-                                    <div className="relative">
-                                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                            <User className="h-5 w-5 text-slate-400" />
-                                        </div>
-                                        <input
-                                            type="text"
-                                            id="email"
-                                            required
-                                            className="block w-full pl-10 pr-40 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
-                                            placeholder="ID를 입력하시오"
-                                        />
-                                        <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-slate-500 font-medium">
-                                            @shinwoovalve.com
-                                        </div>
-                                    </div>
-                                </div>
-                                <div>
-                                    <div className="flex justify-between mb-1">
-                                        <label htmlFor="password" className="block text-sm font-medium text-slate-700">비밀번호</label>
-                                        <a href="#" className="text-sm text-primary-600 hover:text-primary-500 font-medium">비밀번호 찾기</a>
-                                    </div>
-                                    <div className="relative">
-                                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                            <Lock className="h-5 w-5 text-slate-400" />
-                                        </div>
-                                        <input
-                                            type="password"
-                                            id="password"
-                                            required
-                                            className="block w-full pl-10 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
-                                            placeholder="••••••••"
-                                        />
-                                    </div>
-                                </div>
+                        <div className="pt-10 border-t border-slate-800 relative z-10 grid grid-cols-3 gap-4 text-center lg:text-left mt-8">
+                            <div>
+                                <p className="text-2xl font-black text-white">40+</p>
+                                <p className="text-[10px] text-slate-400 mt-1 uppercase tracking-wider font-semibold">품질 업력</p>
+                            </div>
+                            <div>
+                                <p className="text-2xl font-black text-white">100%</p>
+                                <p className="text-[10px] text-slate-400 mt-1 uppercase tracking-wider font-semibold">자격 인증</p>
+                            </div>
+                            <div>
+                                <p className="text-2xl font-black text-white">100PPM</p>
+                                <p className="text-[10px] text-slate-400 mt-1 uppercase tracking-wider font-semibold">목표 불량</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Right Side: Premium Light Auth Form */}
+                    <div className="lg:col-span-7 p-8 lg:p-12 bg-white flex items-center justify-center">
+                        <div className="w-full max-w-md space-y-6">
+                            <div className="flex space-x-1 bg-slate-100 p-1.5 rounded-xl mb-6">
                                 <button
-                                    type="submit"
-                                    className="w-full flex items-center justify-center px-4 py-3 border border-transparent text-sm font-medium rounded-lg text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all shadow-lg shadow-primary-500/20"
+                                    onClick={() => setAuthMode('login')}
+                                    className={`flex-1 py-2.5 text-sm font-semibold rounded-lg transition-all duration-300 ${authMode === 'login'
+                                        ? 'bg-white text-slate-800 shadow-md border border-slate-200/40'
+                                        : 'text-slate-500 hover:text-slate-800'
+                                        }`}
                                 >
                                     로그인
                                 </button>
-                            </form>
-                        ) : authMode === 'signup' ? (
-                            <form onSubmit={(e) => {
-                                e.preventDefault();
-
-                                if (password !== confirmPassword) {
-                                    alert('비밀번호가 일치하지 않습니다.');
-                                    return;
-                                }
-
-                                const formData = {
-                                    name: e.target.name.value,
-                                    company: e.target.company.value,
-                                    rank: e.target.rank.value,
-                                    role: 'employee', // Default role for new signups
-                                    email: e.target.email.value.includes('@') ? e.target.email.value : e.target.email.value + '@shinwoovalve.com',
-                                    password: password
-                                };
-                                onSignup(formData);
-                                setAuthMode('login');
-                                // Reset form state
-                                setPassword('');
-                                setConfirmPassword('');
-                            }} className="space-y-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">이름</label>
-                                    <div className="relative">
-                                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                            <User className="h-5 w-5 text-slate-400" />
-                                        </div>
-                                        <input name="name" type="text" required className="block w-full pl-10 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500" placeholder="홍길동" />
-                                    </div>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">부서명</label>
-                                    <div className="relative">
-                                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                            <Building className="h-5 w-5 text-slate-400" />
-                                        </div>
-                                        <input name="company" type="text" required className="block w-full pl-10 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500" placeholder="소속된 부서명을 명기하시오" />
-                                    </div>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">직급</label>
-                                    <div className="relative">
-                                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                            <Award className="h-5 w-5 text-slate-400" />
-                                        </div>
-                                        <input name="rank" type="text" required className="block w-full pl-10 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500" placeholder="직급 (예: 대리, 과장)" />
-                                    </div>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">아이디</label>
-                                    <div className="relative">
-                                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                            <User className="h-5 w-5 text-slate-400" />
-                                        </div>
-                                        <input name="email" type="text" required className="block w-full pl-10 pr-40 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500" placeholder="ID를 입력하시오" />
-                                        <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-slate-500 font-medium">
-                                            @shinwoovalve.com
-                                        </div>
-                                    </div>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">비밀번호</label>
-                                    <div className="relative">
-                                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                            <Lock className="h-5 w-5 text-slate-400" />
-                                        </div>
-                                        <input
-                                            name="password"
-                                            type={showPassword ? "text" : "password"}
-                                            required
-                                            value={password}
-                                            onChange={(e) => setPassword(e.target.value)}
-                                            className="block w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                                            placeholder="비밀번호"
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowPassword(!showPassword)}
-                                            className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 focus:outline-none"
-                                        >
-                                            {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                                        </button>
-                                    </div>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">비밀번호 확인</label>
-                                    <div className="relative">
-                                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                            <Lock className="h-5 w-5 text-slate-400" />
-                                        </div>
-                                        <input
-                                            name="confirmPassword"
-                                            type={showConfirmPassword ? "text" : "password"}
-                                            required
-                                            value={confirmPassword}
-                                            onChange={(e) => setConfirmPassword(e.target.value)}
-                                            className="block w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                                            placeholder="비밀번호 재확인"
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                                            className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 focus:outline-none"
-                                        >
-                                            {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                                        </button>
-                                    </div>
-                                    {confirmPassword && (
-                                        <p className={`text-xs mt-1 ml-1 ${password === confirmPassword ? 'text-green-600' : 'text-red-600'}`}>
-                                            {password === confirmPassword ? '비밀번호가 일치합니다.' : '비밀번호가 일치하지 않습니다.'}
-                                        </p>
-                                    )}
-                                </div>
                                 <button
-                                    type="submit"
-                                    className="w-full flex items-center justify-center px-4 py-3 border border-transparent text-sm font-medium rounded-lg text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all shadow-lg shadow-primary-500/20"
+                                    onClick={() => setAuthMode('signup')}
+                                    className={`flex-1 py-2.5 text-sm font-semibold rounded-lg transition-all duration-300 ${authMode === 'signup'
+                                        ? 'bg-white text-slate-800 shadow-md border border-slate-200/40'
+                                        : 'text-slate-500 hover:text-slate-800'
+                                        }`}
                                 >
-                                    계정 생성
+                                    회원가입
                                 </button>
-                            </form>
-                        ) : null}
+                            </div>
 
-                        <div className="mt-6">
-                            <p className="text-xs text-center text-slate-500">
-                                계속 진행함으로써, 귀하는 신우밸브의 <a href="#" className="text-primary-600 hover:underline">이용약관</a> 및 <a href="#" className="text-primary-600 hover:underline">개인정보처리방침</a>에 동의하게 됩니다.
-                            </p>
+                            {authMode === 'login' ? (
+                                <form onSubmit={(e) => {
+                                    e.preventDefault();
+                                    const rawEmail = e.target.email.value;
+                                    const email = rawEmail.includes('@') ? rawEmail : rawEmail + '@shinwoovalve.com';
+                                    const password = e.target.password.value;
+                                    onLogin(email, password);
+                                }} className="space-y-4">
+                                    <div className="space-y-1">
+                                        <label htmlFor="email" className="block text-xs font-bold text-slate-500 uppercase tracking-wider">아이디</label>
+                                        <div className="relative">
+                                            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                                                <User className="h-4.5 w-4.5 text-slate-400" />
+                                            </div>
+                                            <input
+                                                type="text"
+                                                id="email"
+                                                required
+                                                className="block w-full pl-11 pr-36 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-slate-900 focus:border-transparent transition-all placeholder:text-slate-400 text-sm font-medium"
+                                                placeholder="ID를 입력하시오"
+                                            />
+                                            <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-slate-400 text-xs font-semibold">
+                                                @shinwoovalve.com
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="space-y-1">
+                                        <div className="flex justify-between items-center">
+                                            <label htmlFor="password" className="block text-xs font-bold text-slate-500 uppercase tracking-wider">비밀번호</label>
+                                            <a href="#" className="text-xs text-blue-500 hover:text-blue-600 font-semibold">비밀번호 찾기</a>
+                                        </div>
+                                        <div className="relative">
+                                            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                                                <Lock className="h-4.5 w-4.5 text-slate-400" />
+                                            </div>
+                                            <input
+                                                type="password"
+                                                id="password"
+                                                required
+                                                className="block w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-slate-900 focus:border-transparent transition-all placeholder:text-slate-400 text-sm"
+                                                placeholder="••••••••"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <button
+                                        type="submit"
+                                        className="w-full py-3.5 px-4 bg-slate-900 hover:bg-slate-800 text-white font-bold text-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-900 transition-all shadow-lg shadow-slate-900/10 mt-2"
+                                    >
+                                        로그인
+                                    </button>
+                                </form>
+                            ) : authMode === 'signup' ? (
+                                <form onSubmit={(e) => {
+                                    e.preventDefault();
+
+                                    if (password !== confirmPassword) {
+                                        alert('비밀번호가 일치하지 않습니다.');
+                                        return;
+                                    }
+
+                                    const formData = {
+                                        name: e.target.name.value,
+                                        company: e.target.company.value,
+                                        rank: e.target.rank.value,
+                                        role: 'employee',
+                                        email: e.target.email.value.includes('@') ? e.target.email.value : e.target.email.value + '@shinwoovalve.com',
+                                        password: password
+                                    };
+                                    onSignup(formData);
+                                    setAuthMode('login');
+                                    setPassword('');
+                                    setConfirmPassword('');
+                                }} className="space-y-3.5 max-h-[420px] overflow-y-auto pr-1">
+                                    <div className="space-y-1">
+                                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">이름</label>
+                                        <div className="relative">
+                                            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                                                <User className="h-4.5 w-4.5 text-slate-400" />
+                                            </div>
+                                            <input name="name" type="text" required className="block w-full pl-11 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm" placeholder="홍길동" />
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="space-y-1">
+                                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">부서명</label>
+                                        <div className="relative">
+                                            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                                                <Building className="h-4.5 w-4.5 text-slate-400" />
+                                            </div>
+                                            <input name="company" type="text" required className="block w-full pl-11 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm" placeholder="소속된 부서명을 명기하시오" />
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="space-y-1">
+                                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">직급</label>
+                                        <div className="relative">
+                                            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                                                <Award className="h-4.5 w-4.5 text-slate-400" />
+                                            </div>
+                                            <input name="rank" type="text" required className="block w-full pl-11 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm" placeholder="직급 (예: 대리, 과장)" />
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="space-y-1">
+                                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">아이디</label>
+                                        <div className="relative">
+                                            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                                                <User className="h-4.5 w-4.5 text-slate-400" />
+                                            </div>
+                                            <input name="email" type="text" required className="block w-full pl-11 pr-36 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm" placeholder="ID를 입력하시오" />
+                                            <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-slate-400 text-xs font-semibold">
+                                                @shinwoovalve.com
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="space-y-1">
+                                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">비밀번호</label>
+                                        <div className="relative">
+                                            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                                                <Lock className="h-4.5 w-4.5 text-slate-400" />
+                                            </div>
+                                            <input
+                                                name="password"
+                                                type={showPassword ? "text" : "password"}
+                                                required
+                                                value={password}
+                                                onChange={(e) => setPassword(e.target.value)}
+                                                className="block w-full pl-11 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm"
+                                                placeholder="비밀번호"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowPassword(!showPassword)}
+                                                className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 focus:outline-none"
+                                            >
+                                                {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="space-y-1">
+                                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">비밀번호 확인</label>
+                                        <div className="relative">
+                                            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                                                <Lock className="h-4.5 w-4.5 text-slate-400" />
+                                            </div>
+                                            <input
+                                                name="confirmPassword"
+                                                type={showConfirmPassword ? "text" : "password"}
+                                                required
+                                                value={confirmPassword}
+                                                onChange={(e) => setConfirmPassword(e.target.value)}
+                                                className="block w-full pl-11 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm"
+                                                placeholder="비밀번호 재확인"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                                className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 focus:outline-none"
+                                            >
+                                                {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                            </button>
+                                        </div>
+                                        {confirmPassword && (
+                                            <p className={`text-xs mt-1 ml-1 ${password === confirmPassword ? 'text-green-600' : 'text-red-600'}`}>
+                                                {password === confirmPassword ? '비밀번호가 일치합니다.' : '비밀번호가 일치하지 않습니다.'}
+                                            </p>
+                                        )}
+                                    </div>
+                                    
+                                    <button
+                                        type="submit"
+                                        className="w-full py-3 px-4 bg-slate-900 hover:bg-slate-800 text-white font-bold text-sm rounded-xl transition-all shadow-md mt-3"
+                                    >
+                                        계정 생성
+                                    </button>
+                                </form>
+                            ) : null}
+
+                            <div className="pt-4 border-t border-slate-100">
+                                <p className="text-[11px] text-center text-slate-400 leading-normal">
+                                    계속 진행함으로써, 귀하는 신우밸브의 <a href="#" className="text-blue-500 hover:underline">이용약관</a> 및 <a href="#" className="text-blue-500 hover:underline">개인정보처리방침</a>에 동의하게 됩니다.
+                                </p>
+                            </div>
                         </div>
-
                     </div>
                 </div>
             </div>

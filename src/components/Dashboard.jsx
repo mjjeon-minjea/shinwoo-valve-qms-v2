@@ -1563,14 +1563,6 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
                     }
                 } catch (error) {
                     console.error('Popup check failed:', error);
-                    // Do NOT default to true on error if using real Supabase
-                    // Or keep it false to be safe?
-                    // User wants to turn it off, so default to false might be better if error?
-                    // But current logic is "Default to true on error".
-                    // If api.fetch fails, it means Supabase is down or key is wrong.
-                    // Let's keep existing fallback logic or maybe remove the "Default to true" if it causes issues.
-                    // But the main issue was parsing HTML as JSON. api.fetch handles the data correctly.
-                    // I will keep the fallback but the main path will now work.
                     setShowPopup(true);
                 }
             }
@@ -1609,58 +1601,58 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
 
     return (
         <div className="flex min-h-[calc(100vh-64px)] bg-slate-50 pt-16">
-            {/* Sidebar */}
-            <aside className="w-64 bg-white border-r border-slate-200 fixed h-full z-40 hidden lg:block overflow-y-auto">
+            {/* Sidebar (Dark-Grey Premium Banner) */}
+            <aside className="w-64 bg-[#1e293b] border-r border-[#0f172a]/20 fixed h-full z-40 hidden lg:block overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
                 <div className="p-6">
-                    <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4">
+                    <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">
                         Dashboards
                     </h2>
-                    <nav className="space-y-1">
+                    <nav className="space-y-1.5">
                         {/* Main Screen Group */}
                         <div>
                             <button
                                 onClick={() => { setActiveTab('home'); setMainExpanded(!mainExpanded); }}
-                                className={`w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium rounded-lg transition-colors ${['home', 'notices', 'resources', 'dev_notes', 'suggestions'].includes(activeTab)
-                                    ? 'bg-primary-50 text-primary-700'
-                                    : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                                className={`w-full flex items-center justify-between px-3 py-2.5 text-sm font-semibold rounded-lg transition-all ${['home', 'notices', 'resources', 'dev_notes', 'suggestions'].includes(activeTab)
+                                    ? 'bg-slate-800 text-white border-l-4 border-blue-500'
+                                    : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'
                                     }`}
                             >
                                 <div className="flex items-center">
-                                    <LayoutDashboard className={`mr-3 h-5 w-5 ${['home', 'notices', 'resources', 'dev_notes', 'suggestions'].includes(activeTab) ? 'text-primary-600' : 'text-slate-400'}`} />
+                                    <LayoutDashboard className={`mr-3 h-5 w-5 ${['home', 'notices', 'resources', 'dev_notes', 'suggestions'].includes(activeTab) ? 'text-blue-400' : 'text-slate-400'}`} />
                                     메인화면
                                 </div>
-                                <ChevronDown className={`w-4 h-4 transition-transform ${mainExpanded ? 'transform rotate-180' : ''} ${activeTab === 'home' ? 'text-primary-500' : 'text-slate-400'}`} />
+                                <ChevronDown className={`w-4 h-4 transition-transform ${mainExpanded ? 'transform rotate-180' : ''} ${activeTab === 'home' ? 'text-white' : 'text-slate-400'}`} />
                             </button>
 
                             {mainExpanded && (
-                                <div className="mt-1 space-y-1 pl-11">
+                                <div className="mt-1.5 space-y-1.5 pl-6 border-l border-slate-700/50 ml-5">
                                     <button
                                         onClick={() => setActiveTab('home')}
-                                        className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === 'home' ? 'text-primary-600 bg-white shadow-sm' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'}`}
+                                        className={`w-full flex items-center px-3 py-2 text-xs font-medium rounded-md transition-all ${activeTab === 'home' ? 'text-blue-400 font-bold bg-slate-800/40' : 'text-slate-400 hover:text-white'}`}
                                     >
                                         대시보드 홈
                                     </button>
                                     <button
                                         onClick={() => setActiveTab('notices')}
-                                        className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === 'notices' ? 'text-primary-600 bg-white shadow-sm' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'}`}
+                                        className={`w-full flex items-center px-3 py-2 text-xs font-medium rounded-md transition-all ${activeTab === 'notices' ? 'text-blue-400 font-bold bg-slate-800/40' : 'text-slate-400 hover:text-white'}`}
                                     >
                                         공지사항
                                     </button>
                                     <button
                                         onClick={() => setActiveTab('dev_notes')}
-                                        className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === 'dev_notes' ? 'text-primary-600 bg-white shadow-sm' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'}`}
+                                        className={`w-full flex items-center px-3 py-2 text-xs font-medium rounded-md transition-all ${activeTab === 'dev_notes' ? 'text-blue-400 font-bold bg-slate-800/40' : 'text-slate-400 hover:text-white'}`}
                                     >
                                         개발자 노트
                                     </button>
                                     <button
                                         onClick={() => setActiveTab('resources')}
-                                        className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === 'resources' ? 'text-primary-600 bg-white shadow-sm' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'}`}
+                                        className={`w-full flex items-center px-3 py-2 text-xs font-medium rounded-md transition-all ${activeTab === 'resources' ? 'text-blue-400 font-bold bg-slate-800/40' : 'text-slate-400 hover:text-white'}`}
                                     >
                                         자료실
                                     </button>
                                     <button
                                         onClick={() => setActiveTab('suggestions')}
-                                        className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === 'suggestions' ? 'text-primary-600 bg-white shadow-sm' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'}`}
+                                        className={`w-full flex items-center px-3 py-2 text-xs font-medium rounded-md transition-all ${activeTab === 'suggestions' ? 'text-blue-400 font-bold bg-slate-800/40' : 'text-slate-400 hover:text-white'}`}
                                     >
                                         건의사항
                                     </button>
@@ -1672,43 +1664,38 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
                         <div>
                             <button
                                 onClick={() => setInboundExpanded(!inboundExpanded)}
-                                className={`w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium rounded-lg transition-colors ${activeTab.includes('inbound') ? 'text-primary-700 bg-primary-50' : 'text-slate-600 hover:bg-slate-50'
-                                    }`}
+                                className={`w-full flex items-center justify-between px-3 py-2.5 text-sm font-semibold rounded-lg transition-all ${activeTab.includes('inbound') || activeTab === 'inspection_analysis' ? 'bg-slate-800 text-white border-l-4 border-blue-500' : 'text-slate-300 hover:bg-slate-800/60'}`}
                             >
                                 <div className="flex items-center">
-                                    <ClipboardCheck className={`mr-3 h-5 w-5 ${activeTab.includes('inbound') ? 'text-primary-600' : 'text-slate-400'}`} />
+                                    <ClipboardCheck className={`mr-3 h-5 w-5 ${activeTab.includes('inbound') || activeTab === 'inspection_analysis' ? 'text-blue-400' : 'text-slate-400'}`} />
                                     인수검사
                                 </div>
-                                <ChevronDown className={`w-4 h-4 transition-transform ${inboundExpanded ? 'transform rotate-180' : ''} ${activeTab.includes('inbound') ? 'text-primary-500' : 'text-slate-400'}`} />
+                                <ChevronDown className={`w-4 h-4 transition-transform ${inboundExpanded ? 'transform rotate-180' : ''} ${activeTab.includes('inbound') ? 'text-white' : 'text-slate-400'}`} />
                             </button>
 
-
                             {inboundExpanded && (
-                                <div className="mt-1 space-y-1 pl-11">
+                                <div className="mt-1.5 space-y-1.5 pl-6 border-l border-slate-700/50 ml-5">
                                     <button
                                         onClick={() => setActiveTab('inbound_analysis')}
-                                        className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === 'inbound_analysis' ? 'text-primary-600 bg-white shadow-sm' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
-                                            }`}
+                                        className={`w-full flex items-center px-3 py-2 text-xs font-medium rounded-md transition-all ${activeTab === 'inbound_analysis' ? 'text-blue-400 font-bold bg-slate-800/40' : 'text-slate-400 hover:text-white'}`}
                                     >
                                         대시보드
                                     </button>
                                     <button
                                         onClick={() => setActiveTab('inspection_analysis')}
-                                        className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === 'inspection_analysis' ? 'text-primary-600 bg-white shadow-sm' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'}`}
+                                        className={`w-full flex items-center px-3 py-2 text-xs font-medium rounded-md transition-all ${activeTab === 'inspection_analysis' ? 'text-blue-400 font-bold bg-slate-800/40' : 'text-slate-400 hover:text-white'}`}
                                     >
                                         종합분석현황
                                     </button>
                                     <button
                                         onClick={() => setActiveTab('inbound_status')}
-                                        className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === 'inbound_status' ? 'text-primary-600 bg-white shadow-sm' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
-                                            }`}
+                                        className={`w-full flex items-center px-3 py-2 text-xs font-medium rounded-md transition-all ${activeTab === 'inbound_status' ? 'text-blue-400 font-bold bg-slate-800/40' : 'text-slate-400 hover:text-white'}`}
                                     >
                                         부적합 현황 조회
                                     </button>
                                     <button
                                         onClick={() => setActiveTab('inbound_history')}
-                                        className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === 'inbound_history' ? 'text-primary-600 bg-white shadow-sm' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
-                                            }`}
+                                        className={`w-full flex items-center px-3 py-2 text-xs font-medium rounded-md transition-all ${activeTab === 'inbound_history' ? 'text-blue-400 font-bold bg-slate-800/40' : 'text-slate-400 hover:text-white'}`}
                                     >
                                         이력 조회 및 등록
                                     </button>
@@ -1720,57 +1707,50 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
                         <div>
                             <button
                                 onClick={() => setProcessExpanded(!processExpanded)}
-                                className={`w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium rounded-lg transition-colors ${activeTab.includes('process') ? 'text-primary-700 bg-primary-50' : 'text-slate-600 hover:bg-slate-50'
-                                    }`}
+                                className={`w-full flex items-center justify-between px-3 py-2.5 text-sm font-semibold rounded-lg transition-all ${activeTab.includes('process') ? 'bg-slate-800 text-white border-l-4 border-blue-500' : 'text-slate-300 hover:bg-slate-800/60'}`}
                             >
                                 <div className="flex items-center">
-                                    <Settings className={`mr-3 h-5 w-5 ${activeTab.includes('process') ? 'text-primary-600' : 'text-slate-400'}`} />
+                                    <Settings className={`mr-3 h-5 w-5 ${activeTab.includes('process') ? 'text-blue-400' : 'text-slate-400'}`} />
                                     공정검사
                                 </div>
-                                <ChevronDown className={`w-4 h-4 transition-transform ${processExpanded ? 'transform rotate-180' : ''} ${activeTab.includes('process') ? 'text-primary-500' : 'text-slate-400'}`} />
+                                <ChevronDown className={`w-4 h-4 transition-transform ${processExpanded ? 'transform rotate-180' : ''} ${activeTab.includes('process') ? 'text-white' : 'text-slate-400'}`} />
                             </button>
 
                             {processExpanded && (
-                                <div className="mt-1 space-y-1 pl-11">
+                                <div className="mt-1.5 space-y-1.5 pl-6 border-l border-slate-700/50 ml-5">
                                     <button
                                         onClick={() => setActiveTab('process_dashboard')}
-                                        className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === 'process_dashboard' || activeTab === 'process' ? 'text-primary-600 bg-white shadow-sm' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
-                                            }`}
+                                        className={`w-full flex items-center px-3 py-2 text-xs font-medium rounded-md transition-all ${activeTab === 'process_dashboard' || activeTab === 'process' ? 'text-blue-400 font-bold bg-slate-800/40' : 'text-slate-400 hover:text-white'}`}
                                     >
                                         대시보드
                                     </button>
                                     <button
                                         onClick={() => setActiveTab('process_by_process')}
-                                        className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === 'process_by_process' ? 'text-primary-600 bg-white shadow-sm' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
-                                            }`}
+                                        className={`w-full flex items-center px-3 py-2 text-xs font-medium rounded-md transition-all ${activeTab === 'process_by_process' ? 'text-blue-400 font-bold bg-slate-800/40' : 'text-slate-400 hover:text-white'}`}
                                     >
                                         공정별 분석현황
                                     </button>
                                     <button
                                         onClick={() => setActiveTab('process_by_workplace')}
-                                        className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === 'process_by_workplace' ? 'text-primary-600 bg-white shadow-sm' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
-                                            }`}
+                                        className={`w-full flex items-center px-3 py-2 text-xs font-medium rounded-md transition-all ${activeTab === 'process_by_workplace' ? 'text-blue-400 font-bold bg-slate-800/40' : 'text-slate-400 hover:text-white'}`}
                                     >
                                         작업장별 분석현황
                                     </button>
                                     <button
                                         onClick={() => setActiveTab('process_by_equipment')}
-                                        className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === 'process_by_equipment' ? 'text-primary-600 bg-white shadow-sm' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
-                                            }`}
+                                        className={`w-full flex items-center px-3 py-2 text-xs font-medium rounded-md transition-all ${activeTab === 'process_by_equipment' ? 'text-blue-400 font-bold bg-slate-800/40' : 'text-slate-400 hover:text-white'}`}
                                     >
                                         설비명별 분석현황
                                     </button>
                                     <button
                                         onClick={() => setActiveTab('process_by_model_category')}
-                                        className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === 'process_by_model_category' ? 'text-primary-600 bg-white shadow-sm' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
-                                            }`}
+                                        className={`w-full flex items-center px-3 py-2 text-xs font-medium rounded-md transition-all ${activeTab === 'process_by_model_category' ? 'text-blue-400 font-bold bg-slate-800/40' : 'text-slate-400 hover:text-white'}`}
                                     >
                                         모델별 분석현황
                                     </button>
                                     <button
                                         onClick={() => setActiveTab('process_history')}
-                                        className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === 'process_history' ? 'text-primary-600 bg-white shadow-sm' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
-                                            }`}
+                                        className={`w-full flex items-center px-3 py-2 text-xs font-medium rounded-md transition-all ${activeTab === 'process_history' ? 'text-blue-400 font-bold bg-slate-800/40' : 'text-slate-400 hover:text-white'}`}
                                     >
                                         이력 조회 및 등록
                                     </button>
@@ -1780,13 +1760,13 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
 
                         <button
                             onClick={() => setActiveTab('final')}
-                            className={`w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium rounded-lg transition-colors ${activeTab === 'final'
-                                ? 'bg-primary-50 text-primary-700'
-                                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                            className={`w-full flex items-center justify-between px-3 py-2.5 text-sm font-semibold rounded-lg transition-all ${activeTab === 'final'
+                                ? 'bg-slate-800 text-white border-l-4 border-blue-500'
+                                : 'text-slate-300 hover:bg-slate-800/60'
                                 }`}
                         >
                             <div className="flex items-center">
-                                <CheckCircle className={`mr-3 h-5 w-5 ${activeTab === 'final' ? 'text-primary-600' : 'text-slate-400'}`} />
+                                <CheckCircle className={`mr-3 h-5 w-5 ${activeTab === 'final' ? 'text-blue-400' : 'text-slate-400'}`} />
                                 최종검사
                             </div>
                         </button>
@@ -1795,44 +1775,35 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
                             <div>
                                 <button
                                     onClick={() => setAdminExpanded(!adminExpanded)}
-                                    className={`w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium rounded-lg transition-colors ${['members', 'settings_home', 'post_approval'].includes(activeTab)
-                                        ? 'bg-primary-50 text-primary-700'
-                                        : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                                    className={`w-full flex items-center justify-between px-3 py-2.5 text-sm font-semibold rounded-lg transition-all ${['members', 'settings_home', 'post_approval'].includes(activeTab)
+                                        ? 'bg-slate-800 text-white border-l-4 border-blue-500'
+                                        : 'text-slate-300 hover:bg-slate-800/60'
                                         }`}
                                 >
                                     <div className="flex items-center">
-                                        <Settings className={`mr-3 h-5 w-5 ${['members', 'settings_home', 'post_approval'].includes(activeTab) ? 'text-primary-600' : 'text-slate-400'}`} />
+                                        <Settings className={`mr-3 h-5 w-5 ${['members', 'settings_home', 'post_approval'].includes(activeTab) ? 'text-blue-400' : 'text-slate-400'}`} />
                                         관리자 설정
                                     </div>
-                                    <ChevronDown className={`w-4 h-4 transition-transform ${adminExpanded ? 'transform rotate-180' : ''} ${['members', 'settings_home', 'post_approval'].includes(activeTab) ? 'text-primary-500' : 'text-slate-400'}`} />
+                                    <ChevronDown className={`w-4 h-4 transition-transform ${adminExpanded ? 'transform rotate-180' : ''} ${['members', 'settings_home', 'post_approval'].includes(activeTab) ? 'text-white' : 'text-slate-400'}`} />
                                 </button>
 
                                 {adminExpanded && (
-                                    <div className="mt-1 space-y-1 pl-11">
+                                    <div className="mt-1.5 space-y-1.5 pl-6 border-l border-slate-700/50 ml-5">
                                         <button
                                             onClick={() => setActiveTab('post_approval')}
-                                            className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === 'post_approval'
-                                                ? 'text-primary-600 bg-white shadow-sm'
-                                                : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
-                                                }`}
+                                            className={`w-full flex items-center px-3 py-2 text-xs font-medium rounded-md transition-all ${activeTab === 'post_approval' ? 'text-blue-400 font-bold bg-slate-800/40' : 'text-slate-400 hover:text-white'}`}
                                         >
                                             게시물 승인 관리
                                         </button>
                                         <button
                                             onClick={() => setActiveTab('members')}
-                                            className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === 'members'
-                                                ? 'text-primary-600 bg-white shadow-sm'
-                                                : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
-                                                }`}
+                                            className={`w-full flex items-center px-3 py-2 text-xs font-medium rounded-md transition-all ${activeTab === 'members' ? 'text-blue-400 font-bold bg-slate-800/40' : 'text-slate-400 hover:text-white'}`}
                                         >
                                             기존회원관리
                                         </button>
                                         <button
                                             onClick={() => setActiveTab('settings_home')}
-                                            className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === 'settings_home'
-                                                ? 'text-primary-600 bg-white shadow-sm'
-                                                : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
-                                                }`}
+                                            className={`w-full flex items-center px-3 py-2 text-xs font-medium rounded-md transition-all ${activeTab === 'settings_home' ? 'text-blue-400 font-bold bg-slate-800/40' : 'text-slate-400 hover:text-white'}`}
                                         >
                                             홈페이지 설정
                                         </button>
@@ -1841,31 +1812,31 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
                             </div>
                         )}
 
-                        <div className="pt-4 mt-4 border-t border-slate-200">
-                            <h3 className="px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
+                        <div className="pt-4 mt-4 border-t border-slate-700/50">
+                            <h3 className="px-3 text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">
                                 업무 관리
                             </h3>
                             <button
                                 onClick={() => setActiveTab('weekly_report')}
-                                className={`w-full flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-colors ${activeTab === 'weekly_report'
-                                    ? 'bg-primary-50 text-primary-700'
-                                    : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                                className={`w-full flex items-center px-3 py-2.5 text-sm font-semibold rounded-lg transition-all ${activeTab === 'weekly_report'
+                                    ? 'bg-slate-800 text-white border-l-4 border-blue-500'
+                                    : 'text-slate-300 hover:bg-slate-800/60'
                                     }`}
                             >
                                 <div className="flex items-center">
-                                    <FileText className={`mr-3 h-5 w-5 ${activeTab === 'weekly_report' ? 'text-primary-500' : 'text-slate-400'}`} />
+                                    <FileText className={`mr-3 h-5 w-5 ${activeTab === 'weekly_report' ? 'text-blue-400' : 'text-slate-400'}`} />
                                     주간업무보고
                                 </div>
                             </button>
                             <button
                                 onClick={() => setActiveTab('weekly_status')}
-                                className={`w-full flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-colors ${activeTab === 'weekly_status'
-                                    ? 'bg-primary-50 text-primary-700'
-                                    : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                                className={`w-full flex items-center px-3 py-2.5 text-sm font-semibold rounded-lg transition-all ${activeTab === 'weekly_status'
+                                    ? 'bg-slate-800 text-white border-l-4 border-blue-500'
+                                    : 'text-slate-300 hover:bg-slate-800/60'
                                     }`}
                             >
                                 <div className="flex items-center">
-                                    <LayoutDashboard className={`mr-3 h-5 w-5 ${activeTab === 'weekly_status' ? 'text-primary-500' : 'text-slate-400'}`} />
+                                    <LayoutDashboard className={`mr-3 h-5 w-5 ${activeTab === 'weekly_status' ? 'text-blue-400' : 'text-slate-400'}`} />
                                     주간업무현황
                                 </div>
                             </button>
