@@ -41,7 +41,6 @@ const getBadgeColor = (rank) => {
 };
 
 const WeeklyStatus = () => {
-    // eslint-disable-next-line no-unused-vars
     const { user } = useUser();
     const [currentDate, setCurrentDate] = useState(new Date());
     const [reports, setReports] = useState([]);
