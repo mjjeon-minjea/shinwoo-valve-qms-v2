@@ -212,11 +212,11 @@ const WeeklyStatus = () => {
     if (loading) return <div className="p-8 text-center">로딩 중...</div>;
 
     return (
-        <div className="p-6 max-w-7xl mx-auto bg-gray-50 min-h-screen print:bg-white print:p-0">
+        <div className="p-6 max-w-7xl mx-auto bg-slate-50/20 min-h-screen print:bg-white print:p-0">
             {/* Header - Hidden on Print */}
             <div className="flex justify-between items-center mb-8 print:hidden">
-                <h2 className="text-2xl font-bold text-gray-800 flex items-center">
-                    <FileText className="w-8 h-8 mr-3 text-indigo-600" />
+                <h2 className="text-xl font-bold text-slate-800 flex items-center">
+                    <FileText className="w-6 h-6 mr-3 text-slate-700" />
                     주간 업무 현황 (통합)
                 </h2>
                 <div className="flex items-center space-x-4">
