@@ -1,0 +1,71 @@
+﻿{
+	"schemaVersion": "0.1.0",
+	"name": "📄 아티클 (Article)",
+	"behavior": "create",
+	"noteContentFormat": "## 📌 핵심 요약\n> 📎 `\"Ingest 해줘\"` 요청 시 AI가 이 섹션을 기반으로 `wiki/concepts/` 또는 `wiki/synthesis/` 페이지를 생성합니다.\n> 수집 직후 간략히 메모하거나 비워두세요.\n\n\n---\n\n## 🏷️ 연관 wiki 항목 (Cross-references)\n> 이 아티클에서 언급된 주요 개념·엔티티를 `[[wikilink]]` 형식으로 나열하세요.\n> AI Ingest 시 wiki 페이지들을 자동 연결합니다.\n\n\n---\n\n## ✏️ 하이라이트 / 핵심 인용\n{{highlights}}\n\n---\n\n## 📄 원문 내용\n{{content}}",
+	"properties": [
+		{
+			"name": "title",
+			"value": "{{title}}",
+			"type": "text"
+		},
+		{
+			"name": "type",
+			"value": "article",
+			"type": "text"
+		},
+		{
+			"name": "category",
+			"value": "concepts",
+			"type": "text"
+		},
+		{
+			"name": "sources",
+			"value": "{{url}}",
+			"type": "text"
+		},
+		{
+			"name": "author",
+			"value": "{{author|split:\", \"|wikilink|join}}",
+			"type": "multitext"
+		},
+		{
+			"name": "published",
+			"value": "{{published}}",
+			"type": "date"
+		},
+		{
+			"name": "created",
+			"value": "{{date}}",
+			"type": "date"
+		},
+		{
+			"name": "updated",
+			"value": "{{date}}",
+			"type": "date"
+		},
+		{
+			"name": "description",
+			"value": "{{description}}",
+			"type": "text"
+		},
+		{
+			"name": "source_count",
+			"value": "1",
+			"type": "number"
+		},
+		{
+			"name": "wiki_status",
+			"value": "pending",
+			"type": "text"
+		},
+		{
+			"name": "tags",
+			"value": "article, clipping, raw",
+			"type": "multitext"
+		}
+	],
+	"triggers": [],
+	"noteNameFormat": "{{date|date:YYYY-MM-DD}} {{title}}",
+	"path": "raw/articles"
+}

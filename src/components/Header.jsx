@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { ShieldCheck } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import logo from '../assets/logo.png';
 
 const Header = ({ isLoggedIn, onLogout, currentUser, onUpdateProfile }) => {
     const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
@@ -20,18 +20,16 @@ const Header = ({ isLoggedIn, onLogout, currentUser, onUpdateProfile }) => {
     return (
         <header className="fixed w-full bg-white/80 backdrop-blur-md border-b border-slate-200 z-50">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="flex justify-between items-center h-16">
+                <div className={`flex items-center h-16 ${isLoggedIn && currentUser ? 'justify-between' : 'justify-center'}`}>
                     <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-                        <div className="bg-primary-600 p-1.5 rounded-lg">
-                            <ShieldCheck className="w-6 h-6 text-white" />
-                        </div>
-                        <span className="text-xl font-bold bg-gradient-to-r from-primary-700 to-primary-500 bg-clip-text text-transparent">
-                            신우밸브 QMS
+                        <img src={logo} alt="신우밸브 로고" className="h-8 w-auto object-contain" />
+                        <span className="text-xl font-black tracking-[-0.06em] text-slate-900 uppercase font-sans">
+                            SHINWOOVALVE QMS
                         </span>
                     </Link>
 
-                    <nav className="flex items-center gap-4">
-                        {isLoggedIn && currentUser ? (
+                    {isLoggedIn && currentUser && (
+                        <nav className="flex items-center gap-4">
                             <div className="flex items-center gap-4">
                                 <button
                                     onClick={onLogout}
@@ -97,16 +95,8 @@ const Header = ({ isLoggedIn, onLogout, currentUser, onUpdateProfile }) => {
                                     )}
                                 </div>
                             </div>
-                        ) : (
-                            !isLoggedIn && (
-                                <div className="hidden md:flex space-x-8 text-sm font-medium text-slate-600">
-                                    <a href="#" className="hover:text-primary-600 transition-colors">제품소개</a>
-                                    <a href="#" className="hover:text-primary-600 transition-colors">솔루션</a>
-                                    <a href="#" className="hover:text-primary-600 transition-colors">고객지원</a>
-                                </div>
-                            )
-                        )}
-                    </nav>
+                        </nav>
+                    )}
                 </div>
             </div>
         </header>

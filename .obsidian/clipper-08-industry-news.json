@@ -1,0 +1,71 @@
+﻿{
+	"schemaVersion": "0.1.0",
+	"name": "📰 뉴스/업계동향 (Industry News)",
+	"behavior": "create",
+	"noteContentFormat": "## 📌 핵심 요약\n> 📎 `\"Ingest 해줘\"` 요청 시 AI가 `wiki/patterns/` 또는 `wiki/synthesis/` 페이지를 업데이트합니다.\n> 이 뉴스가 우리 업무/업계에 주는 시사점을 간략히 기술하세요.\n\n**시사점:** \n**당사 영향도:** 높음 / 중간 / 낮음\n\n---\n\n## 🔗 연관 wiki 항목 (Cross-references)\n> `[[wikilink]]` 형식으로 연관 개념·공급사·공정을 나열하세요.\n\n\n---\n\n## ✏️ 하이라이트\n{{highlights}}\n\n---\n\n## 📄 원문 내용\n{{content}}",
+	"properties": [
+		{
+			"name": "title",
+			"value": "{{title}}",
+			"type": "text"
+		},
+		{
+			"name": "type",
+			"value": "industry-news",
+			"type": "text"
+		},
+		{
+			"name": "category",
+			"value": "patterns",
+			"type": "text"
+		},
+		{
+			"name": "sources",
+			"value": "{{url}}",
+			"type": "text"
+		},
+		{
+			"name": "author",
+			"value": "{{author}}",
+			"type": "text"
+		},
+		{
+			"name": "published",
+			"value": "{{published}}",
+			"type": "date"
+		},
+		{
+			"name": "created",
+			"value": "{{date}}",
+			"type": "date"
+		},
+		{
+			"name": "updated",
+			"value": "{{date}}",
+			"type": "date"
+		},
+		{
+			"name": "description",
+			"value": "{{description}}",
+			"type": "text"
+		},
+		{
+			"name": "source_count",
+			"value": "1",
+			"type": "number"
+		},
+		{
+			"name": "wiki_status",
+			"value": "pending",
+			"type": "text"
+		},
+		{
+			"name": "tags",
+			"value": "news, industry, trend, clipping, raw",
+			"type": "multitext"
+		}
+	],
+	"triggers": [],
+	"noteNameFormat": "{{date|date:YYYY-MM-DD}}_[뉴스]_{{title}}",
+	"path": "raw/news"
+}

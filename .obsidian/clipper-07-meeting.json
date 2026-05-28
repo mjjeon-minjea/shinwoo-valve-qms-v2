@@ -1,0 +1,61 @@
+﻿{
+	"schemaVersion": "0.1.0",
+	"name": "📝 회의록 (Meeting Notes)",
+	"behavior": "create",
+	"noteContentFormat": "## 📌 회의 결론 / 결정 사항\n> 📎 `\"Ingest 해줘\"` 요청 시 AI가 `wiki/entities/` (참석자/조직) 및 `wiki/synthesis/` 페이지를 업데이트합니다.\n\n\n---\n\n## 👥 참석자\n> 참석자를 `[[이름]]` 형식으로 기입하세요.\n\n\n---\n\n## ✅ 액션 아이템\n| 담당자 | 내용 | 기한 | 완료여부 |\n|---|---|---|---|\n| | | | |\n\n---\n\n## 🔗 연관 wiki 항목 (Cross-references)\n> 이 회의에서 논의된 주요 개념·프로젝트를 `[[wikilink]]`로 나열하세요.\n\n\n---\n\n## ✏️ 하이라이트\n{{highlights}}\n\n---\n\n## 📄 회의 내용\n{{content}}",
+	"properties": [
+		{
+			"name": "title",
+			"value": "{{title}}",
+			"type": "text"
+		},
+		{
+			"name": "type",
+			"value": "meeting",
+			"type": "text"
+		},
+		{
+			"name": "category",
+			"value": "entities",
+			"type": "text"
+		},
+		{
+			"name": "sources",
+			"value": "{{url}}",
+			"type": "text"
+		},
+		{
+			"name": "created",
+			"value": "{{date}}",
+			"type": "date"
+		},
+		{
+			"name": "updated",
+			"value": "{{date}}",
+			"type": "date"
+		},
+		{
+			"name": "description",
+			"value": "{{description}}",
+			"type": "text"
+		},
+		{
+			"name": "source_count",
+			"value": "1",
+			"type": "number"
+		},
+		{
+			"name": "wiki_status",
+			"value": "pending",
+			"type": "text"
+		},
+		{
+			"name": "tags",
+			"value": "meeting, minutes, clipping, raw",
+			"type": "multitext"
+		}
+	],
+	"triggers": [],
+	"noteNameFormat": "{{date|date:YYYY-MM-DD}}_[회의]_{{title}}",
+	"path": "raw/meetings"
+}
