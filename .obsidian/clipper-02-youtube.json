@@ -1,0 +1,74 @@
+﻿{
+	"schemaVersion": "0.1.0",
+	"name": "🎬 유튜브 (YouTube)",
+	"behavior": "create",
+	"noteContentFormat": "## 📌 핵심 요약\n> 📎 `\"Ingest 해줘\"` 요청 시 AI가 이 섹션을 기반으로 `wiki/concepts/` 또는 `wiki/synthesis/` 페이지를 생성합니다.\n\n\n---\n\n## ⏱️ 타임스탬프 메모\n> 핵심 구간의 시간(mm:ss)과 내용을 기록하세요. AI Ingest 시 개념 페이지에 반영됩니다.\n\n| 시간 | 내용 |\n|---|---|\n| | |\n\n---\n\n## 🏷️ 연관 wiki 항목 (Cross-references)\n> `[[wikilink]]` 형식으로 연관 개념·엔티티를 나열하세요.\n\n\n---\n\n## ✏️ 하이라이트\n{{highlights}}\n\n---\n\n## 📄 영상 정보\n{{content}}",
+	"properties": [
+		{
+			"name": "title",
+			"value": "{{title}}",
+			"type": "text"
+		},
+		{
+			"name": "type",
+			"value": "youtube",
+			"type": "text"
+		},
+		{
+			"name": "category",
+			"value": "concepts",
+			"type": "text"
+		},
+		{
+			"name": "sources",
+			"value": "{{url}}",
+			"type": "text"
+		},
+		{
+			"name": "channel",
+			"value": "{{author}}",
+			"type": "text"
+		},
+		{
+			"name": "published",
+			"value": "{{published}}",
+			"type": "date"
+		},
+		{
+			"name": "created",
+			"value": "{{date}}",
+			"type": "date"
+		},
+		{
+			"name": "updated",
+			"value": "{{date}}",
+			"type": "date"
+		},
+		{
+			"name": "description",
+			"value": "{{description}}",
+			"type": "text"
+		},
+		{
+			"name": "source_count",
+			"value": "1",
+			"type": "number"
+		},
+		{
+			"name": "wiki_status",
+			"value": "pending",
+			"type": "text"
+		},
+		{
+			"name": "tags",
+			"value": "youtube, video, clipping, raw",
+			"type": "multitext"
+		}
+	],
+	"triggers": [
+		{"type": "url", "value": "youtube.com"},
+		{"type": "url", "value": "youtu.be"}
+	],
+	"noteNameFormat": "{{date|date:YYYY-MM-DD}}_[YT]_{{title}}",
+	"path": "raw/youtube"
+}

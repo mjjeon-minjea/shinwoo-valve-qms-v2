@@ -1,0 +1,225 @@
+{
+  "main": {
+    "id": "1af419aa452545c5",
+    "type": "split",
+    "children": [
+      {
+        "id": "4df6764e85e7a3da",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "e8b5e018e91820d8",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "wiki/history/AG_plan_2026-05-27_QMS_v2_대시보드_및_로그인_전면_디자인_개편_기획안_세부추가_상단배너_R0.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "AG_plan_2026-05-27_QMS_v2_대시보드_및_로그인_전면_디자인_개편_기획안_세부추가_상단배너_R0"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "c0c5cfed8d966d3f",
+    "type": "split",
+    "children": [
+      {
+        "id": "b5a487af3d0acf3a",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "d63703fa1480064b",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "파일 탐색기"
+            }
+          },
+          {
+            "id": "01892527d54efef8",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "검색"
+            }
+          },
+          {
+            "id": "bcfdad6d5dbf5a6f",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "북마크"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "a38870b8eaf3646c",
+    "type": "split",
+    "children": [
+      {
+        "id": "1742c35cc1023e78",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "ba54b7ecde68ae5a",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "wiki/GEMINI.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "GEMINI 의 백링크"
+            }
+          },
+          {
+            "id": "dee012c756203ca1",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "wiki/GEMINI.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "GEMINI 의 나가는 링크"
+            }
+          },
+          {
+            "id": "a25969b3b329e312",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "태그"
+            }
+          },
+          {
+            "id": "a96eb1fb095ae495",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "모든 속성"
+            }
+          },
+          {
+            "id": "d5281c8947478a95",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "wiki/GEMINI.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "GEMINI 의 개요"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:빠른 전환기 열기": false,
+      "graph:그래프 뷰 열기": false,
+      "canvas:새 캔버스 만들기": false,
+      "daily-notes:오늘의 일일 노트 열기": false,
+      "templates:템플릿 삽입": false,
+      "command-palette:명령어 팔레트 열기": false,
+      "bases:새 베이스 생성하기": false
+    }
+  },
+  "active": "e8b5e018e91820d8",
+  "lastOpenFiles": [
+    "raw/youtube/2026-05-28_YT_하네스 엔지니어링 존재 이유부터 실전 예제까지 다 가져가라!.md",
+    "raw/graphify-out/cache/stat-index.json",
+    "raw/graphify-out/graph.html",
+    "raw/graphify-out/GRAPH_REPORT.md",
+    "raw/graphify-out/graph.json",
+    "raw/graphify-out/cache/ast/3c37293cc6cca1d721a1046a7290dece281e8ca5ad3ad6215030b6160d527499.json",
+    "raw/graphify-out/cache/ast/9bb22a902cbea520991fabc52b8c9e88a1f17e47127976ccc204d75f0ff68928.json",
+    "raw/graphify-out/cache/ast/72439fdad00fb97d0e6a994efabd2cc5ccbf2d54d8cd8af6ef402259b894cde3.json",
+    "raw/graphify-out/cache/ast/30dcadaa5c33cdbb4cf0054b423b6544ae12afe798d9258e05537d9119541e19.json",
+    "raw/graphify-out/cache/ast",
+    "raw/graphify-out/cache",
+    "raw/graphify-out",
+    "wiki/concepts/브레인_트리니티.md",
+    "wiki/concepts/하네스_엔지니어링.md",
+    "wiki/synthesis/AG_report_2026-05-28_불필요_스킬_분석_보고서_R0.md",
+    "wiki/synthesis/AG_report_2026-05-28_Dashboard_컴포넌트_분리_최종_검증_보고서_R1.md",
+    "wiki/synthesis/AG_report_2026-05-28_Dashboard_컴포넌트_분리_완료_보고서_R0.md",
+    "wiki/synthesis/AG_report_2026-05-27_QMS_v2_상단배너_개편_및_실패기록_ADR_동기화_보고서_R0.md",
+    "wiki/history/AG_plan_2026-05-27_QMS_v2_점진적_하네스_이식_기획안_R3.md",
+    "wiki/history/AG_plan_2026-05-27_QMS_v2_점진적_하네스_이식_기획안_R2.md",
+    "wiki/history/AG_plan_2026-05-27_QMS_v2_점진적_하네스_이식_기획안_R1.md",
+    "wiki/history/AG_plan_2026-05-27_QMS_v2_점진적_하네스_이식_기획안_R0.md",
+    "wiki/history/AG_plan_2026-05-27_QMS_v2_대시보드_및_로그인_전면_디자인_개편_기획안_세부추가_상단배너_R0.md",
+    "wiki/history/AG_plan_2026-05-27_QMS_v2_대시보드_및_로그인_전면_디자인_개편_기획안_R0.md",
+    "wiki/history/2026-01-29_v0_3_0_Git_커밋_속도_최적화_및_프로세스_정리_완료.md",
+    "wiki/history/2026-04-10_v0_22_1_[P11]_보안_UI_고도화_및_Auth-DB_이중_동기화.md",
+    "wiki/history/2026-02-06_v0_11_0_시스템_전체_점검_태스크.md",
+    "wiki/history/2026-01-26_v0_1_0_게이트웨이_PC_&_미들웨어_구축_계획.md",
+    "wiki/history/2026-03-12_v0_14_0_공정검사_이력_조회_및_등록_구현_계획.md",
+    "wiki/history/2026-04-03_v0_17_5_전사_시스템_코드_정밀_진단(Linting)_및_잠재적_경고성_에러_영구_제거.md",
+    "wiki/history/2026-04-10_v0_23_0_[P12]_DNAS(개발자_노트_자동화_및_승인_시스템)_이식.md",
+    "wiki/history/2026-02-05_v0_9_0_Debugging_Weekly_Report_White_Screen.md",
+    "wiki/history/2026-03-25_v0_17_2_SPA_뒤로가기_방어_및_게시물_승인_관리_UI_릴리즈.md",
+    "wiki/history/2026-01-26_v0_0_0_QMS_프로젝트_태스크.md",
+    "wiki/history/2026-02-06_v0_11_0_일괄_작업_지원_및_API_수정_계획.md",
+    "wiki/history/2026-02-05_v0_10_0_Implementation_Plan_-_Fix_Inspection_Logic.md"
+  ]
+}

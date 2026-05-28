@@ -1,0 +1,71 @@
+﻿{
+	"schemaVersion": "0.1.0",
+	"name": "🎓 강의/코스 (Course)",
+	"behavior": "create",
+	"noteContentFormat": "## 📌 핵심 요약\n> 📎 `\"Ingest 해줘\"` 요청 시 AI가 `wiki/concepts/` 페이지를 생성합니다.\n> 이 강의에서 가장 중요하게 가져갈 핵심 학습 목표를 기술하세요.\n\n**학습 목표:** \n**난이도:** 입문 / 중급 / 고급\n**완료 여부:** 진행중 / 완료\n\n---\n\n## 📒 모듈/챕터별 메모\n| 모듈 | 핵심 내용 | 실습/과제 |\n|---|---|---|\n| | | |\n\n---\n\n## 💡 즉시 적용 가능한 내용\n> QMS 업무나 AI 시스템에 바로 적용할 수 있는 것을 기록하세요.\n\n\n---\n\n## 🔗 연관 wiki 항목 (Cross-references)\n> `[[wikilink]]` 형식으로 연관 개념·시스템을 나열하세요.\n\n\n---\n\n## ✏️ 하이라이트\n{{highlights}}\n\n---\n\n## 📄 강의 정보\n{{content}}",
+	"properties": [
+		{
+			"name": "title",
+			"value": "{{title}}",
+			"type": "text"
+		},
+		{
+			"name": "type",
+			"value": "course",
+			"type": "text"
+		},
+		{
+			"name": "category",
+			"value": "concepts",
+			"type": "text"
+		},
+		{
+			"name": "sources",
+			"value": "{{url}}",
+			"type": "text"
+		},
+		{
+			"name": "instructor",
+			"value": "{{author}}",
+			"type": "text"
+		},
+		{
+			"name": "published",
+			"value": "{{published}}",
+			"type": "date"
+		},
+		{
+			"name": "created",
+			"value": "{{date}}",
+			"type": "date"
+		},
+		{
+			"name": "updated",
+			"value": "{{date}}",
+			"type": "date"
+		},
+		{
+			"name": "description",
+			"value": "{{description}}",
+			"type": "text"
+		},
+		{
+			"name": "source_count",
+			"value": "1",
+			"type": "number"
+		},
+		{
+			"name": "wiki_status",
+			"value": "pending",
+			"type": "text"
+		},
+		{
+			"name": "tags",
+			"value": "course, learning, education, clipping, raw",
+			"type": "multitext"
+		}
+	],
+	"triggers": [],
+	"noteNameFormat": "{{date|date:YYYY-MM-DD}}_[강의]_{{title}}",
+	"path": "raw/courses"
+}
