@@ -97,9 +97,9 @@ export default async function handler(req, res) {
       const originalDefectType = (row['부적합 유형'] || '').trim();
       const itemCode = (row['품목번호'] || '').trim();
 
-      // 중복 방지를 위한 무결성 ID 유도 (동일 업체, 제품, 입고일, 수량, 인덱스 기준 고유 해시 ID 빌드)
-      const rawId = `${supplier}_${itemName}_${date}_${totalQuantity}_${index}`;
-      const safeId = Buffer.from(rawId).toString('base64').replace(/[^a-zA-Z0-9]/g, '').substring(0, 30);
+      const rawId = `${supplier}_${itemName}_${date}_${totalQuantity}`;
+      const hashPart = Buffer.from(rawId).toString('base64').replace(/[^a-zA-Z0-9]/g, '').substring(0, 20);
+      const safeId = `${hashPart}_${index}`;
 
       // Gemini 분류 맵에서 카테고리 획득
       const defectCategory = defectCategoryMap[originalDefectType] || '합격';

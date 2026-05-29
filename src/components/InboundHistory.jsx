@@ -166,8 +166,9 @@ const InboundHistory = () => {
                 const originalDefectType = (row['부적합 유형'] || '').trim();
                 const itemCode = (row['품목번호'] || '').trim();
 
-                const rawId = `${supplier}_${itemName}_${date}_${totalQuantity}_${index}`;
-                const safeId = btoa(unescape(encodeURIComponent(rawId))).replace(/[^a-zA-Z0-9]/g, '').substring(0, 30);
+                const rawId = `${supplier}_${itemName}_${date}_${totalQuantity}`;
+                const hashPart = btoa(unescape(encodeURIComponent(rawId))).replace(/[^a-zA-Z0-9]/g, '').substring(0, 20);
+                const safeId = `${hashPart}_${index}`;
                 const defectCategory = defectCategoryMap[originalDefectType] || '합격';
 
                 return {
