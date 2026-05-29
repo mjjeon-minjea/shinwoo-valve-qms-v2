@@ -1,5 +1,19 @@
 {
+    "crons": [
+        {
+            "path": "/api/sync-sheets",
+            "schedule": "0 0 * * *"
+        }
+    ],
     "rewrites": [
+        {
+            "source": "/api/sync-sheets",
+            "destination": "/api/sync-sheets.js"
+        },
+        {
+            "source": "/api/admin-update-member",
+            "destination": "/api/admin-update-member.js"
+        },
         {
             "source": "/(.*)",
             "destination": "/index.html"

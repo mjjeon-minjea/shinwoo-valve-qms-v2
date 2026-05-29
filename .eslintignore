@@ -1,0 +1,19 @@
+# ESLint Ignore List for QMS Projects
+db-check.js
+db-check.cjs
+db-check-supabase.js
+db-check-pooler.cjs
+db-check-tokyo.cjs
+db-check-ipv6.cjs
+db-check-final.cjs
+db-check-config.cjs
+dns-check.cjs
+dns-check-aaaa.cjs
+dns-reverse.cjs
+dns-txt.cjs
+dns-cname.cjs
+find-region.cjs
+find-cluster.cjs
+find-all-poolers.cjs
+api/sync-sheets.js
+api/admin-update-member.js
