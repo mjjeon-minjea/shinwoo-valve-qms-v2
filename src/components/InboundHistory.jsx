@@ -224,7 +224,10 @@ const InboundHistory = () => {
                 status: 'success',
                 message: `${inspectionsToUpsert.length}개의 구글 시트 데이터를 성공적으로 연동하고 Gemini Flash로 정형화했습니다!`
             });
-            alert(`동기화 완수!\n${inspectionsToUpsert.length}건이 Supabase Staging DB에 안전하게 반영되었습니다.`);
+            const dbName = window.location.hostname.includes('-v2') 
+                ? 'Supabase Production DB (메인)' 
+                : 'Supabase Staging DB (테스트)';
+            alert(`동기화 완수!\n${inspectionsToUpsert.length}건이 ${dbName}에 안전하게 반영되었습니다.`);
             fetchInspections();
 
         } catch (error) {
