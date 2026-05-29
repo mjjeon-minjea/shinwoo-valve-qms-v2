@@ -112,7 +112,7 @@ const InboundHistory = () => {
         try {
             let csvData = '';
             // 로컬/운영 환경 변수에서 구글 시트 CSV 주소 참조
-            const sheetUrl = import.meta.env.VITE_GOOGLE_SHEETS_CSV_URL;
+            const sheetUrl = import.meta.env.VITE_GOOGLE_SHEETS_CSV_URL || "https://docs.google.com/spreadsheets/d/e/2PACX-1vSz-OGELs_8JhV7Vrf14kdF8rrdx-VdcJXLAAc-Tr2FvdC32E4Flol7QeMoJbCVnr32SOpCX5kDsZPo/pub?gid=2043099098&single=true&output=csv";
 
             if (sheetUrl) {
                 const response = await fetch(sheetUrl);

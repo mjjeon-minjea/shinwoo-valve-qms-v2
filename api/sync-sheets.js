@@ -42,7 +42,7 @@ export default async function handler(req, res) {
 
   try {
     let csvData = '';
-    const sheetUrl = process.env.GOOGLE_SHEETS_CSV_URL;
+    const sheetUrl = process.env.GOOGLE_SHEETS_CSV_URL || "https://docs.google.com/spreadsheets/d/e/2PACX-1vSz-OGELs_8JhV7Vrf14kdF8rrdx-VdcJXLAAc-Tr2FvdC32E4Flol7QeMoJbCVnr32SOpCX5kDsZPo/pub?gid=2043099098&single=true&output=csv";
 
     if (sheetUrl) {
       log(`Fetching remote Google Sheet CSV from URL...`);
