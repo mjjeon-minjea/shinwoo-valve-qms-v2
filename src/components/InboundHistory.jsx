@@ -154,7 +154,7 @@ const InboundHistory = () => {
             updateProgress(85, 100, 'sync');
 
             // 가공 및 Upsert 데이터 리스트 빌드
-            const inspectionsToUpsert = rows.map(row => {
+            const inspectionsToUpsert = rows.map((row, index) => {
                 const supplier = (row['업체명'] || '').trim();
                 const itemName = (row['제품명'] || '').trim();
                 const date = (row['입고일'] || '').trim();
@@ -166,7 +166,7 @@ const InboundHistory = () => {
                 const originalDefectType = (row['부적합 유형'] || '').trim();
                 const itemCode = (row['품목번호'] || '').trim();
 
-                const rawId = `${supplier}_${itemName}_${date}_${totalQuantity}`;
+                const rawId = `${supplier}_${itemName}_${date}_${totalQuantity}_${index}`;
                 const safeId = btoa(unescape(encodeURIComponent(rawId))).replace(/[^a-zA-Z0-9]/g, '').substring(0, 30);
                 const defectCategory = defectCategoryMap[originalDefectType] || '합격';
 
