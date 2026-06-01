@@ -23,7 +23,7 @@ async function recordLogin() {
 
     // 3. 테스트웹 이동
     console.log('🔄 Navigating to QMS Test Web...');
-    await page.goto('https://shinwoo-valve-qms.vercel.app', { waitUntil: 'load', timeout: 30000 });
+    await page.goto('https://shinwoo-valve-qms-testweb.vercel.app', { waitUntil: 'load', timeout: 30000 });
     await page.waitForTimeout(2000);
 
     // [클린 세션 확보]

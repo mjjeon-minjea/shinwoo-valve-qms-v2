@@ -1,0 +1,80 @@
+[
+  {
+    "id": "46e5f64c-04f7-4eb7-8c72-70bc0515b867",
+    "email": "jslee@shinwoovalve.com",
+    "password": "sundance!813",
+    "name": "이종선",
+    "company": "품질보증부",
+    "role": "employee",
+    "rank": "대리",
+    "date": "2026-01-01",
+    "status": "Active",
+    "created_at": "2026-02-03T03:12:16.044645+00:00",
+    "auth_id": "46e5f64c-04f7-4eb7-8c72-70bc0515b867"
+  },
+  {
+    "id": "b2b1c978-b1ac-43ee-8854-1932aec2091c",
+    "email": "shcho@shinwoovalve.com",
+    "password": "c4620373?!",
+    "name": "조승현",
+    "company": "품질보증부",
+    "role": "employee",
+    "rank": "사원",
+    "date": "2026-02-02",
+    "status": "Active",
+    "created_at": "2026-02-03T03:12:16.044645+00:00",
+    "auth_id": "b2b1c978-b1ac-43ee-8854-1932aec2091c"
+  },
+  {
+    "id": "1769999649940",
+    "email": "hchwang@shinwoovalve.com",
+    "password": "SHINWOO1234!",
+    "name": "황희찬",
+    "company": "품질보증부",
+    "role": "employee",
+    "rank": "계장",
+    "date": "2026-02-02",
+    "status": "Active",
+    "created_at": "2026-02-03T03:12:16.044645+00:00",
+    "auth_id": "7f56f495-b4b0-4b50-90b2-81de82e11336"
+  },
+  {
+    "id": "33bf8c0a-30e4-4d8b-851c-db411dce4778",
+    "email": "ysson@shinwoovalve.com",
+    "password": "123456",
+    "name": "손양수",
+    "company": "품질보증부",
+    "role": "admin",
+    "rank": "부장",
+    "date": "2025-12-30",
+    "status": "Active",
+    "created_at": "2026-04-08T06:38:56.53852+00:00",
+    "auth_id": "33bf8c0a-30e4-4d8b-851c-db411dce4778"
+  },
+  {
+    "id": "0d64f734-ba3f-4a84-ab7a-e753c4c8aed9",
+    "email": "bskwon@shinwoovalve.com",
+    "password": "123456",
+    "name": "권병수",
+    "company": "품질보증부",
+    "role": "admin",
+    "rank": "이사",
+    "date": "2025-12-30",
+    "status": "Active",
+    "created_at": "2026-04-08T06:38:56.686897+00:00",
+    "auth_id": "0d64f734-ba3f-4a84-ab7a-e753c4c8aed9"
+  },
+  {
+    "id": "1",
+    "email": "mjjeon@shinwoovalve.com",
+    "password": "!alswo6305",
+    "name": "전민재",
+    "company": "품질보증부",
+    "role": "manager",
+    "rank": "차장",
+    "date": "2025-12-30",
+    "status": "Active",
+    "created_at": "2026-01-22T01:31:23.507721+00:00",
+    "auth_id": "6a40cb30-1c44-4404-bb1e-433344028380"
+  }
+]

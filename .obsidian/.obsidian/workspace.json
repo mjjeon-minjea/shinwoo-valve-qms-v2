@@ -4,21 +4,21 @@
     "type": "split",
     "children": [
       {
-        "id": "4df6764e85e7a3da",
+        "id": "f3dd1b0b4540cfee",
         "type": "tabs",
         "children": [
           {
-            "id": "e8b5e018e91820d8",
+            "id": "5145bd6664ba794a",
             "type": "leaf",
             "state": {
               "type": "markdown",
               "state": {
-                "file": "wiki/history/AG_plan_2026-05-27_QMS_v2_대시보드_및_로그인_전면_디자인_개편_기획안_세부추가_상단배너_R0.md",
+                "file": "wiki/history/2026-04-03_v0_17_4_[황희찬_계장님_피드백_반영]_SPA_뒤로가기_방어_및_비정상_접근_차단_완수.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "AG_plan_2026-05-27_QMS_v2_대시보드_및_로그인_전면_디자인_개편_기획안_세부추가_상단배너_R0"
+              "title": "2026-04-03_v0_17_4_[황희찬_계장님_피드백_반영]_SPA_뒤로가기_방어_및_비정상_접근_차단_완수"
             }
           }
         ]
@@ -183,8 +183,9 @@
       "bases:새 베이스 생성하기": false
     }
   },
-  "active": "e8b5e018e91820d8",
+  "active": "5145bd6664ba794a",
   "lastOpenFiles": [
+    "wiki/history/AG_plan_2026-05-27_QMS_v2_대시보드_및_로그인_전면_디자인_개편_기획안_세부추가_상단배너_R0.md",
     "raw/youtube/2026-05-28_YT_하네스 엔지니어링 존재 이유부터 실전 예제까지 다 가져가라!.md",
     "raw/graphify-out/cache/stat-index.json",
     "raw/graphify-out/graph.html",
@@ -207,7 +208,6 @@
     "wiki/history/AG_plan_2026-05-27_QMS_v2_점진적_하네스_이식_기획안_R2.md",
     "wiki/history/AG_plan_2026-05-27_QMS_v2_점진적_하네스_이식_기획안_R1.md",
     "wiki/history/AG_plan_2026-05-27_QMS_v2_점진적_하네스_이식_기획안_R0.md",
-    "wiki/history/AG_plan_2026-05-27_QMS_v2_대시보드_및_로그인_전면_디자인_개편_기획안_세부추가_상단배너_R0.md",
     "wiki/history/AG_plan_2026-05-27_QMS_v2_대시보드_및_로그인_전면_디자인_개편_기획안_R0.md",
     "wiki/history/2026-01-29_v0_3_0_Git_커밋_속도_최적화_및_프로세스_정리_완료.md",
     "wiki/history/2026-04-10_v0_22_1_[P11]_보안_UI_고도화_및_Auth-DB_이중_동기화.md",
