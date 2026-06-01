@@ -6,7 +6,29 @@
 
 ### [초헌법적 절대 규칙] 로컬 PC 시스템 안정성 및 실서버 보안 무결성 (최상위 격상)
 1. 🛡️ **로컬 PC 시스템 안정성 절대 사수:** 에이전트의 구동 및 검증 행위 시, 로컬 PC 환경에 크롬 좀비 프로세스를 남겨 시스템 포트(9222 등)를 블록시키거나 리소스를 점먹는 모든 행위를 엄격히 차단한다. 그 어떠한 E2E 시각적 입증 조항보다 **'로컬 PC 시스템 안정성 및 무결성'**을 최상위 위계로 둔다.
-2. 🚫 **CDP 9222 포트 직결 및 브라우저 제어 전면 금지:** 전민재 차장님의 사전 명시적 허가 없이는 `connectOverCDP('http://127.0.0.1:9222')` 구문 및 `chromium.launch({ headless: false })`를 활용한 그 어떤 E2E 자동 조작 스크립트도 기획하거나 구동할 수 없다. 시각적 쇼(파란 점 커서 및 화면 녹화 등)는 전면 금지한다.
+2. 🔌 **안티그래비티 자체 브라우저 CDP 9222 연동 및 도구 이원화 표준**
+
+### ① 교착 해제 및 포트 고수 (RCA & CAPA)
+- 이전 세션에서 종료되지 않고 디버깅 포트를 꽉 물고 있던 유령 프로세스는 PowerShell 명령어 `Stop-Process -Name "chrome", "node" -Force`를 기동하여 강제 소멸시킨 뒤, `Get-NetTCPConnection -LocalPort 9222` 진단 시 완전한 공백 상태가 확보되어야 9222 포트 해방 상태가 입증됩니다.
+- Vite 개발 서버는 무조건 기본 포트인 **`5173`** 포트로 가동해야만 IDE 관제 뷰어가 이를 정상 프록시 가로채기하여 론칭됩니다.
+
+### ② CDP 새 탭 추가 및 수명 주기 안전장치
+- 독립 쌩 크롬을 Launch하는 꼼수 E2E는 영구 금지하며, 아래와 같이 Playwright `connectOverCDP`로 접속해 진짜 내장 브라우저 탭 옆에 새 탭을 강제 개설(`newPage()`)하여 실증하는 코드를 준수해야 합니다.
+- **교착 예방 핵심:** CDP 연동 시 `browser.close()`를 수행하면 IDE 관제 뷰어 전체가 강제 종료되므로, **생성한 시연용 새 탭(`page.close()`)만 닫아** 리소스를 정돈합니다.
+```javascript
+const browser = await chromium.connectOverCDP('http://127.0.0.1:9222');
+const context = browser.contexts()[0];
+const page = await context.newPage();
+try {
+  await page.goto('https://shinwoo-valve-qms-testweb.vercel.app');
+} finally {
+  await page.close(); // 부모 프로세스 무결성 유지
+}
+```
+
+### ③ E2E 테스트 도구 이원화 운영 규정 (SOP)
+1. **로컬 스크립트 (`record-login.cjs`):** 오직 서버 정상 생존 여부 판별(Health Check) 및 AI 미가동 시 차장님 단독 구동용 **'자가 진단 검사 장비'**로만 그 용도를 제한하여 운용합니다. (레코딩 미결합)
+2. **내장 에이전트 (`browser_subagent`):** 그 외의 모든 비주얼 시연, UI 무결성 및 품질 증빙을 수반하는 모든 검증 과정은 **무조건 안티그래비티 자체 내장 `browser_subagent` 도구**만을 통하여 기동하며 실시간 레코딩(WebP) 증빙을 영구 아카이빙합니다.
 
 에이전트는 코드 작성 및 의사결정 시 아래 규칙들을 순서대로 준수하며, 작업 전 반드시 다음 규칙 파일들을 로드(import)하여 작동해야 합니다.
 
