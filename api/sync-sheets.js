@@ -130,7 +130,7 @@ export default async function handler(req, res) {
     if (error) {
       // 만약 'item_code' 컬럼이 DB 스키마에 없어서 42703 에러가 날 경우, 
       // 예외 대응으로 item_code 컬럼을 뺀 안전본으로 2차 Upsert를 롤백 수행합니다. (피드백 루프 작동)
-      if (error.code === '42703') {
+      if (error.code === '42703' || error.code === 'PGRST204' || (error.message && error.message.includes('item_code'))) {
         log(`[EMERGENCY ROLLBACK] Column "item_code" does not exist! Running secondary fallback sync...`);
         const fallbackInspections = inspectionsToUpsert.map(item => {
           const cleanItem = { ...item };
