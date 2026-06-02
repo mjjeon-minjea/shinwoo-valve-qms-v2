@@ -32,12 +32,17 @@
 ```
 ├── .agent/
 │   ├── rules/
-│   │   ├── GEMINI.md       # 마스터 규칙 인덱스 (전역 규칙 카피본)
-│   │   ├── 01_tech_stack.md# 파워셸 고수 및 F12 진단 기술 규칙
-│   │   ├── 02_dnas_process.md # 3단계 결재 DNAS 의무 규칙
-│   │   └── 03_archiving.md # 지식 아카이빙 규칙
+│   │   ├── GEMINI.md       # 마스터 규칙 (진짜 전역 규칙 상속 선언 및 하부 룰 이정표)
+│   │   ├── 01_tech_stack.md# 기술 스택, PowerShell 터미널 및 환경변수 코드 규칙
+│   │   ├── 02_dnas_process.md # 3단계 결재 DNAS 및 다단계 승인 배포 프로토콜
+│   │   ├── 03_archiving.md # 지식 자산화 4대 대화 분석 아카이빙 규칙
+│   │   └── 04_harness_constraints.md # 하네스 제약, 영구 금지 룰 및 자가검토 의무화
 │   └── skills/
-│       └── qms-orchestrator/ # QMS v2 오케스트레이터 및 검증 모듈
+│       ├── qms-orchestrator/ # QMS v2 오케스트레이터 및 검증 모듈
+│       ├── revision-archiver/ # Plan/Walkthrough 리비전 자동 아카이버 스킬
+│       ├── release-sync/    # [P12] 개발자 노트 릴리즈 자동 인트라넷 동기화 스킬
+│       ├── knowledge-extractor/ # 대화 종료 시 지식 자산 다중 분할 자동 추출 스킬
+│       └── plan-self-review/ # 기획안 제출 전 High 이슈 자가검토 필터링 스킬
 ├── 안티그래비티/
 │   ├── plan/               # 기획안(Plan) 물리 덮어쓰기 금지 보관함
 │   ├── report/             # 최종 자백/중간 보고서(R0~R3) 물리 보관함
@@ -59,6 +64,13 @@
 │   └── index.css           # 마스터 CSS 및 Tailwind 디자인 시스템 파일
 ├── tailwind.config.js      # CSS 디자인 설계 매핑 설정
 └── vite.config.js          # Vite 빌드 및 5173 포트 고정 실행 설정
+
+# 🌐 IDE 전역 (Global) 인프라 매핑 (QMS와 유기적 상속 구동)
+├── C:\Users\mjjeon\.gemini\
+│   └── GEMINI.md           # 초헌법적 절대 전역 규칙 (승인 잠금, CDP 금지, 정체성 고수)
+└── C:\Users\mjjeon\.gemini\antigravity-ide\skills\
+    └── antigravity-browser-guide/
+        └── SKILL.md        # CDP 9222 포트 기반 정석 새 탭 브라우저 연동 실증 가이드
 ```
 
 ---
