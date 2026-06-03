@@ -3,6 +3,11 @@ name: doc-coauthoring
 description: Guide users through a structured workflow for co-authoring documentation. Use when user wants to write documentation, proposals, technical specs, decision docs, or similar structured content. This workflow helps users efficiently transfer context, refine content through iteration, and verify the doc works for readers. Trigger when user mentions writing docs, creating proposals, drafting specs, or similar documentation tasks.
 ---
 
+> [!IMPORTANT]
+> **QMS v2 프로젝트 오버라이드 제약 사항**:
+> 1. **저장경로**: default 저장경로 대신 `C:\Users\mjjeon\Desktop\QMS 프로젝트\shinwoo-valve-qms\안티그래비티\report\` 폴더에 `YYYY-MM-DD_[주제명]_R[N].md` 리비전 파일로 아카이빙한다.
+> 2. **양식 및 언어**: 반드시 한글(한국어)로 격식 있게 작성하며, 한글 DNAS 분석 보고(Report) 포맷을 우선 적용한다.
+
 # Doc Co-Authoring Workflow
 
 This skill provides a structured workflow for guiding users through collaborative document creation. Act as an active guide, walking users through three stages: Context Gathering, Refinement & Structure, and Reader Testing.

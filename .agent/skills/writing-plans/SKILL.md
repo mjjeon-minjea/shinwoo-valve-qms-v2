@@ -7,6 +7,12 @@ description: Use when you have a spec or requirements for a multi-step task, bef
 
 ## Overview
 
+> [!IMPORTANT]
+> **QMS v2 프로젝트 오버라이드 제약 사항**:
+> 1. **저장경로**: `docs/superpowers/plans/` 대신 `C:\Users\mjjeon\Desktop\QMS 프로젝트\shinwoo-valve-qms\안티그래비티\plan\` 폴더에 `YYYY-MM-DD_[주제명]_R[N].md` 리비전 파일로 아카이빙한다.
+> 2. **양식 및 언어**: 반드시 한글(한국어)로 격식 있게 작성하며, `implementation_plan` 서식을 준수한다.
+> 3. **TDD / 커밋 / PR 전제 예외**: QMS 결재 환경에서는 TDD 및 빈번한 git commit/PR 강제 규칙 대신 DNAS DDNA(Plan-Task-Walkthrough) 절차를 우선 준수하여 작성한다.
+
 Write comprehensive implementation plans assuming the engineer has zero context for our codebase and questionable taste. Document everything they need to know: which files to touch for each task, code, testing, docs they might need to check, how to test it. Give them the whole plan as bite-sized tasks. DRY. YAGNI. TDD. Frequent commits.
 
 Assume they are a skilled developer, but know almost nothing about our toolset or problem domain. Assume they don't know good test design very well.
