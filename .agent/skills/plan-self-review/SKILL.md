@@ -1,4 +1,9 @@
+---
+name: plan-self-review
+description: 안티그래비티가 구현 계획서(Plan)를 차장님께 상신하기 직전 반드시 실행하는 자가검토 게이트. High 이슈 1건이라도 있으면 송출 차단. 발동: 플랜 작성 완료 직후, implementation_plan 송출 전, "플랜 자가검토".
+---
 # Skill: Plan Self-Review (plan-self-review)
+
 
 ## 역할
 
