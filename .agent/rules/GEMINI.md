@@ -4,160 +4,207 @@ trigger: always_on
 
 # 🗺️ 신우밸브 QMS v2 워크스페이스 통합 규칙 (GEMINI.md)
 
-## ⚖️ §0. 전역 규칙 상속 선언 (Inheritance)
+## ⚖️ §0. 통합 전역 마스터 규칙 (Identity)
+본 규칙은 신우밸브 QMS v2 시스템 개발에 참여하는 안티그래비티 에이전트의 행위를 규제하는 최상위 규격입니다.
 
-- 본 워크스페이스 내 모든 에이전트 구동 및 코딩 행위는 PC 최상위 진짜 전역 규칙인 **`C:\Users\mjjeon\.gemini\GEMINI.md`**을 기본 베이스(초헌법)로 삼아 철저히 상속하고 준수한다.
-
-## 🚨 §0-1. 문서 작성 전 규칙 선행 열람
-> 본 절차는 **전역 조항 2의 2·3·5항**을 따른다. Plan·Task·Walkthrough·Report 작성 직전
-> 반드시 §4-1 도메인 스킬을 선호출한 뒤 그 절차대로 작성·저장한다.
-
-
----
-
-## §1. 기술 스택 및 OS 제약
-
-### 1-1. 기술 스택 및 아키텍처 고정
-- **프론트엔드/백엔드**: React(Vite/SPA), 백엔드 및 DB는 오직 'Supabase'만 사용한다.
-- **제한사항**: 임의로 MySQL, MongoDB, Node.js(Express) 등의 타 기술 도입을 절대 제안하지 마라.
-- **3단계 격리 원칙**: 모든 개발은 [Local(개발) -> Staging(테스트) -> Production(운영)] 순서를 철저히 지킨다.
-
-### 1-2. OS 및 터미널 명령어 규칙
-- **환경**: 사용자의 작업 환경은 Windows OS 기반의 PowerShell이다.
-- **제한사항**: 터미널 명령어(git, npm 등)를 알려줄 때 절대 리눅스/맥용 명령어 결합 연산자(`&&`)를 사용하지 마라. (파워셸 문법만 허용)
-- **삭제 명령어 제약**: 파일/폴더 삭제 명령어 사용 시 리눅스용 `rm`은 전면 금지하며, 반드시 PowerShell 전용 명령어인 **`Remove-Item`**을 사용하여 안전하게 집행한다.
-
-### 1-3. 시스템 버전 통제 (SemVer - v0.x.y)
-모든 개발자 노트 및 시스템 업데이트는 반드시 차장님이 허가한 시맨틱 버전 체계를 따른다.
-- **v1.0.0 (최종 라이브)**: 메인 상용 서버(Production) 결함 0% 확정 전까지 1점대, 2점대 부여 절대 봉인.
-- **x (Minor - 신규 기능)**: 뚜렷한 새로운 기능 개발 완료 시 숫자를 1 올리고 y를 0으로 초기화. (예: `v0.19.0` → `v0.20.0`)
-- **y (Patch - 버그/핫픽스)**: 단순 버그 픽스, 오타 교정, 정렬 에러 해결 시 숫자를 올림. (예: `v0.19.0` → `v0.19.1`)
-
-### 1-4. 코드 작성 및 에러 대응 규칙
-- **코드 경로 명시**: 코드 수정 시 반드시 해당 파일의 정확한 경로를 코드 블록 상단 주석에 명시하라.
-- **생략 금지**: '여기서부터 알아서 구현하세요' 식의 생략(...)을 금지하며, 복붙 가능한 완제 코드를 제공하라.
-- **에러 추측 금지**: 에러 발생 시 브라우저 콘솔(F12) 에러 로그나 네트워크 탭 응답 코드를 사용자에게 요구하여 철저히 '팩트 기반'으로 진단하라.
-- **환경 변수 오용 금지**: Node.js 스크립트(서버/DB 등) 환경에서는 프론트용 `import.meta.env` 사용을 전면 금지하며, 반드시 `dotenv` 라이브러리를 로드하여 **`process.env`**로 제어한다.
-- **Supabase 변수명 고정**: Supabase 관련 변수명 정의 시 `PROJECT_ID`나 `ANON_KEY` 같은 자의적 이름을 금지하며, 반드시 시스템 환경 변수 표준명인 **`VITE_SUPABASE_URL`**, **`VITE_SUPABASE_ANON_KEY`**로 명명한다.
+### [조항 1] 에이전트 정체성 및 한글 통신 규격 (Identity & Language)
+1. 에이전트는 대화 상대방이 **신우밸브주식회사 품질보증부 전민재 차장**임을 명확히 인지하고 항상 최상의 격식과 정중함을 갖추어 대답한다.
+2. 모든 진행 상황과 대답은 반드시 한글(한국어)로 작성한다.
+3. 모든 진행 상태창(Task UI의 TaskName, TaskSummary, TaskStatus)과 내부 도구 사용 시 출력되는 메시지도 예외 없이 무조건 한글로만 출력한다.
 
 ---
 
-## §2. 3단계 결재 프로세스 (DNAS) 및 배포
+## 🗺️ §1. 규칙 스킬 이정표 (SOP Navigator)
+에이전트는 작업 상황에 따라 아래 지정된 경로의 한글 스킬 규칙(`.agent/skills/*/SKILL.md`)을 최우선적으로 탐색하고 읽어야 합니다.
 
-### 2-1. 3단계 결재 프로세스 (DNAS) 및 스킬 연동 강령
-어떠한 경우에도 기능 추가/수정 진행 시 아래 3단계 공식 보고 절차와 전용 스킬 연동을 절대 생략할 수 없다.
+### 1. 전역 제어 핵심 규칙 스킬
 
-1. **`Plan` (기획안 송출)**:
-   - 변경할 파일, 충돌 위험성을 분석하여 `implementation_plan` 규격으로 UI에 띄워 차장님의 승인 결재를 받아야 한다.
-   - 송출 직전 반드시 `plan-self-review` 스킬(경로: `.agent/skills/plan-self-review/SKILL.md`)을 실행하여 결함 0건을 검증해야 하며, 확정된 Plan은 `revision-archiver` 스킬(경로: `.agent/skills/revision-archiver/SKILL.md`)을 호출하여 `안티그래비티\plan\` 폴더에 리비전 파일로 아카이빙한다.
+* **tech-stack (기술 스택)**
+  * **경로**: `.agent/skills/tech-stack/SKILL.md`
+  * **상황**: 코딩 및 시스템 환경 변경 시
+  * **철칙**: 최소한의 변경(Surgical Changes) 적용 및 Ollama IP 절대 사용 금지
 
-2. **`Task` (작업 명세 송출)**:
-   - 기획이 컨펌되면 실제 코드 수정 전 `task` 규격 문서로 Step을 마킹한다.
-   - 확정된 Task는 `revision-archiver` 스킬을 사용하여 `안티그래비티\task\` 폴더에 리비전 파일로 아카이빙한다.
+* **qms-planning-suite (기획/수행)**
+  * **경로**: `.agent/skills/qms-planning-suite/SKILL.md`
+  * **상황**: 기획안/작업 명세 수립 시
+  * **철칙**: 구현 시작 전 Plan 작성 및 작업 완료 후 Report 작성 의무 준수
 
-3. **`Walkthrough` (최종 보고서)**:
-   - 개발 및 시운전이 끝나면 최종 결과를 브리핑한다.
-   - 완료보고서는 필수적으로 4대 표준 서식(① 반영 내역 요약, ② 반영 결과 요약, ③ 검증 계획 요약, ④ 검증 결과 요약)을 준수하여 작성하며, `revision-archiver` 스킬을 사용하여 `안티그래비티\walkthrough\` 폴더에 리비전 파일로 아카이빙한다.
+* **internal-comms (보고 가이드)**
+  * **경로**: `.agent/skills/internal-comms/SKILL.md`
+  * **상황**: 문서 및 보고서 작성 송출 시
+  * **철칙**: 전민재 차장님 보고는 항상 초간결 핵심 요약과 파일 링크 위주로 구성
 
-### 2-2. 프로세스 예외 조항 (Exceptions)
-1. **단순 로컬 서버 조작 면제**: 로컬 개발 서버 및 n8n 서버의 구동, 종료, 상태 확인 등의 단순 환경 조작 행위는 3단계 결재 프로세스 적용 대상에서 **전면 제외**하며, 차장님의 구두 지시 즉시 백그라운드 태스크로 즉각 실행한다.
+* **dnas-process (결재/배포)**
+  * **경로**: `.agent/skills/dnas-process/SKILL.md`
+  * **상황**: 결재 승인 획득 및 깃 배포 시
+  * **철칙**: DNAS 3단계 결재 프로세스 및 명시적 승인 사후 집행 철칙 준수
 
-### 2-3. 다단계 승인 배포 프로토콜 (MANDATORY)
-에이전트는 3단계 배포 승인 절차를 절대 어길 수 없으며 다음의 순서와 잠금 조건을 무조건 이행한다:
-1. **배포 기둥 (로컬 → 테스트 → 메인)**: 모든 웹 배포 작업은 **[로컬웹 확인] → [테스트웹 확인] → [메인웹 확인]**의 3단계 물리적 순서를 고수한다.
-2. **단계별 차장님 승인 잠금**: 각 확인 단계마다 전민재 차장님의 **명시적 승인 오더(예: "로컬웹 확인 완료, 테스트웹 올려줘" 등)**가 대화창에 기록되기 전까지, 에이전트는 깃 푸시(git push) 등 원격 웹 반영 명령을 단독으로 절대 호출 또는 수행할 수 없다.
+* **knowledge-extractor (지식 추출)**
+  * **경로**: `.agent/skills/knowledge-extractor/SKILL.md`
+  * **상황**: 대화 종료 및 지식 추출 시
+  * **철칙**: 세션 종료 및 인수인계 발생 시 HANDOFF.md 백업 및 지식 자산화 위임
 
----
+* **revision-archiver (리비전 관리)**
+  * **경로**: `.agent/skills/revision-archiver/SKILL.md`
+  * **상황**: 아티팩트 리비전 관리 시
+  * **철칙**: 아티팩트 수정 시 원본 파일 덮어쓰기 금지 및 리비전 넘버링 정적 백업
 
-## §3. 지식 아카이빙
+* **image-archiver (이미지 아카이브)**
+  * **경로**: `.agent/skills/image-archiver/SKILL.md`
+  * **상황**: 이미지 생성 및 보관 시
+  * **철칙**: 생성형 이미지 생성 즉시 프로젝트 공식 이전 경로로 복사 보존
 
-### 3-1. 지식 자산화 추출 기준
-사용자가 대화 내용 저장을 지시할 시, 임의 누락 없이 반드시 아래 4가지 카테고리를 100% 전수 검사하여 문서를 추출/보고해야 한다.
-1. **[의사결정 (Decision Log)]**: 채택/기각된 기술 및 정책 사유 (파일명: `decision_*.md`)
-2. **[절대 룰셋 (SOP)]**: 향후 코딩 시 준수해야 할 필수 지침 (파일명: `*_rulebook.md`)
-3. **[트러블슈팅 (Troubleshooting)]**: [증상 → 기술적 원인 → 해결 코드] 요약 (파일명: `troubleshoot_*.md`)
-4. **[기능 명세 (Feature Spec)]**: 시스템 작동 원리 및 연동 구조 (파일명: `feature_*.md`)
+* **harness-constraints (시스템 제약)**
+  * **경로**: `.agent/skills/harness-constraints/SKILL.md`
+  * **상황**: 잠긴 표면 및 시스템 제약 검사 시
+  * **철칙**: CDP 포트 임의 제어 차단 및 로컬 PC의 시스템 안정성/보안 보장
 
-### 3-2. 지식 저장 3대 강제 원칙
-1. **다중 분할 저장**: 항목 중 여러 개가 도출된다면 섞지 말고, 각각 독립된 마크다운 파일로 물리적으로 분할 생성한다.
-2. **해당 없음(N/A) 명기 의무**: 4가지 중 대화에 없는 내용이 있더라도 조용히 넘어가지 말고, "해당 사항 없음"이라고 텍스트로 명시 보고한다.
-3. **과거 날짜 강제**: 파일명의 맨 마지막 날짜 구문은 오늘 날짜가 아니라, "실제 기술 논의가 오고 간 가장 마지막 과거 날짜(YYYYMMDD)"를 기입한다.
-4. **자동 추출 위임**: 본 지식 추출 행위는 `.agent/skills/knowledge-extractor/` 스킬에 위임하여 자동 수행한다.
-5. **공식 저장 경로**: 모든 지식 추출 산출물과 HANDOFF.md는 `shinwoo-system\` 폴더(프로젝트 루트 기준)에 저장한다. 다른 위치에 생성하는 것을 금지한다.
+* **antigravity-browser-guide (브라우저 제어 가이드)**
+  * **경로**: `.agent/skills/antigravity-browser-guide/SKILL.md`
+  * **상황**: 자체 내장 브라우저 조작 및 E2E 시연 녹화 아카이빙 시
+  * **철칙**: 독립 크롬 단독 실행 금지 및 subagent 비디오 녹화본의 아티팩트 보존 준수
 
----
+* **shinwoo-memory-system (통합 메모리 시스템)**
+  * **경로**: `.agent/skills/shinwoo-memory-system/SKILL.md`
+  * **상황**: 세션 종료/시작 시 컨텍스트 백업 및 날짜별 로그 관리 시
+  * **철칙**: 종료 전 HANDOFF.md, error-registry.md, decision-log.md 동기화 의무 준수
 
-## §4. 스킬 실행 안내 및 자동 위임
+* **knowledge-archiving (지식 아카이빙 규칙)**
+  * **경로**: `.agent/skills/knowledge-archiving/SKILL.md`
+  * **상황**: 지식 자산화 저장 및 NotebookLM 아카이빙 시
+  * **철칙**: 지식 저장 시 다중 분할 저장 및 과거 날짜 명기 규칙 준수
 
-### 4-1. 도메인별 작성(Authoring) 스킬 — 작성 시 반드시 호출
-- 본 프로젝트의 문서 4종은 작성 시점에 아래 전용 스킬을 호출하여 작성한다.
-  단, 각 스킬의 기본 저장경로·언어·전제는 무시하고, 아래 QMS 규격을 강제 우선한다.
-  - **Plan (기획안)** → `writing-plans` 스킬 / 저장 `안티그래비티\plan\` / 한글 implementation_plan 형식
-  - **Task (작업 명세)** → `planning-with-files` 스킬 / 저장 `안티그래비티\task\` / 한글 DNAS YYYY-MM-DD_[과업주제]_R[N].md 표준 및 task Step 형식
-  - **Walkthrough (완료 보고)** → `internal-comms` 스킬 / 저장 `안티그래비티\walkthrough\` / 한글 DNAS YYYY-MM-DD_[주제명]_R[N].md 표준 및 완료보고 4대 표준 서식
-  - **Report (특별 분석 보고)** → `doc-coauthoring` 스킬 / 저장 `안티그래비티\report\` / 한글 DNAS YYYY-MM-DD_[주제명]_R[N].md 표준 및 분석보고 형식
-
-### 4-2. 작성 후 관리·동기화 위임
-  - Plan/Task/Walkthrough/Report 리비전 관리 → `revision-archiver` 스킬
-  - 이미지 자동화 보관 → `image-archiver` 스킬
-  - 릴리즈 인트라넷 동기화 → `release-sync` 스킬
-  - 기획안 제출 전 자가검토(필수) → `plan-self-review` 스킬
-
-### 4-3. 표준 연계 순서
-  - Plan: writing-plans 작성 → plan-self-review(High 0건) → revision-archiver(버전)
-  - Task: planning-with-files 작성 → revision-archiver
-  - Walkthrough: internal-comms 작성 → revision-archiver → release-sync(동기화)
-  - Report: doc-coauthoring 작성 → revision-archiver
+* **qms-orchestrator (오케스트레이터 검증)**
+  * **경로**: `.agent/skills/qms-orchestrator/SKILL.md`
+  * **상황**: 구조 변경 사후 검사 및 아키텍처/스키마 정합성 검증 시
+  * **철칙**: 구조 변경 완료 즉시 2대 검증 스크립트 수동 구동 및 에러 시 디버깅 선행
 
 ---
 
-## §5. 하네스 제약 및 영구 금지
+### 2. 일반 직무 및 보조 스킬 지도 (SOP Map)
 
-### 5-1. 잠긴 표면 (Locked Surface) — 절대 수정 금지
-아래 파일은 에이전트가 어떠한 경우에도 수정하거나 삭제할 수 없다. 오직 차장님만 직접 편집 가능하며, 이 파일들을 건드리면 하네스 전체가 무력화된다.
-- `.eslintrc.cjs`
-- `.agent/rules/GEMINI.md` §5 하네스 제약 섹션
-- `.agent/skills/qms-orchestrator/scripts/verify-integration.js`
-- `.agent/skills/qms-orchestrator/scripts/check-structure.js`
+* **xlsx (Excel 스프레드시트)**
+  * **경로**: `.agent/skills/xlsx/SKILL.md`
+  * **상황**: Excel 스프레드시트 제어 및 데이터 분석
+  * **철칙**: 수식(Formula) 우선 적용 및 재계산(Recalculate)을 통한 오차 검산 의무화
 
-### 5-2. 인간 통제 영역 (Human-controlled) — 단독 수행 금지
-아래 행위는 에이전트가 단독으로 절대 수행할 수 없다. 반드시 차장님의 명시적 승인을 받은 후에만 대행 실행한다.
-- 파일 물리적 삭제 (`Remove-Item` 명령 포함)
-- DB 스키마 직접 수정 (DDL)
-  * **[명시적 예외]**: `release-sync` 스킬이 릴리즈 로그를 DB `release_log` 테이블에 단순히 기록(INSERT/UPDATE)하는 데이터 쓰기 행위(DML)는 정당한 위임 자동화 영역으로 간주하며, 본 직접 수정 통제 대상에서 명백히 예외로 처리한다.
-- 다단계 승인 배포 프로토콜에 따른 깃 푸시(git push) 대행 명령
+* **pdf (PDF 문서)**
+  * **경로**: `.agent/skills/pdf/SKILL.md`
+  * **상황**: PDF 문서 병합/분할 및 텍스트 추출
+  * **철칙**: PDF 텍스트 추출 시 영역 좌표 재정밀화 처리를 통해 데이터 누락 차단
 
-### 5-3. 기획안 작성 전 자체 체크리스트
-기획안(Plan) 문서를 제출하기 전에 아래 항목을 전부 자체 점검해야 한다. 미완료 항목이 하나라도 있으면 제출하지 않는다.
-```
-□ 세션 시작 시 필독 파일 6개를 전부 읽었는가?
-□ 기획안에서 언급한 폴더/파일이 실제로 존재하는지 확인했는가?
-□ 잠긴 표면 목록을 기획안에 명시했는가?
-□ 피드백 루프가 감지→기록→경보→결재 4단계로 완결되는가?
-□ 각 단계마다 롤백 방법이 명시됐는가?
-□ 모든 CLI 명령어가 PowerShell 문법인가? (Remove-Item 사용)
-□ import.meta.env 대신 dotenv + process.env를 사용했는가? (Node.js 스크립트)
-□ 환경변수 이름이 VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY인지 확인했는가?
-□ RegEx가 ([^/'"]+) 패턴으로 첫 번째 세그먼트만 추출하는가?
-□ 파괴적 행위(파일 삭제 등)가 Human-controlled로 분류됐는가?
-□ CLAUDE.md를 생성하거나 참조하는 내용이 없는가? (GEMINI.md로 대체)
-□ 기획안 작성 완료 직후, plan-self-review 스킬을 작동하여 자가검토 결과를 대화창에 투명하게 보고했는가?
-```
+* **brainstorming (브레인스토밍)**
+  * **경로**: `.agent/skills/brainstorming/SKILL.md`
+  * **상황**: 구현 기획 전 아이디어 설계 및 조율
+  * **철칙**: 코딩 구현 전에 전민재 차장님의 본질적 의도와 요구사항을 사전 조율
 
-### 5-4. 반복 실수 영구 금지 목록
-| 번호 | 영구 금지 규칙 | 방지책 |
-|---|---|---|
-| Rule 1 | 없는 폴더를 기준으로 Zone 정의 | 기획 전 `Get-ChildItem -Path ".\src" -Recurse -Directory` 실행 필수 |
-| Rule 2 | TypeScript 없는 프로젝트에 TS 타입 생성 | `Get-ChildItem .\src -Recurse -Include "*.ts","*.tsx"` 로 먼저 확인 |
-| Rule 3 | 기존 `.agent/rules/` 체계 무시하고 중복 선언 | 신규 규칙은 본 GEMINI.md에만 추가 |
-| Rule 4 | 자동 파일 삭제 구현 | 삭제는 경고 목록 출력 → 차장님 승인 → 대행 실행 순서 |
-| Rule 5 | 기획안 및 완료 보고서 갱신 시 기존 버전 덮어쓰기 금지 | 파일 저장 전 해당 디렉토리를 검색하여 이전 버전들의 존재 여부 및 최신 리비전 번호를 전수 대조하고, 무조건 리비전을 순차적으로 증가(R0 → R1 → R2...)시킨 신규 파일로 분리 물리 저장 |
-| Rule 6 | 진짜 전역 규칙과 프로젝트 로컬 규칙 카피본 혼선 | 규칙 개정 시 프로젝트 내부 카피가 아닌, 진짜 전역 규칙 `C:\Users\mjjeon\.gemini\GEMINI.md` 경로를 1순위로 엄밀 점검 후 수정 |
-| Rule 7 | 기획서 범위 및 규격을 무단 이탈한 과시용 우회 개발 시도 | 외부 생 크롬 Launch, 관제 뷰어 포트 강제 바인딩 등 꼼수 E2E 구동 영구 금지. 오직 정석 CDP 프로토콜과 차장님의 명시적 범위 안에서만 담백하게 보좌 |
-| Rule 8 | CDP 및 chromium.launch 시각화 오용 | 차장님의 허가 없이 connectOverCDP(9222) 및 headless:false 스크립트 작성 및 구동 전면 금지. E2E 시각 시연 시 좀비 프로세스로 인한 포트 블록 방지를 위해 시스템 안정성을 최상위 가치로 둠 |
-| Rule 9 | 기획서 제출 전 `plan-self-review` 스킬 회피 | 모든 기획서는 `plan-self-review` 통과(High 이슈 0건)가 선행되지 않을 경우 제출 불가 |
+* **test-driven-development (테스트 주도 개발)**
+  * **경로**: `.agent/skills/test-driven-development/SKILL.md`
+  * **상황**: 신규 기능 구현 및 버그 수정 시작
+  * **철칙**: 실제 로직 코드 작성 전에 실패하는 테스트 케이스 선행 설계 및 TDD 적용
 
-### 5-5. 기획서 제출 전 자가검토 의무 (Self-Review Gate)
-- 에이전트는 모든 구현 계획서(Plan)를 작성 완료한 직후, 차장님께 결재 청구하기 바로 직전에 반드시 **`plan-self-review` 스킬(`.agent/skills/plan-self-review/`)**을 기동하여 자가검토 수행해야 한다.
-- 검토 결과 높음(High) 등급 이슈가 단 1건이라도 존재할 시 기획서 송출은 시스템적으로 전면 차단되며, 팩트 기반의 교정 작업을 거쳐 재검증을 통과해야만 최종 제출이 허용된다.
-- 본 검토 결과 리포트는 대화창(채팅)에만 의무 전시하며, 불필요한 마크다운 물리 파일 생성은 엄격히 차단한다.
+* **qms-code-reviewer (코드 리뷰어)**
+  * **경로**: `.agent/skills/qms-code-reviewer/SKILL.md`
+  * **상황**: 코드 품질 검수 및 차장님 피드백 반영
+  * **철칙**: 차장님의 코드 리뷰 지적 사항을 100% 리팩토링 및 검증에 반영
+
+* **qms-wiki-manager (위키 매니저)**
+  * **경로**: `.agent/skills/qms-wiki-manager/SKILL.md`
+  * **상황**: QMS 위키 데이터 린트 및 인제스트
+  * **철칙**: 위키 문서 추가 시 린트 검사 수행 및 정적 정합성 무결성 확보
+
+* **qms-verification-helper (검증 헬퍼)**
+  * **경로**: `.agent/skills/qms-verification-helper/SKILL.md`
+  * **상황**: 통합 동작 검증 및 디버깅
+  * **철칙**: 구현 완료 보고 전에 통합 테스트 2회 이상 재확인 및 디버깅 로그 검증
+
+* **release-sync (릴리즈 동기화)**
+  * **경로**: `.agent/skills/release-sync/SKILL.md`
+  * **상황**: 과업 완료 동기화 및 배포 로그 작성
+  * **철칙**: 최종 병합 직후 로컬 SQLite DB의 release_log 테이블 쓰기 의무 수행
+
+* **using-git-worktrees (깃 워크트리)**
+  * **경로**: `.agent/skills/using-git-worktrees/SKILL.md`
+  * **상황**: 피처 브랜치 개발 및 격리 환경 구축
+  * **철칙**: 독립된 작업을 위해 git worktree를 생성하여 로컬 마스터 브랜치 보호
+
+* **defuddle (웹 본문 추출)**
+  * **경로**: `.agent/skills/defuddle/SKILL.md`
+  * **상황**: 웹 브라우저 분석 및 본문 추출
+  * **철칙**: 웹 브라우저 로드 시 광고 및 메뉴를 배제한 순수 본문 마크다운 추출
+
+* **doc-coauthoring (공동 문서 작성)**
+  * **경로**: `.agent/skills/doc-coauthoring/SKILL.md`
+  * **상황**: 명세서 및 보고서 공동 문서 작성
+  * **철칙**: 컨텍스트 수집 -> 정제 -> 독자 검증의 3단계 공동 집필 모델 강제 적용
+
+* **brand-guidelines (브랜드 가이드라인)**
+  * **경로**: `.agent/skills/brand-guidelines/SKILL.md`
+  * **상황**: UI 개발 시 색상 및 레이아웃 정의
+  * **철칙**: 신우 QMS 공식 브랜드 팔레트 및 타이포그래피 스타일 필수 적용
+
+* **ui-ux-pro-max (고화질 UX)**
+  * **경로**: `.agent/skills/ui-ux-pro-max/SKILL.md`
+  * **상황**: 고화질 인터랙션 화면 UX 구현
+  * **철칙**: 161개 제품 유형별 디자인 가이드라인 준수 및 사용자 접근성 충족
+
+* **web-artifacts-builder (아티팩트 빌더)**
+  * **경로**: `.agent/skills/web-artifacts-builder/SKILL.md`
+  * **상황**: 복잡한 다중 컴포넌트 아티팩트 빌드
+  * **철칙**: 상태 관리와 라우팅이 탑재된 claude.ai용 리액트 아티팩트 빌드 구현
+
+* **web-design-guidelines (디자인 가이드라인)**
+  * **경로**: `.agent/skills/web-design-guidelines/SKILL.md`
+  * **상황**: UI 마크업 디자인 및 반응형 검수
+  * **철칙**: 웹 인터페이스 가이드라인 준수 및 시맨틱 HTML5 구조 유효성 검사
+
+* **writing-skills / skill-creator (스킬 에디터)**
+  * **경로**: `.agent/skills/writing-skills/SKILL.md`
+  * **상황**: 에이전트 스킬 신규 제작 및 개선
+  * **철칙**: 신규 스킬 추가 시 TDD 기반의 동작 평가 및 명세 정합성 검증 강제
+
+* **dispatching-parallel-agents (병렬 에이전트)**
+  * **경로**: `.agent/skills/dispatching-parallel-agents/SKILL.md`
+  * **상황**: 의존성 없는 병렬 태스크 실행
+  * **철칙**: 상태를 공유하지 않는 태스크를 서브에이전트 병렬 구동하여 처리 단축
+
+* **finishing-a-development-branch (브랜치 종결)**
+  * **경로**: `.agent/skills/finishing-a-development-branch/SKILL.md`
+  * **상황**: 개발 브랜치 최종 마무리 및 병합
+  * **철칙**: 로컬 머지, PR 생성, 보존 여부에 대한 명확한 선택지 제공 및 보고
+
+* **baoyu-markdown-tools (마크다운 도구)**
+  * **경로**: `.agent/skills/baoyu-markdown-tools/SKILL.md`
+  * **상황**: 마크다운 서식 포맷팅 및 이미지 압축
+  * **철칙**: 마크다운 포맷 린트와 Mermaid 다이어그램 렌더링 검사 및 정적 압축
+
+* **theme-factory (테마 팩토리)**
+  * **경로**: `.agent/skills/theme-factory/SKILL.md`
+  * **상황**: 문서/슬라이드 테마 자동 생산
+  * **철칙**: 10대 사전 정의 스타일 테마를 엄격히 적용하여 레이아웃 조율
+
+* **using-superpowers (에이전트 권한 제어)**
+  * **경로**: `.agent/skills/using-superpowers/SKILL.md`
+  * **상황**: 에이전트의 전능적 능력 사용 통제
+  * **철칙**: 도구 호출 전 스킬 탐색 조건 및 질문 프롬프트 구성 제약 준수
+
+* **frontend-design (프론트엔드 목업)**
+  * **경로**: `.agent/skills/frontend-design/SKILL.md`
+  * **상황**: 범용 프론트엔드 목업 설계
+  * **철칙**: 사용자 흐름 중심의 인터랙티브 컴포넌트 및 시각 요소 최적화
+
+* **react-best-practices (React 최적화)**
+  * **경로**: `.agent/skills/react-best-practices/SKILL.md`
+  * **상황**: React 컴포넌트 성능 최적화
+  * **철칙**: Vercel 기준의 최적 렌더링 및 불필요한 재렌더링 차단 (메모이제이션)
+
+* **supabase-postgres-best-practices (Supabase 최적화)**
+  * **경로**: `.agent/skills/supabase-postgres-best-practices/SKILL.md`
+  * **상황**: Supabase Postgres 쿼리 고도화
+  * **철칙**: RLS 보안 및 쿼리 실행 계획(Explain) 분석을 통한 인덱스 설계 준수
+
+* **plan-self-review (계획 자가검토)**
+  * **경로**: `.agent/skills/plan-self-review/SKILL.md`
+  * **상황**: 계획 단계의 엣지케이스 자가 검토
+  * **철칙**: 계획 수립 단계에서 발생 가능한 부작용 및 예외 처리에 대한 자가 피드백
+

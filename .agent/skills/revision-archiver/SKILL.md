@@ -1,29 +1,19 @@
 ---
 name: revision-archiver
-description: QMS 마크다운 문서 4종(Plan, Task, Walkthrough, Report)의 리비전 자동 관리 스킬
-triggers:
-  - 아카이빙
-  - 리비전
-  - revision
-  - plan
-  - task
-  - walkthrough
-  - report
+description: QMS 마크다운 문서 4종(Plan, Task, Walkthrough, Report)의 리비전 자동 관리를 제어하는 규칙 스킬.
 ---
 
-# Skill: Revision Archiver (revision-archiver)
+# 🗂️ 리비전 아카이버 규칙 (revision-archiver)
 
-## 1. 동작 원리
-본 스킬은 에이전트가 `implementation_plan` 및 `walkthrough` 문서를 생성하거나 저장할 때, 수동 덮어쓰기를 방지하고 리비전을 자동 제어하는 도구입니다.
+본 스킬은 QMS 프로젝트에서 발생하는 주요 문서들(기획안, 작업 명세서, 완료 보고서, 검토 보고서)의 물리적 이력을 보존하고 버전 드리프트를 방지하는 강제 규정입니다.
 
-## 2. 세부 실행 프로토콜 및 저장 규칙
-1. **대상 도메인별 저장 경로 규격**:
-   - **Plan (기획안)** ➔ `C:\Users\mjjeon\Desktop\QMS 프로젝트\shinwoo-valve-qms\안티그래비티\plan\`
-   - **Task (작업 명세)** ➔ `C:\Users\mjjeon\Desktop\QMS 프로젝트\shinwoo-valve-qms\안티그래비티\task\`
-   - **Walkthrough (완료 보고)** ➔ `C:\Users\mjjeon\Desktop\QMS 프로젝트\shinwoo-valve-qms\안티그래비티\walkthrough\`
-   - **Report (특별 분석 보고)** ➔ `C:\Users\mjjeon\Desktop\QMS 프로젝트\shinwoo-valve-qms\안티그래비티\report\`
+## 1. 리비전 덮어쓰기 금지 규칙 [조항 3]
+- **독립 공존 생성**: 새로운 계획서(`implementation_plan.md`), 작업 명세서(`task.md`) 등을 발행할 때 기존 파일이 존재하면 단순 덮어쓰기(`Overwrite=true`)를 금지하며, 반드시 `_R0`, `_R1` 등의 리비전 번호(또는 `_v2`, `_v3` 등의 버전 번호)를 올려 신규 독립 파일로 공존하도록 생성합니다. (단, 에디터 전시용 임시 아티팩트 뷰어 파일은 덮어쓰기 예외 허용)
+- **리비전 순차 증가**: 파일 저장 전 해당 디렉토리를 검색하여 이전 버전들의 존재 여부 및 최신 리비전 번호를 전수 대조하고, 무조건 리비전을 순차적으로 증가(R0 ➡️ R1 ➡️ R2...)시킨 신규 파일로 분리하여 물리적으로 저장합니다.
 
-2. **명명 및 리비전 보증 공식**:
-   - 마크다운 파일 작명 표준: `YYYY-MM-DD_[주제명]_R[N].md`
-   - 스캔 시 리비전 검출용 정규식: `_R(\d+)`
-   - **주제 동일성 판정 규칙**: 파일 목록 조회 후, 파일명의 날짜(YYYY-MM-DD)와 리비전(`_R\d+`)을 정규식으로 소거하고 공백 및 특수문자를 제거한 핵심 키워드 문자열이 기존 파일과 100% 일치할 경우 동일 주제군으로 강제 인식하여 R 번호를 1 증가시킨다. (일치하지 않으면 R0로 신설)
+## 2. 문서 4종의 공식 저장 경로
+아카이빙되는 4종 문서의 저장 위치는 다음과 같이 엄격히 한정됩니다.
+- **Plan (구현 계획서)**: `안티그래비티\plan\` 폴더에 `YYYY-MM-DD_[주제명]_R[N].md` 로 저장
+- **Task (작업 명세서)**: `안티그래비티\task\` 폴더에 `YYYY-MM-DD_[과업주제]_R[N].md` 로 저장
+- **Walkthrough (완료 보고서)**: `안티그래비티\walkthrough\` 폴더에 `YYYY-MM-DD_[주제명]_R[N].md` 로 저장
+- **Report (특별 분석 보고서)**: `안티그래비티\report\` 폴더에 `YYYY-MM-DD_[주제명]_R[N].md` 로 저장
