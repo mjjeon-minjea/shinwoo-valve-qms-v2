@@ -140,7 +140,7 @@ const DevNotes = ({ user }) => {
                                                 <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-700 border border-red-200">
                                                     🔴 로컬 검증중
                                                 </span>
-                                            ) : !item.is_synced ? (
+                                            ) : item.is_synced === false ? (
                                                 <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
                                                     🟡 테스트망 대기
                                                 </span>
@@ -208,7 +208,7 @@ const DevNotes = ({ user }) => {
                                         <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-700 border border-red-200">
                                             🔴 로컬 검증중
                                         </span>
-                                    ) : !selectedNote.is_synced ? (
+                                    ) : selectedNote.is_synced === false ? (
                                         <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
                                             🟡 테스트망 대기
                                         </span>
