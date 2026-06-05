@@ -7,7 +7,7 @@ date: "2026-05-28"
 revision: "R0"
 author: "AI (Antigravity)"
 wiki_status: done
-tags: antigravity, walkthrough, history, qms
+tags: [antigravity, walkthrough, history, qms]
 ---
 
 # 불필요 스킬(Skill) 31개 삭제 최종 완료 보고서

@@ -10,7 +10,7 @@ source_id: "e0dee542-90cb-443f-8a36-a96acfd54d8c"
 created_at: "2026-03-23"
 updated_at: "2026-04-07"
 wiki_status: done
-tags: dev-notes, history, qms, walkthrough
+tags: [dev-notes, history, qms, walkthrough]
 ---
 
 # Item Master Data Import Walkthrough

@@ -10,7 +10,7 @@ source_id: "b5c2ddd1-595c-470e-9230-798535edc7a6"
 created_at: "2026-03-23"
 updated_at: "2026-04-07"
 wiki_status: done
-tags: dev-notes, history, qms, walkthrough
+tags: [dev-notes, history, qms, walkthrough]
 ---
 
 # Weekly Report & Dashboard Verification Walkthrough

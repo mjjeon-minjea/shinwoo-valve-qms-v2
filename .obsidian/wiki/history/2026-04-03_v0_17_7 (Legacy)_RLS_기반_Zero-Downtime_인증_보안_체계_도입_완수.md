@@ -10,7 +10,7 @@ source_id: "9126c3bc-e209-466a-b917-bd533d4e41a7"
 created_at: "2026-03-30"
 updated_at: "2026-04-07"
 wiki_status: done
-tags: dev-notes, history, qms, major
+tags: [dev-notes, history, qms, major]
 ---
 
 # RLS 기반 Zero-Downtime 인증 보안 체계 도입 완수
@@ -18,7 +18,7 @@ tags: dev-notes, history, qms, major
 **[작업 요약 리포트: 2026-03-30]**
 
 ### 1. 100% 무중단 자동 인증 마이그레이션 적용
-- 기존 `users` 테이블 사용자 정보 및 비밀번호를 Supabase 공식 JWT Auth 체계로 안전하게 이전했습니다.
+- 기존 `users` 테이블 사용자 정보 및 비밀번호를 Supabase 공식 [[history/2026-04-03_v0_19_0_[인증_고도화_&_배포_파이프라인_구축]_JWT_기반_Supabase_Auth_전면_전환_및_역방향_승인_시스템_완성|JWT]] Auth 체계로 안전하게 이전했습니다.
 - 비밀번호가 6자리 미만인 기존 직원도 별도 조치 없이 쓰던 비밀번호 그대로 접속 유지되도록, 프론트엔드와 마이그레이션 스크립트에 `swQMS!` 암호 길이 보정 트릭을 적용하여 **Zero-Downtime**을 달성했습니다.
 
 ### 2. 강력한 RLS(Row Level Security) 방어벽 실전 배포

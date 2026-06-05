@@ -10,7 +10,7 @@ source_id: "c2e6e64b-6745-4bd8-a202-a249935112fe"
 created_at: "2026-03-23"
 updated_at: "2026-04-07"
 wiki_status: done
-tags: dev-notes, history, qms, task
+tags: [dev-notes, history, qms, task]
 ---
 
 # Asurada System Check

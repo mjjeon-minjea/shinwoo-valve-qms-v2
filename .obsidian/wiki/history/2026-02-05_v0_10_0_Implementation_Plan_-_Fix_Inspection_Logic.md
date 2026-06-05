@@ -10,7 +10,7 @@ source_id: "00c32700-5cbc-42f5-8a49-e6b8cf91a060"
 created_at: "2026-03-23"
 updated_at: "2026-04-07"
 wiki_status: done
-tags: dev-notes, history, qms, walkthrough
+tags: [dev-notes, history, qms, walkthrough]
 ---
 
 # Implementation Plan - Fix Inspection Logic

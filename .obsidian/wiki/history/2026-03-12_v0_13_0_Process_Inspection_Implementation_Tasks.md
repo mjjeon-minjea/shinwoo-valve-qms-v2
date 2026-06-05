@@ -10,7 +10,7 @@ source_id: "4503063b-40dc-47b1-9d8e-45ca70b9ec22"
 created_at: "2026-03-23"
 updated_at: "2026-04-07"
 wiki_status: done
-tags: dev-notes, history, qms, task
+tags: [dev-notes, history, qms, task]
 ---
 
 # Process Inspection Implementation Tasks
@@ -25,7 +25,7 @@ tags: dev-notes, history, qms, task
 
 ## 2단계: 사이드바 진화 및 이력 관리
 - [x] Update `Dashboard.jsx` to make '공정검사' a collapsible menu group with identical sub-menus to '인수검사'.
-- [ ] Create `ProcessHistory.jsx` (or component) replicating the features of `InboundHistory`.
+- [ ] Create `ProcessHistory.jsx` (or component) replicating the features of `[[history/2026-04-12_v0_24_0_[개발_노트]_v0.24.0_(P13)_-_Dashboard.jsx_컴포넌트_분리|InboundHistory]]`.
     - Setup history list grid with filtering & pagination.
     - Create Excel upload logic with fields relevant to process inspections.
     - Implement manual add, update, and delete actions.

@@ -10,14 +10,14 @@ source_id: "ec8a71a3-bc97-441c-92a0-5d54b7a023f1"
 created_at: "2026-03-23"
 updated_at: "2026-04-07"
 wiki_status: done
-tags: dev-notes, history, qms, task
+tags: [dev-notes, history, qms, task]
 ---
 
-# 공정검사(Process Inspection) 기능 구현 태스크
+# [[history/2026-03-09_v0_11_0_공정검사(Process_Inspection)_기능_구현_태스크|공정검사(Process Inspection) 기능 구현 태스크]]
 
 - [x] 공정검사 기능 요구사항 확인 및 기획
 - [x] 공정검사 데이터 스키마 및 더미 데이터(또는 백엔드 연동) 구성
-- [x] 공정검사 현황/대시보드 UI 컴포넌트 개발 (`ProcessInspectionDashboard.jsx`)
+- [x] 공정검사 현황/[[history/2026-01-30_v0_6_0_대시보드_UI_개선_계획|대시보드 UI]] 컴포넌트 개발 (`ProcessInspectionDashboard.jsx`)
 - [x] 공정검사 데이터 입력 및 관리(CRUD) UI 컴포넌트 개발
 - [x] 사이드바 메뉴 및 라우팅 추가 (`App.jsx`, `Dashboard.jsx` 등)
 - [ ] 사용자 리뷰 및 기능 테스트 (테스트 환경 준비 완료)

@@ -7,12 +7,12 @@ date: "2026-05-27"
 revision: "R1"
 author: "AI (Antigravity)"
 wiki_status: done
-tags: antigravity, walkthrough, history, qms
+tags: [antigravity, walkthrough, history, qms]
 ---
 
-# QMS v2 하네스 엔지니어링 이식 최종 완료 및 2차 재점검 복구 보고서 (walkthrough.md - R1)
+# QMS v2 [[concepts/하네스_엔지니어링|하네스 엔지니어링]] 이식 최종 완료 및 2차 재점검 복구 보고서 (walkthrough.md - R1)
 
-전민재 차장님, 신우밸브주식회사 품질보증부 QMS v2 프로젝트의 자율적 오작동을 강력하고 안전하게 제어하기 위한 **하네스 엔지니어링 5단계 점진적 이식 프로젝트** 및 2차 점검 시 제기된 **package.json 손상에 대한 2차 긴급 복구 조치**를 100% 무결점으로 대행 완료하고 R1 최종 완료 보고를 올립니다.
+전민재 차장님, 신우밸브주식회사 품질보증부 QMS v2 프로젝트의 자율적 오작동을 강력하고 안전하게 제어하기 위한 **[[concepts/하네스_엔지니어링|하네스 엔지니어링]] 5단계 점진적 이식 프로젝트** 및 2차 점검 시 제기된 **package.json 손상에 대한 2차 긴급 복구 조치**를 100% 무결점으로 대행 완료하고 R1 최종 완료 보고를 올립니다.
 
 ---
 
@@ -45,7 +45,7 @@ npm run lint
 
 ---
 
-## 🧭 5대 하네스 안전망 최종 구축 결과 요약
+## 🧭 5대 [[history/AG_plan_2026-05-27_QMS_v2_점진적_하네스_이식_기획안_R0|하네스]] 안전망 최종 구축 결과 요약
 
 ```mermaid
 graph TD
@@ -62,7 +62,7 @@ graph TD
     style E fill:#f43f5e
 ```
 
-1. **1단계 [지시 문서]:** [전역 GEMINI.md](file:///C:/Users/mjjeon/.gemini/GEMINI.md) 내 하네스 행동 강령(4-1 ~ 4-5) 영구 장착 및 행동 지침 진입 문서 [AGENTS.md](file:///C:/Users/mjjeon/Desktop/QMS%20프로젝트/shinwoo-valve-qms/AGENTS.md) 루트 이식 완료.
+1. **1단계 [지시 문서]:** [전역 GEMINI.md](file:///C:/Users/mjjeon/.gemini/GEMINI.md) 내 [[history/AG_plan_2026-05-27_QMS_v2_점진적_하네스_이식_기획안_R0|하네스]] 행동 강령(4-1 ~ 4-5) 영구 장착 및 행동 지침 진입 문서 [AGENTS.md](file:///C:/Users/mjjeon/Desktop/QMS%20프로젝트/shinwoo-valve-qms/AGENTS.md) 루트 이식 완료.
 2. **2단계 [아키텍처 제약]:** 단방향 레이어 의존성을 강제하고 husky pre-commit 및 lint-staged 환경을 교정 장착하여 아키텍처 역류 차단망 구축 완료.
 3. **3단계 [피드백 루프]:** [verify-integration.js](file:///C:/Users/mjjeon/Desktop/QMS%20프로젝트/shinwoo-valve-qms/.agent/skills/qms-orchestrator/scripts/verify-integration.js) 테이블 검증 센서와 append-only 형태의 [integration-check.tsv](file:///C:/Users/mjjeon/Desktop/QMS%20프로젝트/shinwoo-valve-qms/.agent/logs/integration-check.tsv) 로그 장치 연동 완료.
 4. **4단계 [지식 저장소]:** [ADR-001](file:///C:/Users/mjjeon/Desktop/QMS%20프로젝트/shinwoo-valve-qms/docs/decisions/001-supabase-state.md)(로컬 캐싱 전략) 및 [Failure-001](file:///C:/Users/mjjeon/Desktop/QMS%20프로젝트/shinwoo-valve-qms/docs/failures/001-mock-sync-drift.md)(동기화 지연 실패사례) 기술 레코드 적재 완료.

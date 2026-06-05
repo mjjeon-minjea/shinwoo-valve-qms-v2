@@ -10,10 +10,10 @@ source_id: "a362ab18-6ed5-43dc-a610-63a1266ed91f"
 created_at: "2026-03-23"
 updated_at: "2026-04-07"
 wiki_status: done
-tags: dev-notes, history, qms, walkthrough
+tags: [dev-notes, history, qms, walkthrough]
 ---
 
-# 공정검사(Process Inspection) 대시보드 UI 구현 완료 보고서
+# 공정검사(Process Inspection) [[history/2026-01-30_v0_6_0_대시보드_UI_개선_계획|대시보드 UI]] 구현 완료 보고서
 
 ## 작업 요약 (Summary)
 사용자께서 제공해주신 '신우밸브 품질 검사 종합 대시보드' 스크린샷 3장을 바탕으로 완벽하게 동일한 구성과 스타일을 갖춘 페이지를 구현 완료하였습니다. 

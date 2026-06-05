@@ -3,7 +3,6 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "homepage": "https://mjjeon-minjea.github.io/shinwoo-valve-qms",
   "scripts": {
     "dev": "vite --host",
     "server:json": "node server.js",
@@ -13,8 +12,6 @@
     "build": "vite build",
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 50",
     "preview": "vite preview",
-    "predeploy": "cross-env VITE_GH_PAGES=true npm run build",
-    "deploy": "gh-pages -d dist",
     "db:sync": "powershell -ExecutionPolicy Bypass -File scripts/sync-db.ps1",
     "db:pull": "node scripts/sync-db.js pull",
     "db:push": "node scripts/sync-db.js push",

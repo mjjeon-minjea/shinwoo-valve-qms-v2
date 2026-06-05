@@ -10,7 +10,7 @@ source_id: "6e630e9b-b69a-4630-9248-582bfa75d026"
 created_at: "2026-03-23"
 updated_at: "2026-04-07"
 wiki_status: done
-tags: dev-notes, history, qms, task
+tags: [dev-notes, history, qms, task]
 ---
 
 # Debugging Weekly Report White Screen

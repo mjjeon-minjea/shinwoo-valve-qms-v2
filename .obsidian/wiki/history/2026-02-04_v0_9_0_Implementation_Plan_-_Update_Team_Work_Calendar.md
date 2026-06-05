@@ -10,7 +10,7 @@ source_id: "4a1a8188-e249-40bc-a418-b40ed09c15ba"
 created_at: "2026-03-23"
 updated_at: "2026-04-07"
 wiki_status: done
-tags: dev-notes, history, qms, plan
+tags: [dev-notes, history, qms, plan]
 ---
 
 # Implementation Plan - Update Team Work Calendar

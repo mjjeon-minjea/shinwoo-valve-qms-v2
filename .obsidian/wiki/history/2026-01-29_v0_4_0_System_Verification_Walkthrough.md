@@ -10,7 +10,7 @@ source_id: "ae1c53dc-8623-4357-9e37-f6d94569918c"
 created_at: "2026-03-23"
 updated_at: "2026-04-07"
 wiki_status: done
-tags: dev-notes, history, qms, walkthrough
+tags: [dev-notes, history, qms, walkthrough]
 ---
 
 # System Verification Walkthrough

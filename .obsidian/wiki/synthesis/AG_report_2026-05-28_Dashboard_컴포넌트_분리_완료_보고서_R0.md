@@ -7,7 +7,7 @@ date: "2026-05-28"
 revision: "R0"
 author: "AI (Antigravity)"
 wiki_status: done
-tags: antigravity, report, history, qms
+tags: [antigravity, report, history, qms]
 ---
 
 # Dashboard 컴포넌트 분리 완료 보고 (Walkthrough)
@@ -15,12 +15,12 @@ tags: antigravity, report, history, qms
 ## 1. 수행 완료된 작업
 지시하신 3가지 작업을 모두 완료하고 빌드 테스트까지 마쳤습니다.
 
-1. **[작업 1] InboundAnalysis.jsx 추출**
-   - `Dashboard.jsx` 내에 하드코딩 되어 있던 `InboundAnalysis` 컴포넌트(약 390줄 분량)를 절취하여 `src/components/InboundAnalysis.jsx` 파일로 독립시켰습니다.
+1. **[작업 1] [[history/2026-04-12_v0_24_0_[개발_노트]_v0.24.0_(P13)_-_Dashboard.jsx_컴포넌트_분리|InboundAnalysis]].jsx 추출**
+   - `Dashboard.jsx` 내에 하드코딩 되어 있던 `[[history/2026-04-12_v0_24_0_[개발_노트]_v0.24.0_(P13)_-_Dashboard.jsx_컴포넌트_분리|InboundAnalysis]]` 컴포넌트(약 390줄 분량)를 절취하여 `src/components/[[history/2026-04-12_v0_24_0_[개발_노트]_v0.24.0_(P13)_-_Dashboard.jsx_컴포넌트_분리|InboundAnalysis]].jsx` 파일로 독립시켰습니다.
    - 포맷 헬퍼 함수(`formatDate`) 및 컴포넌트에 필요한 모듈(`lucide-react`, `recharts` 등)을 상단에 함께 이식했습니다.
 
-2. **[작업 2] InboundHistory.jsx 추출**
-   - `Dashboard.jsx` 내에 포함되어 있던 `InboundHistory` 컴포넌트(약 530줄 분량)를 절취하여 `src/components/InboundHistory.jsx` 파일로 독립시켰습니다.
+2. **[작업 2] [[history/2026-04-12_v0_24_0_[개발_노트]_v0.24.0_(P13)_-_Dashboard.jsx_컴포넌트_분리|InboundHistory]].jsx 추출**
+   - `Dashboard.jsx` 내에 포함되어 있던 `[[history/2026-04-12_v0_24_0_[개발_노트]_v0.24.0_(P13)_-_Dashboard.jsx_컴포넌트_분리|InboundHistory]]` 컴포넌트(약 530줄 분량)를 절취하여 `src/components/[[history/2026-04-12_v0_24_0_[개발_노트]_v0.24.0_(P13)_-_Dashboard.jsx_컴포넌트_분리|InboundHistory]].jsx` 파일로 독립시켰습니다.
    - `xlsx` 엑셀 파서 라이브러리 등 의존성을 모두 옮겨 정상 동작하도록 조치했습니다.
 
 3. **[작업 3] Home 컴포넌트 중복 선언 조사 및 처리**

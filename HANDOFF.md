@@ -1,6 +1,6 @@
 # 🤝 QMS v2 세션 통합 메모리 및 인수인계 파일 (HANDOFF.md)
 
-* **최종 갱신일:** 2026년 06월 03일
+* **최종 갱신일:** 2026년 06월 05일
 * **작성자:** QMS AI 전담 비서 안티그래비티
 * **인계대상:** 다음 세션 구동 AI 에이전트 및 전민재 차장님
 
@@ -37,6 +37,36 @@
 
 ---
 
+## 2-B. 2026-06-05 세션: 배포 인프라 정비 (Today Tasks)
+
+### 🔧 1. DB 정체 규명 및 좌표 정비 (W1)
+- `qrmyhuipfkctgvzgdvmd` DB → **폐기 인스턴스** 확정 (TCP False + 폭파사건 보고서 근거).
+- `.env.local` 교정: `PROD_SUPABASE_URL` = `https://zuahpjdsypovxdplxryw.supabase.co` (메인), `VITE_SUPABASE_URL` = 테스트 DB.
+
+### 🌿 2. staging 브랜치 + Vercel 재배선 (W2, W3)
+- `git push -u origin staging` → 원격 등록 완료.
+- 테스트웹 Vercel: 구 레포 Disconnect → `shinwoo-valve-qms-v2` 재연결 → Production Branch = **`staging`** 변경 완료.
+- 도메인 `shinwoo-valve-qms-testweb.vercel.app` 정상 작동 확인.
+
+### 📦 3. 데이터 복제 파이프라인 구축 (W6)
+- `clone-db.js` 신규 작성 (메인 DB Proxy 읽기전용 래퍼 탑재).
+- **복제 대상 테이블 확정 9종**: `users`, `weekly_reports`, `inspections`, `item_master`, `process_inspections`, `calendar_events`, `inquiries`, `resources`, `suggestions`.
+- **제외 테이블**: `dev_notes`, `notices` (로컬 관리), `settings` (로컬→서버).
+- **테스트 DB 스키마 동기화**: `process_inspections` 누락 컬럼 4종 ALTER TABLE 성공 (`title`, `inspector_id`, `status`, `created_at`).
+- **최종 실행 결과**: 9종 테이블, **총 2,801건 복제 완료**, 메인 DB 쓰기 **0건** (Proxy 물리 차단).
+
+### 🧹 4. 레거시 정리 (W5, W7)
+- 위험 스크립트 4종 삭제 (`test-prod-db-conn.js` 등 메인 DB 패스워드 평문 포함 파일).
+- `package.json` GH Pages 스크립트 소거, `vite.config.js` base 단일화, `test-origin` 리모트 삭제.
+
+### ⚠️ 5. 잔여 작업 (차장님 수동)
+- 메인 DB 비밀번호 로테이션(재발급).
+- W4: 메인웹 Vercel 설정 확인.
+- W7: 구 GitHub Pages 비활성화.
+- Task 8: `.gemini` KI 타임스탬프 직접 대조.
+
+---
+
 ## 3. 토큰 및 비용 모니터링 (Token & Cost)
 * **모델명**: GEMINI 3.5 FLASH (HIGH)
 * **단가**: 입력 $1.50 / 출력 $9.00 (1백만 토큰당)
@@ -48,5 +78,11 @@
 ---
 
 ## 4. 인수인계 핵심 사항 (Next Action Items)
-1. **차기 세션 시작 시 최우선 조치**: 본 `HANDOFF.md`를 1순위로 읽어 어제와 오늘의 장애 복구 맥락 및 정비된 스킬 구성을 즉각 로드할 것.
-2. **검증 스크립트 보존**: `scratch/` 내에 생성된 파워쉘 테스트 스크립트 3종은 삭제하지 않고 보관하므로, 추후 스킬 작동성 의심 시 즉시 활용할 것.
+1. **차기 세션 시작 시 최우선 조치**: 본 `HANDOFF.md`를 1순위로 읽어 장애 복구 맥락 및 정비된 스킬 구성을 즉각 로드할 것.
+2. **검증 스크립트 보존**: `scratch/` 내에 생성된 파워쉘 테스트 스크립트 3종은 삭제하지 않고 보관할 것.
+3. **배포 인프라 3계층 좌표 (2026-06-05 확정)**:
+   - 메인웹: Vercel `shinwoo-valve-qms-mainweb-v2.vercel.app` ← GitHub `main` ← Supabase `zuahpjdsypovxdplxryw`
+   - 테스트웹: Vercel `shinwoo-valve-qms-testweb.vercel.app` ← GitHub `staging` ← Supabase `srzaanvojyhwzugoaimk`
+   - 로컬웹: `localhost:5173` ← 테스트 DB 동일
+4. **clone-db.js 재실행 시 참고**: 메인 키는 `.env.local`의 `PROD_SERVICE_ROLE_KEY`에 이미 입력 완료. `node scripts/clone-db.js`로 즉시 실행 가능.
+5. **문서 4종 작성 시 필수 점검**: `02_dnas_process.md` §4-3 표준 연계 순서를 반드시 준수할 것 (internal-comms → revision-archiver → release-sync).

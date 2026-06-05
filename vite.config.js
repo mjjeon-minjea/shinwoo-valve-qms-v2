@@ -4,9 +4,8 @@ import react from '@vitejs/plugin-react'
 // https://vitejs.dev/config/
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
-  const isGhPages = mode === 'production' && process.env.VITE_GH_PAGES === 'true';
   return {
-    base: isGhPages ? '/shinwoo-valve-qms/' : '/',
+    base: '/',
     plugins: [react()],
     server: {
       host: true,

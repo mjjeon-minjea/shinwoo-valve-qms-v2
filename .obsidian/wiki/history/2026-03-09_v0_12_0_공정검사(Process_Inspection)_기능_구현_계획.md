@@ -10,7 +10,7 @@ source_id: "deda2764-f3af-413c-b4a8-7363c479bfbe"
 created_at: "2026-03-23"
 updated_at: "2026-04-07"
 wiki_status: done
-tags: dev-notes, history, qms, plan
+tags: [dev-notes, history, qms, plan]
 ---
 
 # 공정검사(Process Inspection) 기능 구현 계획

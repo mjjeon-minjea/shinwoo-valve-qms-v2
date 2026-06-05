@@ -7,7 +7,7 @@ date: "2026-05-28"
 revision: "R0"
 author: "AI (Antigravity)"
 wiki_status: done
-tags: antigravity, plan, history, qms
+tags: [antigravity, plan, history, qms]
 ---
 
 # Dashboard 컴포넌트 분리 및 최적화 기획안
@@ -24,16 +24,16 @@ tags: antigravity, plan, history, qms
 ### Component Extraction & Optimization
 
 #### [MODIFY] [Dashboard.jsx](file:///c:/Users/mjjeon/Desktop/QMS%20%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8/shinwoo-valve-qms/src/components/Dashboard.jsx)
-- `InboundAnalysis` 컴포넌트 블록(약 64번째 줄 시작)을 절취선 삭제하고, 파일 최상단에 `import InboundAnalysis from './InboundAnalysis';` 구문 삽입.
-- `InboundHistory` 컴포넌트 블록(약 458번째 줄 시작)을 절취선 삭제하고, 파일 최상단에 `import InboundHistory from './InboundHistory';` 구문 삽입.
+- `[[history/2026-04-12_v0_24_0_[개발_노트]_v0.24.0_(P13)_-_Dashboard.jsx_컴포넌트_분리|InboundAnalysis]]` 컴포넌트 블록(약 64번째 줄 시작)을 절취선 삭제하고, 파일 최상단에 `import [[history/2026-04-12_v0_24_0_[개발_노트]_v0.24.0_(P13)_-_Dashboard.jsx_컴포넌트_분리|InboundAnalysis]] from './[[history/2026-04-12_v0_24_0_[개발_노트]_v0.24.0_(P13)_-_Dashboard.jsx_컴포넌트_분리|InboundAnalysis]]';` 구문 삽입.
+- `[[history/2026-04-12_v0_24_0_[개발_노트]_v0.24.0_(P13)_-_Dashboard.jsx_컴포넌트_분리|InboundHistory]]` 컴포넌트 블록(약 458번째 줄 시작)을 절취선 삭제하고, 파일 최상단에 `import [[history/2026-04-12_v0_24_0_[개발_노트]_v0.24.0_(P13)_-_Dashboard.jsx_컴포넌트_분리|InboundHistory]] from './[[history/2026-04-12_v0_24_0_[개발_노트]_v0.24.0_(P13)_-_Dashboard.jsx_컴포넌트_분리|InboundHistory]]';` 구문 삽입.
 - (발견 시) `Home` 컴포넌트 2번째 중복 선언부 완전 삭제.
 
 #### [NEW] [InboundAnalysis.jsx](file:///c:/Users/mjjeon/Desktop/QMS%20%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8/shinwoo-valve-qms/src/components/InboundAnalysis.jsx)
-- `Dashboard.jsx`에서 추출한 `InboundAnalysis` 컴포넌트 소스코드 전면 이식.
+- `Dashboard.jsx`에서 추출한 `[[history/2026-04-12_v0_24_0_[개발_노트]_v0.24.0_(P13)_-_Dashboard.jsx_컴포넌트_분리|InboundAnalysis]]` 컴포넌트 소스코드 전면 이식.
 - 컴포넌트 구동에 필요한 의존성(`recharts`, `lucide-react`, `../lib/api`, 포맷팅 헬퍼 함수 등) import 선언 추가.
 
 #### [NEW] [InboundHistory.jsx](file:///c:/Users/mjjeon/Desktop/QMS%20%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8/shinwoo-valve-qms/src/components/InboundHistory.jsx)
-- `Dashboard.jsx`에서 추출한 `InboundHistory` 컴포넌트 소스코드 전면 이식.
+- `Dashboard.jsx`에서 추출한 `[[history/2026-04-12_v0_24_0_[개발_노트]_v0.24.0_(P13)_-_Dashboard.jsx_컴포넌트_분리|InboundHistory]]` 컴포넌트 소스코드 전면 이식.
 - 엑셀 업로드 처리를 위한 `xlsx` 및 기타 필수 아이콘/API 모듈 import 선언 추가.
 
 ## Verification Plan

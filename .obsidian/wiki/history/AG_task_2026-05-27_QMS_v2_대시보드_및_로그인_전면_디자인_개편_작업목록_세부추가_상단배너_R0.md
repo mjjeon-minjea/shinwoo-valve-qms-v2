@@ -7,7 +7,7 @@ date: "2026-05-27"
 revision: "R0"
 author: "AI (Antigravity)"
 wiki_status: done
-tags: antigravity, task, history, qms
+tags: [antigravity, task, history, qms]
 ---
 
 # QMS v2 대시보드 및 로그인 전면 디자인 개편 작업 명세서 (세부추가: 상단배너 R0)
@@ -42,4 +42,4 @@ tags: antigravity, task, history, qms
 ### 🔴 [대기 5단계] 메인웹 최종 릴리즈 및 개발자 완료 보고서 종결 ➔ (대기)
 * [ ] 메인 실서버 릴리즈 대행 (`git push origin main` 최종 실행)
 * [ ] 메인 웹(shinwoo-valve-qms-v2.vercel.app) 실구동 100% 정상 작동 완료 확인
-* [ ] 최종 릴리즈 동기화 및 DNAS 3단계 `walkthrough.md` 종결 보고서 확정
+* [ ] 최종 릴리즈 동기화 및 [[history/2026-04-10_v0_23_0_[P12]_DNAS(개발자_노트_자동화_및_승인_시스템)_이식|DNAS]] 3단계 `walkthrough.md` 종결 보고서 확정

@@ -10,10 +10,10 @@ source_id: "cfb7cc43-ab24-4fe0-979d-098240f51daf"
 created_at: "2026-03-23"
 updated_at: "2026-04-07"
 wiki_status: done
-tags: dev-notes, history, qms, walkthrough
+tags: [dev-notes, history, qms, walkthrough]
 ---
 
-# 시스템 전체 점검 & Error Verification Report
+# [[history/2026-02-09_v0_11_0_시스템_전체_점검|시스템 전체 점검]] & Error Verification Report
 
 ## 1. 시스템 상태
 

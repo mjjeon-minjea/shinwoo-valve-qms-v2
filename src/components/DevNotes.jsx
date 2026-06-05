@@ -106,13 +106,14 @@ const DevNotes = ({ user }) => {
                                 <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 w-24">버전</th>
                                 <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500">패치 노트 내역</th>
                                 <th className="px-6 py-3 text-center text-xs font-semibold text-slate-500 w-32">담당자</th>
+                                <th className="px-6 py-3 text-center text-xs font-semibold text-slate-500 w-32">배포 상태</th>
                                 <th className="px-6 py-3 text-center text-xs font-semibold text-slate-500 w-32">배포일</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {paginatedList.length === 0 ? (
                                 <tr>
-                                    <td colSpan="4" className="px-6 py-12 text-center text-slate-400">
+                                    <td colSpan="5" className="px-6 py-12 text-center text-slate-400">
                                         기록된 개발자 노트가 없습니다.
                                     </td>
                                 </tr>
@@ -133,7 +134,22 @@ const DevNotes = ({ user }) => {
                                             <div className="font-medium text-slate-800 text-sm truncate max-w-md">{item.title}</div>
                                             <div className="text-xs text-slate-500 truncate max-w-md mt-1">{item.content}</div>
                                         </td>
-                                        <td className="px-6 py-4 text-center text-sm text-slate-600">{item.author || item.manager || '시스템'}</td>
+                                        <td className="px-6 py-4 text-center text-sm text-slate-600">{item.author || 'Antigravity'}</td>
+                                        <td className="px-6 py-4 text-center">
+                                            {(!item.status || item.status === 'draft' || item.status === 'rejected') ? (
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-700 border border-red-200">
+                                                    🔴 로컬 검증중
+                                                </span>
+                                            ) : !item.is_synced ? (
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                                                    🟡 테스트망 대기
+                                                </span>
+                                            ) : (
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                                    🟢 메인서버 라이브
+                                                </span>
+                                            )}
+                                        </td>
                                         <td className="px-6 py-4 text-center text-sm text-slate-500">
                                             {item.created_at ? new Date(item.created_at).toISOString().split('T')[0] : item.date}
                                         </td>
@@ -183,10 +199,25 @@ const DevNotes = ({ user }) => {
                     <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
                         <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                             <div>
-                                <span className="inline-flex items-center text-primary-700 bg-primary-100 text-xs font-bold px-2.5 py-1 rounded-full mb-2">
-                                    <Hash className="w-3.5 h-3.5 mr-1" />
-                                    {selectedNote.version || 'v0.0.0'}
-                                </span>
+                                <div className="flex items-center gap-2 mb-2">
+                                    <span className="inline-flex items-center text-primary-700 bg-primary-100 text-xs font-bold px-2.5 py-1 rounded-full">
+                                        <Hash className="w-3.5 h-3.5 mr-1" />
+                                        {selectedNote.version || 'v0.0.0'}
+                                    </span>
+                                    {(!selectedNote.status || selectedNote.status === 'draft' || selectedNote.status === 'rejected') ? (
+                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-700 border border-red-200">
+                                            🔴 로컬 검증중
+                                        </span>
+                                    ) : !selectedNote.is_synced ? (
+                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                                            🟡 테스트망 대기
+                                        </span>
+                                    ) : (
+                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                            🟢 메인서버 라이브
+                                        </span>
+                                    )}
+                                </div>
                                 <h3 className="text-xl font-bold text-slate-800">{selectedNote.title}</h3>
                             </div>
                             <button 
@@ -202,7 +233,7 @@ const DevNotes = ({ user }) => {
                             </div>
                         </div>
                         <div className="p-4 border-t border-slate-100 bg-slate-50 text-xs text-slate-500 flex justify-between items-center">
-                            <span>담당자: <span className="font-semibold text-slate-700">{selectedNote.author || selectedNote.manager || '시스템 개발자'}</span></span>
+                            <span>담당자: <span className="font-semibold text-slate-700">{selectedNote.author || 'Antigravity'}</span></span>
                             <span>배포일: {selectedNote.created_at ? new Date(selectedNote.created_at).toISOString().split('T')[0] : selectedNote.date}</span>
                         </div>
                     </div>

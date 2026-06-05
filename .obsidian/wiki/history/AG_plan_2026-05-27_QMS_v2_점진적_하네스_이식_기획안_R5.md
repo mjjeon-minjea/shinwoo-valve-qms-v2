@@ -7,12 +7,12 @@ date: "2026-05-27"
 revision: "R5"
 author: "AI (Antigravity)"
 wiki_status: done
-tags: antigravity, plan, history, qms
+tags: [antigravity, plan, history, qms]
 ---
 
-# QMS v2 5단계 점진적 하네스 이식 기획안 (R5 - 최종 결정판)
+# QMS v2 5단계 점진적 [[history/AG_plan_2026-05-27_QMS_v2_점진적_하네스_이식_기획안_R0|하네스]] 이식 기획안 (R5 - 최종 결정판)
 
-본 기획안은 차장님의 R4 개선 권고 사항 및 지시 사항을 100% 수용하여, **안티그래비티(Gemini)가 읽지 못하는 `CLAUDE.md`를 기획서 전체에서 영구 소거**하고, `eslint-plugin-boundaries` 버전을 npm semver 표준(`^4`)으로 보완했으며, greedy 정밀 정규식(`api\.fetch\(\s*['"]\/([^/'"]+)`)으로 테이블명을 오차 없이 추출하도록 교정하고, 수정 대상을 **`전역 C:\Users\mjjeon\.gemini\GEMINI.md`로 완전히 단일화**한 **최종 결정판 R5 기획서**입니다.
+본 기획안은 차장님의 R4 개선 권고 사항 및 지시 사항을 100% 수용하여, **안티그래비티(Gemini)가 읽지 못하는 `CLAUDE.md`를 기획서 전체에서 영구 소거**하고, `eslint-plugin-boundaries` 버전을 npm semver 표준(`^4`)으로 보완했으며, greedy 정밀 정규식(`api\.fetch\(\s*['"]\/([^/'"]+)`)으로 테이블명을 오차 없이 추출하도록 교정하고, 수정 대상을 **`전역 C:\Users\mjjeon\.gemini\[[GEMINI|GEMINI]].md`로 완전히 단일화**한 **최종 결정판 R5 기획서**입니다.
 
 * **갱신 작성일:** 2026-05-27  
 * **문서 버전:** R5 (최종 결정판)  
@@ -22,11 +22,11 @@ tags: antigravity, plan, history, qms
 
 ## 1. 목적 및 변경 영향 범위
 
-* **목적:** Mitchell Hashimoto의 AI 도입 6단계 여정 중 "4단계: 단일 에이전트" 환경에서 발생하는 5대 병폐(스타일 붕괴, 아키텍처 무시, 반복되는 망각, 파일 누적, 컨텍스트 불안)를 차단하기 위해, 에이전트의 오작동을 통제하고 올바른 궤도로 유도하는 **5대 하네스 안전망(지시문서, 아키텍처제약, 피드백루프, 지식저장소, 가비지 컬렉션)**을 안전하게 점진 구축합니다.
+* **목적:** Mitchell Hashimoto의 AI 도입 6단계 여정 중 "4단계: 단일 에이전트" 환경에서 발생하는 5대 병폐(스타일 붕괴, 아키텍처 무시, 반복되는 망각, 파일 누적, 컨텍스트 불안)를 차단하기 위해, 에이전트의 오작동을 통제하고 올바른 궤도로 유도하는 **5대 [[history/AG_plan_2026-05-27_QMS_v2_점진적_하네스_이식_기획안_R0|하네스]] 안전망(지시문서, 아키텍처제약, 피드백루프, 지식저장소, 가비지 컬렉션)**을 안전하게 점진 구축합니다.
 * **변경 영향 범위:**
   - `AGENTS.md` [NEW] - 기존 기술 규칙 인덱스 포인터 문서
-  - `전역 C:\Users\mjjeon\.gemini\GEMINI.md` [MODIFY] - 하네스 엔지니어링 제약(4-1 ~ 4-5) 맨 끝에 추가 이식 (CLAUDE.md 대체)
-  - `.agent/rules/04_harness_constraints.md` [NEW] - 하네스 세부 행동 통제 규칙
+  - `전역 C:\Users\mjjeon\.gemini\[[GEMINI|GEMINI]].md` [MODIFY] - [[concepts/하네스_엔지니어링|하네스 엔지니어링]] 제약(4-1 ~ 4-5) 맨 끝에 추가 이식 (CLAUDE.md 대체)
+  - `.agent/rules/04_harness_constraints.md` [NEW] - [[history/AG_plan_2026-05-27_QMS_v2_점진적_하네스_이식_기획안_R0|하네스]] 세부 행동 통제 규칙
   - `.eslintrc.cjs` [MODIFY] - boundaries 플러그인 룰 및 `scripts/` 제외 제거
   - `package.json` [MODIFY] - boundaries 플러그인, husky, lint-staged 패키지 추가 및 설정 블록 삽입
   - `.agent/skills/qms-orchestrator/scripts/verify-integration.js` [NEW] - 원격 Supabase API 메타데이터 교차 검증 센서 (JS 전용)
@@ -54,10 +54,10 @@ tags: antigravity, plan, history, qms
 
 ```mermaid
 gantt
-    title QMS v2 5단계 점진적 하네스 이식 일정 (R5)
+    title QMS v2 5단계 점진적 [[history/AG_plan_2026-05-27_QMS_v2_점진적_하네스_이식_기획안_R0|하네스]] 이식 일정 (R5)
     dateFormat  YYYY-MM-DD
     section 1단계
-    AGENTS.md & GEMINI.md 제정 (공수: 1일)      :active, p1, 2026-05-27, 1d
+    AGENTS.md & [[GEMINI|GEMINI]].md 제정 (공수: 1일)      :active, p1, 2026-05-27, 1d
     section 2단계
     ESLint Boundaries & husky (공수: 2일)    :p2, after p1, 2d
     section 3단계
@@ -68,13 +68,13 @@ gantt
     드리프트 경고 센서 장착 (공수: 1일)    :p5, after p4, 1d
 ```
 
-### 1단계: [지시 문서] `AGENTS.md` 인덱스 문서 및 전역 `GEMINI.md` 룰셋 제정
-* **목적:** 정보의 이원화(SSOT 붕괴)를 완전히 막고, 에이전트(Gemini)가 읽지 못하는 `CLAUDE.md` 파일 생성을 배제하며, 전역 `GEMINI.md`에 하네스 제약을 연동합니다.
+### 1단계: [지시 문서] `AGENTS.md` 인덱스 문서 및 전역 `[[GEMINI|GEMINI]].md` 룰셋 제정
+* **목적:** 정보의 이원화(SSOT 붕괴)를 완전히 막고, 에이전트(Gemini)가 읽지 못하는 `CLAUDE.md` 파일 생성을 배제하며, 전역 `[[GEMINI|GEMINI]].md`에 [[history/AG_plan_2026-05-27_QMS_v2_점진적_하네스_이식_기획안_R0|하네스]] 제약을 연동합니다.
 * **구현 사양:**
   - `AGENTS.md`는 새로운 규칙을 중복 나열하지 않고, 기존 `.agent/rules/` 파일들을 참조하는 **진입 인덱스(Index Document)**로 설계합니다.
-  - **`C:\Users\mjjeon\Desktop\QMS 프로젝트\shinwoo-valve-qms\.agent\rules\GEMINI.md` (혹은 전역 `C:\Users\mjjeon\.gemini\GEMINI.md`) 규칙 덧붙임 이식:** 차장님의 룰셋 추가안을 수용하여 규칙 파일 하단에 **"4. 하네스 엔지니어링 제약(4-1 ~ 4-5)"** 내용을 영구 이식합니다. 이로써 `CLAUDE.md` 없이도 모든 세션에서 전역 행동 강령이 에이전트의 런타임에 직접 연동됩니다.
+  - **`C:\Users\mjjeon\Desktop\QMS 프로젝트\shinwoo-valve-qms\.agent\rules\[[GEMINI|GEMINI]].md` (혹은 전역 `C:\Users\mjjeon\.gemini\[[GEMINI|GEMINI]].md`) 규칙 덧붙임 이식:** 차장님의 룰셋 추가안을 수용하여 규칙 파일 하단에 **"4. [[concepts/하네스_엔지니어링|하네스 엔지니어링]] 제약(4-1 ~ 4-5)"** 내용을 영구 이식합니다. 이로써 `CLAUDE.md` 없이도 모든 세션에서 전역 행동 강령이 에이전트의 런타임에 직접 연동됩니다.
   - **사전 코드베이스 감사(Audit) 반영:** 현재 `src/lib/api.js` 내에 잔존하는 12개의 `console.log` 호출부를 단계적으로 소거하고 공식 Logger 모듈로 전환하는 리팩토링 예외 규정을 포함시킵니다.
-* **검증 기준:** `AGENTS.md` 및 `GEMINI.md` 내 `@see` 링크 포인터들이 끊어짐 없이 연결되는지 마크다운 정합성 검사.
+* **검증 기준:** `AGENTS.md` 및 `[[GEMINI|GEMINI]].md` 내 `@see` 링크 포인터들이 끊어짐 없이 연결되는지 마크다운 정합성 검사.
 
 ---
 
@@ -127,7 +127,7 @@ gantt
     1. **감지:** `verify-integration.js` 스크립트를 구동하여 존재하지 않는 테이블 호출 스캔.
     2. **기록:** 검사 결과를 `.agent\logs\integration-check.tsv` 파일에 append-only 이력으로 기록.
     3. **경보:** 불일치 감지 즉시 빌드 exit code `1`을 방출하며 콘솔에 오류 상세 위치(파일:라인) 표시.
-    4. **결재 에스컬레이션:** 에이전트의 자동 수정을 금지하고 즉시 차장님 수동 확인을 위한 DNAS Plan 단계로 보고 에스컬레이션.
+    4. **결재 에스컬레이션:** 에이전트의 자동 수정을 금지하고 즉시 차장님 수동 확인을 위한 [[history/2026-04-10_v0_23_0_[P12]_DNAS(개발자_노트_자동화_및_승인_시스템)_이식|DNAS]] Plan 단계로 보고 에스컬레이션.
 * **공수 산정 근거:** 다중 세그먼트 API 스캔 greedy 정규식 작성 및 `node-fetch` 연동 스키마 검증기 구현과 QMS v2 24개 컴포넌트 드라이런에 총 5일의 공수를 현실적으로 배정합니다.
 * **검증 기준:** 의도적으로 잘못된 테이블 호출 코드(`src\components\test_mismatch.js` 내 `api.fetch('/invalid_table')`)를 심고 스크립트를 실행하여 exit code `1`이 성공적으로 터져 나오는지 검증.
 
@@ -176,7 +176,7 @@ gantt
 | **5단계** | 구조 드리프트 잔재 감지 | 감지된 오염 파일을 백업 폴더(`_workspace\backup\`)로 수동 이동 처리 |
 
 ### 단계별 검증 스케줄
-- **1단계 검증:** `AGENTS.md` 및 `GEMINI.md` 포인터 무결성 검증
+- **1단계 검증:** `AGENTS.md` 및 `[[GEMINI|GEMINI]].md` 포인터 무결성 검증
 - **2단계 검증:** boundaries 린트 룰 동작 수동 검사 (`npm run lint`)
 - **3단계 검증:** `verify-integration.js` 센서 감지 성능 테스트 (`node .agent\skills\qms-orchestrator\scripts\verify-integration.js`)
 - **4단계 검증:** ADR-001 및 Failure-001 문서의 포맷 및 용어 일치 검사
@@ -184,7 +184,7 @@ gantt
 
 ---
 
-## 📝 5. 기획안 자체 체크리스트 및 영구 금지 룰 (GEMINI.md 합병안)
+## 📝 5. 기획안 자체 체크리스트 및 영구 금지 룰 ([[GEMINI|GEMINI]].md 합병안)
 
 ### 5-1. 기획안 작성 전 자체 체크리스트
 본 기획안 R5는 차장님의 엄격한 전역 지시 조항에 따라 다음 10대 검증 항목을 사전 자가진단하여 모두 완료하였습니다.

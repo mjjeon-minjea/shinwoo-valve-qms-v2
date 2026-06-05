@@ -7,7 +7,7 @@ date: "2026-05-27"
 revision: "R0"
 author: "AI (Antigravity)"
 wiki_status: done
-tags: antigravity, plan, history, qms
+tags: [antigravity, plan, history, qms]
 ---
 
 # QMS v2 대시보드 및 로그인 전면 디자인 개편 기획안 (세부추가: 상단배너 R0)
@@ -30,7 +30,7 @@ tags: antigravity, plan, history, qms
 
 ## 2. 잠긴 표면 (Locked Surface) - 절대 수정 금지
 
-하네스 안전성 및 아키텍처 규칙 보존을 위해 아래 파일은 절대 수정하지 않습니다:
+[[history/AG_plan_2026-05-27_QMS_v2_점진적_하네스_이식_기획안_R0|하네스]] 안전성 및 아키텍처 규칙 보존을 위해 아래 파일은 절대 수정하지 않습니다:
 * `.eslintrc.cjs`
 * `.agent/rules/04_harness_constraints.md`
 

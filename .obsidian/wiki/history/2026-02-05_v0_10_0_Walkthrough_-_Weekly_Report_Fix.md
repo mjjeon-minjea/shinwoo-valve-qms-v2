@@ -10,7 +10,7 @@ source_id: "bd004fc6-d4b7-4f16-97a9-c2c767693e97"
 created_at: "2026-03-23"
 updated_at: "2026-04-07"
 wiki_status: done
-tags: dev-notes, history, qms, walkthrough
+tags: [dev-notes, history, qms, walkthrough]
 ---
 
 # Walkthrough - Weekly Report Fix

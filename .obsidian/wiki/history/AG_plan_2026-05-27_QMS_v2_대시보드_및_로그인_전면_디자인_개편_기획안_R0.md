@@ -7,7 +7,7 @@ date: "2026-05-27"
 revision: "R0"
 author: "AI (Antigravity)"
 wiki_status: done
-tags: antigravity, plan, history, qms
+tags: [antigravity, plan, history, qms]
 ---
 
 # QMS v2 대시보드 및 로그인 전면 디자인 개편 기획안 (R0)
@@ -69,4 +69,4 @@ tags: antigravity, plan, history, qms
 
 ---
 
-차장님의 최고급 디자인 가이드를 신우밸브 QMS v2 프로젝트에 완벽하게 녹여내겠습니다! 본 기획안에 대해 최종 승인을 주시면 즉시 로컬 구현 및 전면 개편 작업(DNAS 2단계)에 착수하겠습니다!
+차장님의 최고급 디자인 가이드를 신우밸브 QMS v2 프로젝트에 완벽하게 녹여내겠습니다! 본 기획안에 대해 최종 승인을 주시면 즉시 로컬 구현 및 전면 개편 작업([[history/2026-04-10_v0_23_0_[P12]_DNAS(개발자_노트_자동화_및_승인_시스템)_이식|DNAS]] 2단계)에 착수하겠습니다!

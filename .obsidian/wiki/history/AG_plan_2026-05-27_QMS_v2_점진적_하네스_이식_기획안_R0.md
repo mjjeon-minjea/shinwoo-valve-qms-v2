@@ -7,7 +7,7 @@ date: "2026-05-27"
 revision: "R0"
 author: "AI (Antigravity)"
 wiki_status: done
-tags: antigravity, plan, history, qms
+tags: [antigravity, plan, history, qms]
 ---
 
 # QMS v2 5단계 점진적 하네스 이식 기획안 (R0)
@@ -60,7 +60,7 @@ Document anything that requires user review or feedback, for example, breaking c
 * **작업 상세:**
   #### [NEW] [AGENTS.md](file:///c:/Users/mjjeon/Desktop/QMS%20프로젝트/shinwoo-valve-qms/AGENTS.md)
   - QMS v2의 핵심 스택(React, Tailwind, Supabase) 코딩 컨벤션 및 폴더 구조 규정.
-  - 당사의 **3단계 결재 프로세스(DNAS)** 및 **배포 전 3단 검증 안전망**을 에이전트 전용의 강제적 금지/준수 규칙으로 명문화.
+  - 당사의 **3단계 결재 프로세스([[history/2026-04-10_v0_23_0_[P12]_DNAS(개발자_노트_자동화_및_승인_시스템)_이식|DNAS]])** 및 **배포 전 3단 검증 안전망**을 에이전트 전용의 강제적 금지/준수 규칙으로 명문화.
   - print/console 출력 금지 및 특정 DB 다이렉트 쿼리 통제 등 에이전트 행동 지침 선언.
 
 ---

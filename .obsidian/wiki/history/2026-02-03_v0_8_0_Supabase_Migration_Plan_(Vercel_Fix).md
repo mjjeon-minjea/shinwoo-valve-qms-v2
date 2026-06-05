@@ -10,7 +10,7 @@ source_id: "e597424f-afc9-46be-a388-c4f4a79dfabe"
 created_at: "2026-03-23"
 updated_at: "2026-04-07"
 wiki_status: done
-tags: dev-notes, history, qms, plan
+tags: [dev-notes, history, qms, plan]
 ---
 
 # Supabase Migration Plan (Vercel Fix)

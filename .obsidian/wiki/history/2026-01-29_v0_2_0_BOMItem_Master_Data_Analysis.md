@@ -10,7 +10,7 @@ source_id: "d39be6fa-5577-4d12-a836-4cd8c66b838a"
 created_at: "2026-03-23"
 updated_at: "2026-04-07"
 wiki_status: done
-tags: dev-notes, history, qms, task
+tags: [dev-notes, history, qms, task]
 ---
 
 # BOM/Item Master Data Analysis

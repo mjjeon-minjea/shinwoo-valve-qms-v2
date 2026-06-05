@@ -7,7 +7,7 @@ date: "2026-05-27"
 revision: "R1"
 author: "AI (Antigravity)"
 wiki_status: done
-tags: antigravity, walkthrough, history, qms
+tags: [antigravity, walkthrough, history, qms]
 ---
 
 # QMS v2 로그인 화면 상단 배너 개편 및 커스텀 로고/영문 타이포 적용 최종 보고서 (R1)

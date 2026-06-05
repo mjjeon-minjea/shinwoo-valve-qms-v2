@@ -7,10 +7,10 @@ date: "2026-05-27"
 revision: "R2"
 author: "AI (Antigravity)"
 wiki_status: done
-tags: antigravity, plan, history, qms
+tags: [antigravity, plan, history, qms]
 ---
 
-# QMS v2 5단계 점진적 하네스 이식 기획안 (R2)
+# QMS v2 5단계 점진적 [[history/AG_plan_2026-05-27_QMS_v2_점진적_하네스_이식_기획안_R0|하네스]] 이식 기획안 (R2)
 
 본 기획안은 차장님의 R1 개선 권고 사항을 100% 완벽히 수용하여, TypeScript 가정을 전면 철폐하고 **실제 QMS v2 코드베이스(JS/JSX 전용 스택, React Router Dom v7, 원격 Supabase REST API, json-server)에 1:1로 정밀 밀착**시켰으며, 실제 폴더 구조(pages/hooks 부재 반영), husky/lint-staged의 구체적 셋업 절차, 그리고 PowerShell 윈도우 파일 경로를 엄격히 준수한 **최종 무결점 R2 버전 기술 기획서**입니다.
 
@@ -22,10 +22,10 @@ tags: antigravity, plan, history, qms
 
 ## 1. 목적 및 변경 영향 범위
 
-* **목적:** Mitchell Hashimoto의 AI 도입 6단계 여정 중 "4단계: 단일 에이전트" 환경에서 발생하는 5대 병폐(스타일 붕괴, 아키텍처 무시, 반복되는 망각, 파일 누적, 컨텍스트 불안)를 차단하기 위해, 에이전트의 오작동을 통제하고 올바른 궤도로 유도하는 **5대 하네스 안전망(지시문서, 아키텍처제약, 피드백루프, 지식저장소, 가비지 컬렉션)**을 안전하게 점진 구축합니다.
+* **목적:** Mitchell Hashimoto의 AI 도입 6단계 여정 중 "4단계: 단일 에이전트" 환경에서 발생하는 5대 병폐(스타일 붕괴, 아키텍처 무시, 반복되는 망각, 파일 누적, 컨텍스트 불안)를 차단하기 위해, 에이전트의 오작동을 통제하고 올바른 궤도로 유도하는 **5대 [[history/AG_plan_2026-05-27_QMS_v2_점진적_하네스_이식_기획안_R0|하네스]] 안전망(지시문서, 아키텍처제약, 피드백루프, 지식저장소, 가비지 컬렉션)**을 안전하게 점진 구축합니다.
 * **변경 영향 범위:**
-  - `CLAUDE.md` [NEW] - 하네스 트리거 포인터 및 변경 이력 수록
-  - `.agent/rules/04_harness_constraints.md` [NEW] - 하네스 세부 행동 통제 규칙
+  - `CLAUDE.md` [NEW] - [[history/AG_plan_2026-05-27_QMS_v2_점진적_하네스_이식_기획안_R0|하네스]] 트리거 포인터 및 변경 이력 수록
+  - `.agent/rules/04_harness_constraints.md` [NEW] - [[history/AG_plan_2026-05-27_QMS_v2_점진적_하네스_이식_기획안_R0|하네스]] 세부 행동 통제 규칙
   - `.eslintrc.cjs` [MODIFY] - boundaries 플러그인 룰 및 `scripts/` 제외 제거
   - `package.json` [MODIFY] - boundaries 플러그인, husky, lint-staged 패키지 추가 및 설정 블록 삽입
   - `.agent/skills/qms-orchestrator/scripts/verify-integration.js` [NEW] - 원격 Supabase API 메타데이터 교차 검증 센서 (JS 전용)
@@ -53,7 +53,7 @@ tags: antigravity, plan, history, qms
 
 ```mermaid
 gantt
-    title QMS v2 5단계 점진적 하네스 이식 일정 (R2)
+    title QMS v2 5단계 점진적 [[history/AG_plan_2026-05-27_QMS_v2_점진적_하네스_이식_기획안_R0|하네스]] 이식 일정 (R2)
     dateFormat  YYYY-MM-DD
     section 1단계
     AGENTS.md & CLAUDE.md 제정 (공수: 1일)  :active, p1, 2026-05-27, 1d
@@ -68,11 +68,11 @@ gantt
 ```
 
 ### 1단계: [지시 문서] `AGENTS.md` 인덱스 문서 및 `CLAUDE.md` 제정
-* **목적:** 정보의 이원화(SSOT 붕괴)를 완전히 막고 기존 `.agent/rules/` 체계와 하네스 룰을 유기적으로 융합합니다.
+* **목적:** 정보의 이원화(SSOT 붕괴)를 완전히 막고 기존 `.agent/rules/` 체계와 [[history/AG_plan_2026-05-27_QMS_v2_점진적_하네스_이식_기획안_R0|하네스]] 룰을 유기적으로 융합합니다.
 * **구현 사양:**
   - `AGENTS.md`는 새로운 규칙을 중복 나열하지 않고, 기존 `.agent/rules/` 파일들을 참조하는 **진입 인덱스(Index Document)**로 설계합니다.
   - 신규 행동 제약 사항은 `.agent/rules/04_harness_constraints.md`에 격리 수록합니다.
-  - **`CLAUDE.md` 신규 생성:** 새 세션 로딩 시 에이전트가 가장 먼저 트리거되도록 **하네스 포인터(트리거 규칙 및 R2 변경 이력)**를 정식 등록합니다.
+  - **`CLAUDE.md` 신규 생성:** 새 세션 로딩 시 에이전트가 가장 먼저 트리거되도록 **[[history/AG_plan_2026-05-27_QMS_v2_점진적_하네스_이식_기획안_R0|하네스]] 포인터(트리거 규칙 및 R2 변경 이력)**를 정식 등록합니다.
   - **사전 코드베이스 감사(Audit) 반영:** 현재 `src/lib/api.js` 내에 잔존하는 12개의 `console.log` 호출부를 단계적으로 소거하고 공식 Logger 모듈로 전환하는 리팩토링 예외 규정을 포함시킵니다.
 * **검증 기준:** `AGENTS.md` 및 `CLAUDE.md` 내 `@see` 링크 포인터들이 끊어짐 없이 연결되는지 마크다운 정합성 검사.
 
@@ -116,7 +116,7 @@ gantt
     1. **감지:** `verify-integration.js` 스크립트를 구동하여 필드 명칭 불일치 스캔.
     2. **기록:** 검사 결과를 `.agent\logs\integration-check.tsv` 파일에 append-only 이력으로 기록.
     3. **경보:** 불일치 감지 즉시 빌드 exit code `1`을 방출하며 콘솔에 오류 상세 위치(파일:라인) 표시.
-    4. **결재 에스컬레이션:** 에이전트의 자동 수정을 금지하고 즉시 차장님 수동 확인을 위한 DNAS Plan 단계로 보고 에스컬레이션.
+    4. **결재 에스컬레이션:** 에이전트의 자동 수정을 금지하고 즉시 차장님 수동 확인을 위한 [[history/2026-04-10_v0_23_0_[P12]_DNAS(개발자_노트_자동화_및_승인_시스템)_이식|DNAS]] Plan 단계로 보고 에스컬레이션.
 * **공수 산정 근거:** QMS v2의 24개 핵심 컴포넌트의 REST API 호출 구조를 일일이 파싱 대조해야 하므로, 스키마 수집 모듈과 RegEx 파서 작성 및 테스트에 총 5일의 공수를 현실적으로 배정합니다.
 * **검증 기준:** 의도적으로 불일치 코드(`src\components\test_mismatch.js`)를 심고 스크립트를 실행하여 exit code `1`이 성공적으로 터져 나오는지 검증.
 

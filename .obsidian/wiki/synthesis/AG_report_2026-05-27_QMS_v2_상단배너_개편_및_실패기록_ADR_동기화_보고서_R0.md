@@ -7,12 +7,12 @@ date: "2026-05-27"
 revision: "R0"
 author: "AI (Antigravity)"
 wiki_status: done
-tags: antigravity, report, history, qms
+tags: [antigravity, report, history, qms]
 ---
 
 # QMS v2 상단 배너 개편 및 실패기록/전역 룰셋 동기화 종합 보고서 (R0)
 
-본 종합 보고서는 신우밸브주식회사 품질보증부 전민재 차장님의 준엄하신 지침에 입각하여, 로그인 상단 배너의 완벽한 리디자인, 하네스 정식 실패 기록서 적재, 그리고 대화창 장문 보고 제한 전역 규칙 수립에 따른 전체 내역을 총망라하여 보고하는 기술 문서입니다.
+본 종합 보고서는 신우밸브주식회사 품질보증부 전민재 차장님의 준엄하신 지침에 입각하여, 로그인 상단 배너의 완벽한 리디자인, [[history/AG_plan_2026-05-27_QMS_v2_점진적_하네스_이식_기획안_R0|하네스]] 정식 실패 기록서 적재, 그리고 대화창 장문 보고 제한 전역 규칙 수립에 따른 전체 내역을 총망라하여 보고하는 기술 문서입니다.
 
 ---
 
@@ -33,19 +33,19 @@ tags: antigravity, report, history, qms
 
 ---
 
-## 3. 🛡️ 하네스 작동: Failure-002 정식 실패 기록서 적재
+## 3. 🛡️ [[history/AG_plan_2026-05-27_QMS_v2_점진적_하네스_이식_기획안_R0|하네스]] 작동: Failure-002 정식 실패 기록서 적재
 * **파일명:** `docs/failures/002-agent-context-drift-and-revision-loss.md`
 * **물리 보관 경로:** [002-agent-context-drift-and-revision-loss.md](file:///c:/Users/mjjeon/Desktop/QMS%20프로젝트/shinwoo-valve-qms/docs/failures/002-agent-context-drift-and-revision-loss.md) (적재 완료)
 * **주요 반성 골자:** 
   - 빌드 디버깅 도중 임시 바인딩한 에셋의 최종 복원 누락 방치.
   - 마스터 TASK 및 PLAN을 덮어써서 기존 전체 디자인 개편 마스터 역사를 소실한 편의주의적 아티팩트 관리 방심.
-  - 이미 완료된 하네스 이식 R5 버전과 현재 디자인 R0 TASK를 짬뽕하여 짬뽕 마스터를 급조한 컨텍스트 불안(Drift) 분석.
-* **영구 대책:** 신규 세부 요건은 물리적 파일명 완전 분할(`*_세부추가_*_R0.md`) 필수화 및 Playwright 실물 렌더링 HTML 스캔 교차 검사 하네스 가동.
+  - 이미 완료된 [[history/AG_plan_2026-05-27_QMS_v2_점진적_하네스_이식_기획안_R0|하네스]] 이식 R5 버전과 현재 디자인 R0 TASK를 짬뽕하여 짬뽕 마스터를 급조한 컨텍스트 불안(Drift) 분석.
+* **영구 대책:** 신규 세부 요건은 물리적 파일명 완전 분할(`*_세부추가_*_R0.md`) 필수화 및 Playwright 실물 렌더링 HTML 스캔 교차 검사 [[history/AG_plan_2026-05-27_QMS_v2_점진적_하네스_이식_기획안_R0|하네스]] 가동.
 
 ---
 
 ## 4. 🔒 신규 전역 룰셋 수립 동기화 완료
-* **수정 파일:** 전역 `GEMINI.md` [조항 4] 신설 및 로컬 `.agent/rules/02_dnas_process.md` [P13] 신설 완료.
+* **수정 파일:** 전역 `[[GEMINI|GEMINI]].md` [조항 4] 신설 및 로컬 `.agent/rules/02_dnas_process.md` [P13] 신설 완료.
 * **핵심 골자:**
   1. 에이전트는 대화창에 장황한 설명이나 감정적 텍스트 낭비를 원천 금지하며, 핵심만 가독성 있게 요약하여 초간결 보고한다.
   2. 텍스트 총량이 **2000자 이상**이 될 때는 대화창 직접 노출을 완전 차단하고, `안티그래비티\report\` 디렉토리에 마크다운 보고서로 물리 파일로 생성하여 영구 보존한다.

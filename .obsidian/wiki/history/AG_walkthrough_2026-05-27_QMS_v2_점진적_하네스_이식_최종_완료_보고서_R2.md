@@ -7,7 +7,7 @@ date: "2026-05-27"
 revision: "R2"
 author: "AI (Antigravity)"
 wiki_status: done
-tags: antigravity, walkthrough, history, qms
+tags: [antigravity, walkthrough, history, qms]
 ---
 
 # QMS v2 로그인 및 대시보드 전면 디자인 개편 최종 완료 보고서 (walkthrough.md - R2)

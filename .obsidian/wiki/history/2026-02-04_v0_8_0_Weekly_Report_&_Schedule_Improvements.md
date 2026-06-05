@@ -10,7 +10,7 @@ source_id: "c438e37f-cf22-4f10-9207-8d2d2a32a23b"
 created_at: "2026-03-23"
 updated_at: "2026-04-07"
 wiki_status: done
-tags: dev-notes, history, qms, task
+tags: [dev-notes, history, qms, task]
 ---
 
 # Weekly Report & Schedule Improvements

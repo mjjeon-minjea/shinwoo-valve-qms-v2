@@ -7,7 +7,7 @@ date: "2026-05-27"
 revision: "R0"
 author: "AI (Antigravity)"
 wiki_status: done
-tags: antigravity, task, history, qms
+tags: [antigravity, task, history, qms]
 ---
 
 # QMS v2 대시보드 및 로그인 전면 디자인 개편 마스터 작업 명세서 (R0)
@@ -54,4 +54,4 @@ tags: antigravity, task, history, qms
 
 ### 🔴 [Phase 5] 통합 무결성 검증 및 최종 릴리즈 ➔ (대기)
 * [ ] 전체 24개 UI 컴포넌트 boundaries 역류 의존성 0 에러 총점검
-* [ ] 최종 릴리즈 개발자 노트 동기화 및 Walkthrough 영구 저장
+* [ ] 최종 릴리즈 [[history/2026-04-10_v0_23_0_[P12]_DNAS(개발자_노트_자동화_및_승인_시스템)_이식|개발자 노트]] 동기화 및 Walkthrough 영구 저장
