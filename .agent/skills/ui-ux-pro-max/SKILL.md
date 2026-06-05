@@ -1,659 +1,175 @@
 ---
 name: ui-ux-pro-max
-description: "UI/UX design intelligence for web and mobile. Includes 50+ styles, 161 color palettes, 57 font pairings, 161 product types, 99 UX guidelines, and 25 chart types across 10 stacks (React, Next.js, Vue, Svelte, SwiftUI, React Native, Flutter, Tailwind, shadcn/ui, and HTML/CSS). Actions: plan, build, create, design, implement, review, fix, improve, optimize, enhance, refactor, and check UI/UX code. Projects: website, landing page, dashboard, admin panel, e-commerce, SaaS, portfolio, blog, and mobile app. Elements: button, modal, navbar, sidebar, card, table, form, and chart. Styles: glassmorphism, claymorphism, minimalism, brutalism, neumorphism, bento grid, dark mode, responsive, skeuomorphism, and flat design. Topics: color systems, accessibility, animation, layout, typography, font pairing, spacing, interaction states, shadow, and gradient. Integrations: shadcn/ui MCP for component search and examples."
+description: 웹 및 모바일을 위한 UI/UX 디자인 인텔리전스 가이드라인입니다. 10개 스택(React, Next.js, Vue, Svelte, SwiftUI, React Native, Flutter, Tailwind, shadcn/ui, HTML/CSS)에 걸쳐 50개 이상의 스타일, 161개의 색상 팔레트, 57개의 폰트 조합, 161개의 제품 유형별 설계 규칙, 99개의 UX 가이드라인 및 25개의 차트 유형을 수록하고 있습니다. UI 기획, 구현, 검토, 최적화 및 접근성 검증 단계에서 이 스킬을 호출합니다.
 ---
 
-# UI/UX Pro Max - Design Intelligence
+# UI/UX 프로 맥스 - 디자인 가이드라인 (UI/UX Pro Max)
 
-Comprehensive design guide for web and mobile applications. Contains 50+ styles, 161 color palettes, 57 font pairings, 161 product types with reasoning rules, 99 UX guidelines, and 25 chart types across 10 technology stacks. Searchable database with priority-based recommendations.
+웹 및 모바일 애플리케이션의 종합 디자인 인텔리전스 가이드입니다. 10대 기술 스택에 걸쳐 50개 이상의 스타일, 161개의 색상 팔레트, 57개의 폰트 쌍, 제품군별 161개의 의사결정 규칙, 99개의 UX 가이드라인, 25개의 데이터 시각화 차트 유형을 포괄합니다.
 
-## When to Apply
+## 적용 시점 (When to Apply)
 
-This Skill should be used when the task involves **UI structure, visual design decisions, interaction patterns, or user experience quality control**.
+**UI 구조 설계, 시각 디자인 의사결정, 상호작용 패턴 개발, 또는 사용자 경험(UX) 품질 검수**가 포함된 모든 작업 시 이 스킬을 적용합니다.
 
-### Must Use
+### 필수 적용 상황 (Must Use)
+- 새로운 페이지나 화면(랜딩 페이지, 대시보드, 관리자 패널, SaaS 인터페이스, 모바일 앱 등)을 설계할 때
+- UI 컴포넌트(버튼, 모달, 폼, 테이블, 차트, 네비게이션 바 등)를 생성하거나 리팩토링할 때
+- 색상 체계, 타이포그래피 시스템, 간격 규칙(spacing scale), 레이아웃 그리드를 결정할 때
+- 사용자 경험, 웹 접근성, 시각적 일관성 측면에서 UI 코드를 검증 및 리뷰할 때
+- 네비게이션 구조, 화면 전환 애니메이션, 반응형 레이아웃을 구현할 때
+- 전반적인 디자인 테마와 정보 계층, 브랜드 아이덴티티를 조율할 때
+- 사용자가 느끼는 인터페이스의 시각적 완성도, 명확성, 사용성을 개선하고자 할 때
 
-This Skill must be invoked in the following situations:
+### 권장 상황 (Recommended)
+- UI가 다소 어설프거나 프로페셔널해 보이지 않는데 원인을 정확히 모를 때
+- 사용성 피드백이나 휴리스틱 평가 결과를 반영할 때
+- 런칭 전 최종 UI/UX 품질 최적화를 수행할 때
+- 웹, iOS, Android 간 크로스 플랫폼 디자인 일관성을 확보할 때
+- 공통 디자인 시스템 또는 재사용 컴포넌트 라이브러리를 구축할 때
 
-- Designing new pages (Landing Page, Dashboard, Admin, SaaS, Mobile App)
-- Creating or refactoring UI components (buttons, modals, forms, tables, charts, etc.)
-- Choosing color schemes, typography systems, spacing standards, or layout systems
-- Reviewing UI code for user experience, accessibility, or visual consistency
-- Implementing navigation structures, animations, or responsive behavior
-- Making product-level design decisions (style, information hierarchy, brand expression)
-- Improving perceived quality, clarity, or usability of interfaces
+### 적용 제외 상황 (Skip)
+- 순수 백엔드 비즈니스 로직만 개발할 때
+- API 스키마나 데이터베이스 테이블 설계만 수행할 때
+- 화면 인터페이스와 무관한 성능 튜닝 및 인프라/DevOps 작업을 수행할 때
+- 시각적 변화가 없는 스크립트 작성 및 자동화 태스크를 수행할 때
 
-### Recommended
+**판단 기준**: 해당 작업이 기능의 **시각적 형태(look), 체감 감각(feel), 움직임(move), 또는 상호작용 방식(interacted with)**을 변화시킨다면 이 스킬을 반드시 적용해야 합니다.
 
-This Skill is recommended in the following situations:
+## 우선순위별 규칙 카테고리 (Rule Categories by Priority)
 
-- UI looks "not professional enough" but the reason is unclear
-- Receiving feedback on usability or experience
-- Pre-launch UI quality optimization
-- Aligning cross-platform design (Web / iOS / Android)
-- Building design systems or reusable component libraries
+디자인 설계 및 검토 시 아래의 우선순위(1→10)에 따라 핵심 항목을 순차적으로 확인하십시오.
 
-### Skip
+| 우선순위 | 카테고리 | 영향도 | 핵심 점검 사항 (필수) | 방지해야 할 안티패턴 (금지) |
+|----------|----------|--------|------------------------|------------------------|
+| 1 | 접근성 (Accessibility) | 심각 (CRITICAL) | 명도비 4.5:1 준수, 대체 텍스트(alt), 키보드 탐색, Aria 레이블 | 포커스 링(focus ring) 제거, 레이블 없는 아이콘 전용 버튼 사용 |
+| 2 | 터치 및 상호작용 | 심각 (CRITICAL) | 최소 터치 영역 44×44px, 간격 8px 이상, 인터랙션 로딩 피드백 | 호버(hover) 상호작용에만 의존, 지연 없는(0ms) 갑작스러운 상태 변화 |
+| 3 | 로딩 성능 | 높음 (HIGH) | WebP/AVIF 사용, 이미지 지연 로딩, 영역 확보로 레이아웃 시프트 방지(CLS < 0.1) | 레이아웃 스래싱(Layout Thrashing), 갑작스러운 콘텐츠 튀어남 현상 |
+| 4 | 스타일 일관성 | 높음 (HIGH) | 제품 성격에 맞는 테마 선택, 일관된 스타일 톤앤매너, 벡터 SVG 아이콘 사용 | 플랫과 입체를 무작위로 혼용, 텍스트 아이콘 대신 이모지 남용 |
+| 5 | 레이아웃 및 반응형 | 높음 (HIGH) | 모바일 퍼스트 중단점 설정, 뷰포트 메타 태그 지정, 가로 스크롤 최소화 | 불필요한 가로 스크롤 발생, 고정 px 컨테이너 남용, 사용자 확대 차단 |
+| 6 | 타이포그래피 및 색상 | 중간 (MEDIUM) | 본문 최소 16px, 줄간격 1.5, 시맨틱 색상 토큰 활용 | 본문 12px 미만 적용, 회색 배경에 회색 글씨 사용, 하드코딩된 Hex 값 분산 |
+| 7 | 애니메이션 | 중간 (MEDIUM) | 실행 시간 150–300ms, 의미 있는 모션 적용, 공간적 연속성 유지 | 장식용 남용, width/height 직접 변경(Reflow 유발), 동작 줄이기 미지원 |
+| 8 | 폼 및 입력 피드백 | 중간 (MEDIUM) | 입력창 근처 에러 메시지 표시, 안내 문구 제공, 단계적 정보 공개 | 플레이스홀더만으로 레이아웃 구성, 최상단에만 에러 요약, 과도한 정보 한 번에 요구 |
+| 9 | 네비게이션 구조 | 높음 (HIGH) | 직관적인 뒤로가기 흐름, 하단 바 메뉴 5개 이하 제한, 딥 링크 지원 | 복잡하고 깊은 메뉴 계층, 뒤로가기 시 상태 소실, 특정 페이지 링크 불가능 |
+| 10 | 데이터 시각화 | 낮음 (LOW) | 범례 및 툴팁 제공, 접근성 고려한 차트 색상 구성 | 색상 차이만으로 정보를 구분하는 설계 |
 
-This Skill is not needed in the following situations:
+## 핵심 요약 지침 (Quick Reference)
 
-- Pure backend logic development
-- Only involving API or database design
-- Performance optimization unrelated to the interface
-- Infrastructure or DevOps work
-- Non-visual scripts or automation tasks
+### 1. 웹 접근성 (Accessibility - CRITICAL)
+- **명도비 보장**: 일반 텍스트는 최소 4.5:1(큰 텍스트는 3:1)의 명도 대비를 유지합니다.
+- **포커스 표시**: 키보드 탐색 시 포커스 링이 선명하게 나타나야 합니다 (최소 2–4px 두께).
+- **대체 텍스트**: 의미 있는 이미지와 그래픽 요소에는 설명이 포함된 대체 텍스트(alt text)를 제공합니다.
+- **Aria 레이블**: 아이콘으로만 이루어진 버튼 등 텍스트가 없는 요소에는 `aria-label`(네이티브 앱의 경우 `accessibilityLabel`)을 명시합니다.
+- **키보드 접근성**: Tab 키 이동 순서가 화면의 시각적 흐름과 일치해야 하며 모든 인터랙션을 키보드로 제어할 수 있어야 합니다.
+- **헤딩 구조**: `<h1>`부터 `<h6>`까지의 계층을 건너뛰지 않고 순차적으로 사용합니다.
+- **동작 줄이기 지원**: OS의 애니메이션 감축 설정(`prefers-reduced-motion`)을 감지하여 모션을 간소화하거나 비활성화합니다.
 
-**Decision criteria**: If the task will change how a feature **looks, feels, moves, or is interacted with**, this Skill should be used.
+### 2. 터치 및 상호작용 (Touch & Interaction - CRITICAL)
+- **터치 영역 최소 크기**: 모바일 터치 타겟은 최소 44×44pt (Apple) / 48×48dp (Material) 이상을 확보합니다.
+- **터치 타겟 간 간격**: 터치 요소 간 간격은 최소 8px 이상을 유지하여 오클릭을 방지합니다.
+- **비동기 상태 표시**: 네트워크 요청이나 연산 중일 때는 버튼을 비활성화하고 스피너나 프로그레스 상태를 표시합니다.
+- **동작 취소 경로 제공**: 모든 모달, 시트, 다단계 워크플로우에는 명확한 취소 또는 닫기 버튼을 눈에 띄게 배치합니다.
+- **반응성**: 사용자가 터치했을 때 100ms 이내에 즉각적인 시각 피드백(눌림 효과, Ripple 효과 등)을 제공합니다.
+- **안전 영역 준수**: 핵심 조작 버튼이 노치(Notch), status bar, 홈 스크롤 바 등의 영역에 겹치지 않게 패딩을 둡니다.
 
-## Rule Categories by Priority
+### 3. 로딩 성능 및 레이아웃 시프트 방지 (Performance - HIGH)
+- **이미지 최적화**: 차세대 이미지 포맷(WebP, AVIF)을 사용하고, 중요도가 낮은 리소스는 지연 로딩(`loading="lazy"`)을 적용합니다.
+- **누적 레이아웃 이동(CLS) 방지**: 이미지나 비동기 데이터 영역의 크기(width/height 또는 aspect-ratio)를 미리 지정하여 렌더링 중 레이아웃이 튀는 현상을 막습니다.
+- **폰트 최적화**: 폰트 로딩 시 텍스트가 안 보이지 않도록 `font-display: swap`을 설정합니다.
+- **데이터 가상화**: 리스트나 테이블에 50개 이상의 다량의 아이템을 렌더링할 때는 가상 스크롤(Virtual List)을 적용합니다.
+- **스켈레톤 화면 적용**: 1초 이상 걸리는 비동기 로딩 영역에는 단순 회전 아이콘보다 스켈레톤(Skeleton Screen) 또는 쉬머(Shimmer) 효과를 우선 적용합니다.
 
-*For human/AI reference: follow priority 1→10 to decide which rule category to focus on first; use `--domain <Domain>` to query details when needed. Scripts do not read this table.*
+### 4. 스타일 및 그래픽 (Style Selection - HIGH)
+- **제품군별 스타일 융합**: 금융(fintech)은 정밀하고 신뢰감 주는 미니멀리즘, 뷰티/헬스는 유기적이고 따뜻한 톤 등 도메인에 부합하는 테마를 설계합니다.
+- **이모지 아이콘 배제**: 시스템 네비게이션이나 컨트롤 도구에 이모지를 아이콘 대용으로 쓰지 말고, 선 두께와 스타일이 통일된 일관된 벡터 SVG 아이콘 팩(예: Lucide, Heroicons)을 사용합니다.
+- **시각적 일관성**: 그림자(shadow), 모서리 곡률(border-radius), 블러(blur) 효과의 단계를 시스템화하여 무분별한 개별 hex 값이나 px 값이 코드에 산재하지 않도록 CSS 변수화합니다.
+- **다크 모드 배제되지 않은 디자인**: 다크 모드 구현 시 단순히 흰색과 검은색을 반전시키기보다, 눈의 피로가 적고 명비 대비를 만족하는 명도 단계를 별도로 설계합니다.
 
-| Priority | Category | Impact | Domain | Key Checks (Must Have) | Anti-Patterns (Avoid) |
-|----------|----------|--------|--------|------------------------|------------------------|
-| 1 | Accessibility | CRITICAL | `ux` | Contrast 4.5:1, Alt text, Keyboard nav, Aria-labels | Removing focus rings, Icon-only buttons without labels |
-| 2 | Touch & Interaction | CRITICAL | `ux` | Min size 44×44px, 8px+ spacing, Loading feedback | Reliance on hover only, Instant state changes (0ms) |
-| 3 | Performance | HIGH | `ux` | WebP/AVIF, Lazy loading, Reserve space (CLS &lt; 0.1) | Layout thrashing, Cumulative Layout Shift |
-| 4 | Style Selection | HIGH | `style`, `product` | Match product type, Consistency, SVG icons (no emoji) | Mixing flat & skeuomorphic randomly, Emoji as icons |
-| 5 | Layout & Responsive | HIGH | `ux` | Mobile-first breakpoints, Viewport meta, No horizontal scroll | Horizontal scroll, Fixed px container widths, Disable zoom |
-| 6 | Typography & Color | MEDIUM | `typography`, `color` | Base 16px, Line-height 1.5, Semantic color tokens | Text &lt; 12px body, Gray-on-gray, Raw hex in components |
-| 7 | Animation | MEDIUM | `ux` | Duration 150–300ms, Motion conveys meaning, Spatial continuity | Decorative-only animation, Animating width/height, No reduced-motion |
-| 8 | Forms & Feedback | MEDIUM | `ux` | Visible labels, Error near field, Helper text, Progressive disclosure | Placeholder-only label, Errors only at top, Overwhelm upfront |
-| 9 | Navigation Patterns | HIGH | `ux` | Predictable back, Bottom nav ≤5, Deep linking | Overloaded nav, Broken back behavior, No deep links |
-| 10 | Charts & Data | LOW | `chart` | Legends, Tooltips, Accessible colors | Relying on color alone to convey meaning |
+### 5. 레이아웃 및 반응형 (Layout & Responsive - HIGH)
+- **모바일 퍼스트**: 모바일을 기본으로 설계하고, 태블릿과 데스크톱으로 점진적으로 레이아웃을 확장 및 변형합니다.
+- **가로 스크롤 방지**: 모바일 해상도에서 화면 밖으로 콘텐츠가 삐져나가 가로 스크롤이 생기지 않도록 가변 레이아웃(Flex, Grid)을 설계합니다.
+- **가독성 높은 줄 길이**: 본문 텍스트는 한 줄당 영문 기준 45~75자(한글 30~50자) 내외로 유지되도록 텍스트 컨테이너의 최대 너비(`max-width`)를 제한합니다.
+- **체계적인 Spacing**: 간격과 여백은 4px 또는 8px 배수(Incremental Spacing Scale)를 적용하여 정돈된 비례감을 부여합니다.
 
-## Quick Reference
+### 6. 타이포그래피 및 본문 글자 크기 (Typography - MEDIUM)
+- **본문 크기 기본값**: 모바일 환경에서 가독성을 확보하고 폼 입력창 포커스 시 브라우저가 강제 확대(Auto-zoom)하는 것을 방지하기 위해 본문 텍스트 크기는 최소 16px 이상을 적용합니다.
+- **적절한 행간 설정**: 긴 본문 텍스트의 가독성을 위해 줄간격(`line-height`)은 글자 크기의 1.5배에서 1.75배 사이로 설정합니다.
+- **폰트 페어링**: 제목용 폰트(Bold, 개성 있음)와 본문용 폰트(Sans-serif, 가독성 중심)의 비례와 스타일 조화를 고려합니다.
+- **표 형식 숫자 표기**: 가격, 타이머, 데이터 표의 숫자 열 등은 자폭이 일정하게 유지되는 `font-variant-numeric: tabular-nums` 속성을 적용하여 정렬선이 무너지는 현상을 방지합니다.
 
-### 1. Accessibility (CRITICAL)
+### 7. 애니메이션 및 모션 (Animation - MEDIUM)
+- **동작 시간 준수**: 단순 미세 상호작용은 150–250ms, 큰 화면 전환은 최대 350–400ms 이내로 처리하며, 500ms 이상의 느리고 지루한 모션은 지양합니다.
+- **성능 고려**: 애니메이션 적용 시 Reflow를 유발하는 `width`, `height`, `top`, `left` 대신 GPU 가속을 받는 `transform`과 `opacity` 속성을 주로 사용합니다.
+- **의미 있는 움직임**: 모션은 단순 장식이 아니라, 정보의 전후 인과관계나 화면의 공간적 이동 흐름을 독자에게 설명하는 도구로 설계합니다 (예: 목록 아이템 클릭 시 상세 카드가 스케일 업되며 확장되는 트랜지션).
+- **자연스러운 가속도**: 리니어(linear) 움직임을 피하고, 대상이 나타날 때는 부드럽게 감속하는 `ease-out`, 사라질 때는 빠르게 가속하는 `ease-in` 혹은 네이티브 느낌의 탄성 물리(spring physics) 곡선을 사용합니다.
 
-- `color-contrast` - Minimum 4.5:1 ratio for normal text (large text 3:1); Material Design
-- `focus-states` - Visible focus rings on interactive elements (2–4px; Apple HIG, MD)
-- `alt-text` - Descriptive alt text for meaningful images
-- `aria-labels` - aria-label for icon-only buttons; accessibilityLabel in native (Apple HIG)
-- `keyboard-nav` - Tab order matches visual order; full keyboard support (Apple HIG)
-- `form-labels` - Use label with for attribute
-- `skip-links` - Skip to main content for keyboard users
-- `heading-hierarchy` - Sequential h1→h6, no level skip
-- `color-not-only` - Don't convey info by color alone (add icon/text)
-- `dynamic-type` - Support system text scaling; avoid truncation as text grows (Apple Dynamic Type, MD)
-- `reduced-motion` - Respect prefers-reduced-motion; reduce/disable animations when requested (Apple Reduced Motion API, MD)
-- `voiceover-sr` - Meaningful accessibilityLabel/accessibilityHint; logical reading order for VoiceOver/screen readers (Apple HIG, MD)
-- `escape-routes` - Provide cancel/back in modals and multi-step flows (Apple HIG)
-- `keyboard-shortcuts` - Preserve system and a11y shortcuts; offer keyboard alternatives for drag-and-drop (Apple HIG)
+### 8. 폼 및 피드백 (Forms & Feedback - MEDIUM)
+- **명확한 레이블 제공**: 플레이스홀더(placeholder)에만 의존하지 말고, 입력창 위에 상시 노출되는 독립된 레이블 태그를 제공합니다.
+- **직관적 에러 표시**: 오류가 발생한 경우 폼 맨 위나 모달 팝업으로 퉁치지 말고, 에러가 발생한 해당 입력 필드 바로 아래에 오류 원인과 조치 방법이 적힌 붉은색 메시지를 노출합니다.
+- **모바일 키보드 최적화**: 이메일(`type="email"`), 전화번호(`type="tel"`), 숫자(`type="number"`) 등 입력 용도에 맞는 적합한 모바일 키보드 레이아웃을 트리거하도록 시맨틱 마크업을 준수합니다.
+- **중요 액션 더블체크**: 삭제, 탈퇴 등 되돌리기 어렵거나 파괴적인 액션의 경우 버튼을 붉은색 계열로 강조하고, 실행 전에 명시적으로 되묻는 확인 대화상자(Confirmation Dialog)를 띄웁니다.
 
-### 2. Touch & Interaction (CRITICAL)
-
-- `touch-target-size` - Min 44×44pt (Apple) / 48×48dp (Material); extend hit area beyond visual bounds if needed
-- `touch-spacing` - Minimum 8px/8dp gap between touch targets (Apple HIG, MD)
-- `hover-vs-tap` - Use click/tap for primary interactions; don't rely on hover alone
-- `loading-buttons` - Disable button during async operations; show spinner or progress
-- `error-feedback` - Clear error messages near problem
-- `cursor-pointer` - Add cursor-pointer to clickable elements (Web)
-- `gesture-conflicts` - Avoid horizontal swipe on main content; prefer vertical scroll
-- `tap-delay` - Use touch-action: manipulation to reduce 300ms delay (Web)
-- `standard-gestures` - Use platform standard gestures consistently; don't redefine (e.g. swipe-back, pinch-zoom) (Apple HIG)
-- `system-gestures` - Don't block system gestures (Control Center, back swipe, etc.) (Apple HIG)
-- `press-feedback` - Visual feedback on press (ripple/highlight; MD state layers)
-- `haptic-feedback` - Use haptic for confirmations and important actions; avoid overuse (Apple HIG)
-- `gesture-alternative` - Don't rely on gesture-only interactions; always provide visible controls for critical actions
-- `safe-area-awareness` - Keep primary touch targets away from notch, Dynamic Island, gesture bar and screen edges
-- `no-precision-required` - Avoid requiring pixel-perfect taps on small icons or thin edges
-- `swipe-clarity` - Swipe actions must show clear affordance or hint (chevron, label, tutorial)
-- `drag-threshold` - Use a movement threshold before starting drag to avoid accidental drags
-
-### 3. Performance (HIGH)
-
-- `image-optimization` - Use WebP/AVIF, responsive images (srcset/sizes), lazy load non-critical assets
-- `image-dimension` - Declare width/height or use aspect-ratio to prevent layout shift (Core Web Vitals: CLS)
-- `font-loading` - Use font-display: swap/optional to avoid invisible text (FOIT); reserve space to reduce layout shift (MD)
-- `font-preload` - Preload only critical fonts; avoid overusing preload on every variant
-- `critical-css` - Prioritize above-the-fold CSS (inline critical CSS or early-loaded stylesheet)
-- `lazy-loading` - Lazy load non-hero components via dynamic import / route-level splitting
-- `bundle-splitting` - Split code by route/feature (React Suspense / Next.js dynamic) to reduce initial load and TTI
-- `third-party-scripts` - Load third-party scripts async/defer; audit and remove unnecessary ones (MD)
-- `reduce-reflows` - Avoid frequent layout reads/writes; batch DOM reads then writes
-- `content-jumping` - Reserve space for async content to avoid layout jumps (Core Web Vitals: CLS)
-- `lazy-load-below-fold` - Use loading="lazy" for below-the-fold images and heavy media
-- `virtualize-lists` - Virtualize lists with 50+ items to improve memory efficiency and scroll performance
-- `main-thread-budget` - Keep per-frame work under ~16ms for 60fps; move heavy tasks off main thread (HIG, MD)
-- `progressive-loading` - Use skeleton screens / shimmer instead of long blocking spinners for >1s operations (Apple HIG)
-- `input-latency` - Keep input latency under ~100ms for taps/scrolls (Material responsiveness standard)
-- `tap-feedback-speed` - Provide visual feedback within 100ms of tap (Apple HIG)
-- `debounce-throttle` - Use debounce/throttle for high-frequency events (scroll, resize, input)
-- `offline-support` - Provide offline state messaging and basic fallback (PWA / mobile)
-- `network-fallback` - Offer degraded modes for slow networks (lower-res images, fewer animations)
-
-### 4. Style Selection (HIGH)
-
-- `style-match` - Match style to product type (use `--design-system` for recommendations)
-- `consistency` - Use same style across all pages
-- `no-emoji-icons` - Use SVG icons (Heroicons, Lucide), not emojis
-- `color-palette-from-product` - Choose palette from product/industry (search `--domain color`)
-- `effects-match-style` - Shadows, blur, radius aligned with chosen style (glass / flat / clay etc.)
-- `platform-adaptive` - Respect platform idioms (iOS HIG vs Material): navigation, controls, typography, motion
-- `state-clarity` - Make hover/pressed/disabled states visually distinct while staying on-style (Material state layers)
-- `elevation-consistent` - Use a consistent elevation/shadow scale for cards, sheets, modals; avoid random shadow values
-- `dark-mode-pairing` - Design light/dark variants together to keep brand, contrast, and style consistent
-- `icon-style-consistent` - Use one icon set/visual language (stroke width, corner radius) across the product
-- `system-controls` - Prefer native/system controls over fully custom ones; only customize when branding requires it (Apple HIG)
-- `blur-purpose` - Use blur to indicate background dismissal (modals, sheets), not as decoration (Apple HIG)
-- `primary-action` - Each screen should have only one primary CTA; secondary actions visually subordinate (Apple HIG)
-
-### 5. Layout & Responsive (HIGH)
-
-- `viewport-meta` - width=device-width initial-scale=1 (never disable zoom)
-- `mobile-first` - Design mobile-first, then scale up to tablet and desktop
-- `breakpoint-consistency` - Use systematic breakpoints (e.g. 375 / 768 / 1024 / 1440)
-- `readable-font-size` - Minimum 16px body text on mobile (avoids iOS auto-zoom)
-- `line-length-control` - Mobile 35–60 chars per line; desktop 60–75 chars
-- `horizontal-scroll` - No horizontal scroll on mobile; ensure content fits viewport width
-- `spacing-scale` - Use 4pt/8dp incremental spacing system (Material Design)
-- `touch-density` - Keep component spacing comfortable for touch: not cramped, not causing mis-taps
-- `container-width` - Consistent max-width on desktop (max-w-6xl / 7xl)
-- `z-index-management` - Define layered z-index scale (e.g. 0 / 10 / 20 / 40 / 100 / 1000)
-- `fixed-element-offset` - Fixed navbar/bottom bar must reserve safe padding for underlying content
-- `scroll-behavior` - Avoid nested scroll regions that interfere with the main scroll experience
-- `viewport-units` - Prefer min-h-dvh over 100vh on mobile
-- `orientation-support` - Keep layout readable and operable in landscape mode
-- `content-priority` - Show core content first on mobile; fold or hide secondary content
-- `visual-hierarchy` - Establish hierarchy via size, spacing, contrast — not color alone
-
-### 6. Typography & Color (MEDIUM)
-
-- `line-height` - Use 1.5-1.75 for body text
-- `line-length` - Limit to 65-75 characters per line
-- `font-pairing` - Match heading/body font personalities
-- `font-scale` - Consistent type scale (e.g. 12 14 16 18 24 32)
-- `contrast-readability` - Darker text on light backgrounds (e.g. slate-900 on white)
-- `text-styles-system` - Use platform type system: iOS 11 Dynamic Type styles / Material 5 type roles (display, headline, title, body, label) (HIG, MD)
-- `weight-hierarchy` - Use font-weight to reinforce hierarchy: Bold headings (600–700), Regular body (400), Medium labels (500) (MD)
-- `color-semantic` - Define semantic color tokens (primary, secondary, error, surface, on-surface) not raw hex in components (Material color system)
-- `color-dark-mode` - Dark mode uses desaturated / lighter tonal variants, not inverted colors; test contrast separately (HIG, MD)
-- `color-accessible-pairs` - Foreground/background pairs must meet 4.5:1 (AA) or 7:1 (AAA); use tools to verify (WCAG, MD)
-- `color-not-decorative-only` - Functional color (error red, success green) must include icon/text; avoid color-only meaning (HIG, MD)
-- `truncation-strategy` - Prefer wrapping over truncation; when truncating use ellipsis and provide full text via tooltip/expand (Apple HIG)
-- `letter-spacing` - Respect default letter-spacing per platform; avoid tight tracking on body text (HIG, MD)
-- `number-tabular` - Use tabular/monospaced figures for data columns, prices, and timers to prevent layout shift
-- `whitespace-balance` - Use whitespace intentionally to group related items and separate sections; avoid visual clutter (Apple HIG)
-
-### 7. Animation (MEDIUM)
-
-- `duration-timing` - Use 150–300ms for micro-interactions; complex transitions ≤400ms; avoid >500ms (MD)
-- `transform-performance` - Use transform/opacity only; avoid animating width/height/top/left
-- `loading-states` - Show skeleton or progress indicator when loading exceeds 300ms
-- `excessive-motion` - Animate 1-2 key elements per view max
-- `easing` - Use ease-out for entering, ease-in for exiting; avoid linear for UI transitions
-- `motion-meaning` - Every animation must express a cause-effect relationship, not just be decorative (Apple HIG)
-- `state-transition` - State changes (hover / active / expanded / collapsed / modal) should animate smoothly, not snap
-- `continuity` - Page/screen transitions should maintain spatial continuity (shared element, directional slide) (Apple HIG)
-- `parallax-subtle` - Use parallax sparingly; must respect reduced-motion and not cause disorientation (Apple HIG)
-- `spring-physics` - Prefer spring/physics-based curves over linear or cubic-bezier for natural feel (Apple HIG fluid animations)
-- `exit-faster-than-enter` - Exit animations shorter than enter (~60–70% of enter duration) to feel responsive (MD motion)
-- `stagger-sequence` - Stagger list/grid item entrance by 30–50ms per item; avoid all-at-once or too-slow reveals (MD)
-- `shared-element-transition` - Use shared element / hero transitions for visual continuity between screens (MD, HIG)
-- `interruptible` - Animations must be interruptible; user tap/gesture cancels in-progress animation immediately (Apple HIG)
-- `no-blocking-animation` - Never block user input during an animation; UI must stay interactive (Apple HIG)
-- `fade-crossfade` - Use crossfade for content replacement within the same container (MD)
-- `scale-feedback` - Subtle scale (0.95–1.05) on press for tappable cards/buttons; restore on release (HIG, MD)
-- `gesture-feedback` - Drag, swipe, and pinch must provide real-time visual response tracking the finger (MD Motion)
-- `hierarchy-motion` - Use translate/scale direction to express hierarchy: enter from below = deeper, exit upward = back (MD)
-- `motion-consistency` - Unify duration/easing tokens globally; all animations share the same rhythm and feel
-- `opacity-threshold` - Fading elements should not linger below opacity 0.2; either fade fully or remain visible
-- `modal-motion` - Modals/sheets should animate from their trigger source (scale+fade or slide-in) for spatial context (HIG, MD)
-- `navigation-direction` - Forward navigation animates left/up; backward animates right/down — keep direction logically consistent (HIG)
-- `layout-shift-avoid` - Animations must not cause layout reflow or CLS; use transform for position changes
-
-### 8. Forms & Feedback (MEDIUM)
-
-- `input-labels` - Visible label per input (not placeholder-only)
-- `error-placement` - Show error below the related field
-- `submit-feedback` - Loading then success/error state on submit
-- `required-indicators` - Mark required fields (e.g. asterisk)
-- `empty-states` - Helpful message and action when no content
-- `toast-dismiss` - Auto-dismiss toasts in 3-5s
-- `confirmation-dialogs` - Confirm before destructive actions
-- `input-helper-text` - Provide persistent helper text below complex inputs, not just placeholder (Material Design)
-- `disabled-states` - Disabled elements use reduced opacity (0.38–0.5) + cursor change + semantic attribute (MD)
-- `progressive-disclosure` - Reveal complex options progressively; don't overwhelm users upfront (Apple HIG)
-- `inline-validation` - Validate on blur (not keystroke); show error only after user finishes input (MD)
-- `input-type-keyboard` - Use semantic input types (email, tel, number) to trigger the correct mobile keyboard (HIG, MD)
-- `password-toggle` - Provide show/hide toggle for password fields (MD)
-- `autofill-support` - Use autocomplete / textContentType attributes so the system can autofill (HIG, MD)
-- `undo-support` - Allow undo for destructive or bulk actions (e.g. "Undo delete" toast) (Apple HIG)
-- `success-feedback` - Confirm completed actions with brief visual feedback (checkmark, toast, color flash) (MD)
-- `error-recovery` - Error messages must include a clear recovery path (retry, edit, help link) (HIG, MD)
-- `multi-step-progress` - Multi-step flows show step indicator or progress bar; allow back navigation (MD)
-- `form-autosave` - Long forms should auto-save drafts to prevent data loss on accidental dismissal (Apple HIG)
-- `sheet-dismiss-confirm` - Confirm before dismissing a sheet/modal with unsaved changes (Apple HIG)
-- `error-clarity` - Error messages must state cause + how to fix (not just "Invalid input") (HIG, MD)
-- `field-grouping` - Group related fields logically (fieldset/legend or visual grouping) (MD)
-- `read-only-distinction` - Read-only state should be visually and semantically different from disabled (MD)
-- `focus-management` - After submit error, auto-focus the first invalid field (WCAG, MD)
-- `error-summary` - For multiple errors, show summary at top with anchor links to each field (WCAG)
-- `touch-friendly-input` - Mobile input height ≥44px to meet touch target requirements (Apple HIG)
-- `destructive-emphasis` - Destructive actions use semantic danger color (red) and are visually separated from primary actions (HIG, MD)
-- `toast-accessibility` - Toasts must not steal focus; use aria-live="polite" for screen reader announcement (WCAG)
-- `aria-live-errors` - Form errors use aria-live region or role="alert" to notify screen readers (WCAG)
-- `contrast-feedback` - Error and success state colors must meet 4.5:1 contrast ratio (WCAG, MD)
-- `timeout-feedback` - Request timeout must show clear feedback with retry option (MD)
-
-### 9. Navigation Patterns (HIGH)
-
-- `bottom-nav-limit` - Bottom navigation max 5 items; use labels with icons (Material Design)
-- `drawer-usage` - Use drawer/sidebar for secondary navigation, not primary actions (Material Design)
-- `back-behavior` - Back navigation must be predictable and consistent; preserve scroll/state (Apple HIG, MD)
-- `deep-linking` - All key screens must be reachable via deep link / URL for sharing and notifications (Apple HIG, MD)
-- `tab-bar-ios` - iOS: use bottom Tab Bar for top-level navigation (Apple HIG)
-- `top-app-bar-android` - Android: use Top App Bar with navigation icon for primary structure (Material Design)
-- `nav-label-icon` - Navigation items must have both icon and text label; icon-only nav harms discoverability (MD)
-- `nav-state-active` - Current location must be visually highlighted (color, weight, indicator) in navigation (HIG, MD)
-- `nav-hierarchy` - Primary nav (tabs/bottom bar) vs secondary nav (drawer/settings) must be clearly separated (MD)
-- `modal-escape` - Modals and sheets must offer a clear close/dismiss affordance; swipe-down to dismiss on mobile (Apple HIG)
-- `search-accessible` - Search must be easily reachable (top bar or tab); provide recent/suggested queries (MD)
-- `breadcrumb-web` - Web: use breadcrumbs for 3+ level deep hierarchies to aid orientation (MD)
-- `state-preservation` - Navigating back must restore previous scroll position, filter state, and input (HIG, MD)
-- `gesture-nav-support` - Support system gesture navigation (iOS swipe-back, Android predictive back) without conflict (HIG, MD)
-- `tab-badge` - Use badges on nav items sparingly to indicate unread/pending; clear after user visits (HIG, MD)
-- `overflow-menu` - When actions exceed available space, use overflow/more menu instead of cramming (MD)
-- `bottom-nav-top-level` - Bottom nav is for top-level screens only; never nest sub-navigation inside it (MD)
-- `adaptive-navigation` - Large screens (≥1024px) prefer sidebar; small screens use bottom/top nav (Material Adaptive)
-- `back-stack-integrity` - Never silently reset the navigation stack or unexpectedly jump to home (HIG, MD)
-- `navigation-consistency` - Navigation placement must stay the same across all pages; don't change by page type
-- `avoid-mixed-patterns` - Don't mix Tab + Sidebar + Bottom Nav at the same hierarchy level
-- `modal-vs-navigation` - Modals must not be used for primary navigation flows; they break the user's path (HIG)
-- `focus-on-route-change` - After page transition, move focus to main content region for screen reader users (WCAG)
-- `persistent-nav` - Core navigation must remain reachable from deep pages; don't hide it entirely in sub-flows (HIG, MD)
-- `destructive-nav-separation` - Dangerous actions (delete account, logout) must be visually and spatially separated from normal nav items (HIG, MD)
-- `empty-nav-state` - When a nav destination is unavailable, explain why instead of silently hiding it (MD)
-
-### 10. Charts & Data (LOW)
-
-- `chart-type` - Match chart type to data type (trend → line, comparison → bar, proportion → pie/donut)
-- `color-guidance` - Use accessible color palettes; avoid red/green only pairs for colorblind users (WCAG, MD)
-- `data-table` - Provide table alternative for accessibility; charts alone are not screen-reader friendly (WCAG)
-- `pattern-texture` - Supplement color with patterns, textures, or shapes so data is distinguishable without color (WCAG, MD)
-- `legend-visible` - Always show legend; position near the chart, not detached below a scroll fold (MD)
-- `tooltip-on-interact` - Provide tooltips/data labels on hover (Web) or tap (mobile) showing exact values (HIG, MD)
-- `axis-labels` - Label axes with units and readable scale; avoid truncated or rotated labels on mobile
-- `responsive-chart` - Charts must reflow or simplify on small screens (e.g. horizontal bar instead of vertical, fewer ticks)
-- `empty-data-state` - Show meaningful empty state when no data exists ("No data yet" + guidance), not a blank chart (MD)
-- `loading-chart` - Use skeleton or shimmer placeholder while chart data loads; don't show an empty axis frame
-- `animation-optional` - Chart entrance animations must respect prefers-reduced-motion; data should be readable immediately (HIG)
-- `large-dataset` - For 1000+ data points, aggregate or sample; provide drill-down for detail instead of rendering all (MD)
-- `number-formatting` - Use locale-aware formatting for numbers, dates, currencies on axes and labels (HIG, MD)
-- `touch-target-chart` - Interactive chart elements (points, segments) must have ≥44pt tap area or expand on touch (Apple HIG)
-- `no-pie-overuse` - Avoid pie/donut for >5 categories; switch to bar chart for clarity
-- `contrast-data` - Data lines/bars vs background ≥3:1; data text labels ≥4.5:1 (WCAG)
-- `legend-interactive` - Legends should be clickable to toggle series visibility (MD)
-- `direct-labeling` - For small datasets, label values directly on the chart to reduce eye travel
-- `tooltip-keyboard` - Tooltip content must be keyboard-reachable and not rely on hover alone (WCAG)
-- `sortable-table` - Data tables must support sorting with aria-sort indicating current sort state (WCAG)
-- `axis-readability` - Axis ticks must not be cramped; maintain readable spacing, auto-skip on small screens
-- `data-density` - Limit information density per chart to avoid cognitive overload; split into multiple charts if needed
-- `trend-emphasis` - Emphasize data trends over decoration; avoid heavy gradients/shadows that obscure the data
-- `gridline-subtle` - Grid lines should be low-contrast (e.g. gray-200) so they don't compete with data
-- `focusable-elements` - Interactive chart elements (points, bars, slices) must be keyboard-navigable (WCAG)
-- `screen-reader-summary` - Provide a text summary or aria-label describing the chart's key insight for screen readers (WCAG)
-- `error-state-chart` - Data load failure must show error message with retry action, not a broken/empty chart
-- `export-option` - For data-heavy products, offer CSV/image export of chart data
-- `drill-down-consistency` - Drill-down interactions must maintain a clear back-path and hierarchy breadcrumb
-- `time-scale-clarity` - Time series charts must clearly label time granularity (day/week/month) and allow switching
-
-## How to Use
-
-Search specific domains using the CLI tool below.
+### 9. 네비게이션 구조 (Navigation - HIGH)
+- **하단 탭 메뉴 제약**: 모바일 앱의 하단 네비게이션 바 메뉴는 가장 핵심적인 3~5개로 제한하고, 각 메뉴는 직관적인 아이콘과 라벨 텍스트를 함께 표시합니다.
+- **상태 보존**: 상세 페이지로 이동했다가 다시 뒤로 가기를 실행했을 때, 이전 화면의 스크롤 위치, 선택했던 필터 조건 및 입력 도중이던 데이터 상태가 유실되지 않도록 보존합니다.
+- **일관된 네비게이션 배치**: 서비스 전체 페이지에서 글로벌 네비게이션의 위치가 일관되게 유지되어야 하며, 특정 페이지에서 레이아웃이나 조작 체계가 뜬금없이 변경되지 않도록 합니다.
 
 ---
 
-## Prerequisites
+## 스킬 사용 절차 (Workflow)
 
-Check if Python is installed:
+UI/UX 관련 작업 요청 시 아래 절차를 밟아 진행하십시오:
 
-```bash
-python3 --version || python --version
-```
+### 1단계: 사용자 요구사항 분석
+- **제품군 분류**: 엔터테인먼트(소셜, 미디어), 도구형(에디터, 변환기), 생산성(태스크 관리, 캘린더) 등
+- **대상 독자 및 디바이스**: 연령대, 사용 환경(모바일 중심, 모니터 중심)
+- **스타일 콘셉트**: 미니멀리즘, 세련된 다크 모드, 정보 집약적 등
+- **타겟 기술 스택**: React, React Native, Tailwind CSS, shadcn/ui 등
 
-If Python is not installed, install it based on user's OS:
+### 2단계: 디자인 시스템 설계 (MASTER)
+- 전역 스타일 소스 오브 트루스인 `design-system/MASTER.md`를 생성하여 색상(Hex 명시), 타이포그래피(font-family, size), 그리드 시스템, 여백(spacing), 컴포넌트 스타일 가이드를 사전에 설계하여 명문화합니다.
+- 특정 페이지별로 미세한 스타일 변형이 필요한 경우, `design-system/pages/[page-name].md`에 오버라이드 규칙을 기술하여 마스터 규칙과 이격 관리합니다.
 
-**macOS:**
-```bash
-brew install python3
-```
+### 3단계: 컴포넌트 및 레이아웃 구현
+- 마스터 디자인 시스템에 맞춰 정밀하게 코딩을 진행합니다.
+- 모든 인터랙션 요소에 마이크로 인터랙션 모션 및 터치 타겟 규격을 적용합니다.
 
-**Ubuntu/Debian:**
-```bash
-sudo apt update && sudo apt install python3
-```
-
-**Windows:**
-```powershell
-winget install Python.Python.3.12
-```
+### 4단계: 인도 전 최종 검수
+- 아래의 최종 점검표에 맞춰 시각 품질, 접근성, 반응형 대응 상태를 면밀히 테스트한 후 사용자에게 결과물을 제시합니다.
 
 ---
 
-## How to Use This Skill
-
-Use this skill when the user requests any of the following:
-
-| Scenario | Trigger Examples | Start From |
-|----------|-----------------|------------|
-| **New project / page** | "Build a landing page", "Build a dashboard" | Step 1 → Step 2 (design system) |
-| **New component** | "Create a pricing card", "Add a modal" | Step 3 (domain search: style, ux) |
-| **Choose style / color / font** | "What style fits a fintech app?", "Recommend a color palette" | Step 2 (design system) |
-| **Review existing UI** | "Review this page for UX issues", "Check accessibility" | Quick Reference checklist above |
-| **Fix a UI bug** | "Button hover is broken", "Layout shifts on load" | Quick Reference → relevant section |
-| **Improve / optimize** | "Make this faster", "Improve mobile experience" | Step 3 (domain search: ux, react) |
-| **Implement dark mode** | "Add dark mode support" | Step 3 (domain: style "dark mode") |
-| **Add charts / data viz** | "Add an analytics dashboard chart" | Step 3 (domain: chart) |
-| **Stack best practices** | "React performance tips"、"SwiftUI navigation" | Step 4 (stack search) |
-
-Follow this workflow:
-
-### Step 1: Analyze User Requirements
-
-Extract key information from user request:
-- **Product type**: Entertainment (social, video, music, gaming), Tool (scanner, editor, converter), Productivity (task manager, notes, calendar), or hybrid
-- **Target audience**: C-end consumer users; consider age group, usage context (commute, leisure, work)
-- **Style keywords**: playful, vibrant, minimal, dark mode, content-first, immersive, etc.
-- **Stack**: React Native (this project's only tech stack)
-
-### Step 2: Generate Design System (REQUIRED)
-
-**Always start with `--design-system`** to get comprehensive recommendations with reasoning:
-
-```bash
-python3 scripts/search.py "<product_type> <industry> <keywords>" --design-system [-p "Project Name"]
-```
-
-This command:
-1. Searches domains in parallel (product, style, color, landing, typography)
-2. Applies reasoning rules from `ui-reasoning.csv` to select best matches
-3. Returns complete design system: pattern, style, colors, typography, effects
-4. Includes anti-patterns to avoid
-
-**Example:**
-```bash
-python3 scripts/search.py "beauty spa wellness service" --design-system -p "Serenity Spa"
-```
-
-### Step 2b: Persist Design System (Master + Overrides Pattern)
-
-To save the design system for **hierarchical retrieval across sessions**, add `--persist`:
-
-```bash
-python3 scripts/search.py "<query>" --design-system --persist -p "Project Name"
-```
-
-This creates:
-- `design-system/MASTER.md` — Global Source of Truth with all design rules
-- `design-system/pages/` — Folder for page-specific overrides
-
-**With page-specific override:**
-```bash
-python3 scripts/search.py "<query>" --design-system --persist -p "Project Name" --page "dashboard"
-```
-
-This also creates:
-- `design-system/pages/dashboard.md` — Page-specific deviations from Master
-
-**How hierarchical retrieval works:**
-1. When building a specific page (e.g., "Checkout"), first check `design-system/pages/checkout.md`
-2. If the page file exists, its rules **override** the Master file
-3. If not, use `design-system/MASTER.md` exclusively
-
-**Context-aware retrieval prompt:**
-```
-I am building the [Page Name] page. Please read design-system/MASTER.md.
-Also check if design-system/pages/[page-name].md exists.
-If the page file exists, prioritize its rules.
-If not, use the Master rules exclusively.
-Now, generate the code...
-```
-
-### Step 3: Supplement with Detailed Searches (as needed)
-
-After getting the design system, use domain searches to get additional details:
-
-```bash
-python3 scripts/search.py "<keyword>" --domain <domain> [-n <max_results>]
-```
-
-**When to use detailed searches:**
-
-| Need | Domain | Example |
-|------|--------|---------|
-| Product type patterns | `product` | `--domain product "entertainment social"` |
-| More style options | `style` | `--domain style "glassmorphism dark"` |
-| Color palettes | `color` | `--domain color "entertainment vibrant"` |
-| Font pairings | `typography` | `--domain typography "playful modern"` |
-| Chart recommendations | `chart` | `--domain chart "real-time dashboard"` |
-| UX best practices | `ux` | `--domain ux "animation accessibility"` |
-| Alternative fonts | `typography` | `--domain typography "elegant luxury"` |
-| Individual Google Fonts | `google-fonts` | `--domain google-fonts "sans serif popular variable"` |
-| Landing structure | `landing` | `--domain landing "hero social-proof"` |
-| React Native perf | `react` | `--domain react "rerender memo list"` |
-| App interface a11y | `web` | `--domain web "accessibilityLabel touch safe-areas"` |
-| AI prompt / CSS keywords | `prompt` | `--domain prompt "minimalism"` |
-
-### Step 4: Stack Guidelines (React Native)
-
-Get React Native implementation-specific best practices:
-
-```bash
-python3 scripts/search.py "<keyword>" --stack react-native
-```
-
----
-
-## Search Reference
-
-### Available Domains
-
-| Domain | Use For | Example Keywords |
-|--------|---------|------------------|
-| `product` | Product type recommendations | SaaS, e-commerce, portfolio, healthcare, beauty, service |
-| `style` | UI styles, colors, effects | glassmorphism, minimalism, dark mode, brutalism |
-| `typography` | Font pairings, Google Fonts | elegant, playful, professional, modern |
-| `color` | Color palettes by product type | saas, ecommerce, healthcare, beauty, fintech, service |
-| `landing` | Page structure, CTA strategies | hero, hero-centric, testimonial, pricing, social-proof |
-| `chart` | Chart types, library recommendations | trend, comparison, timeline, funnel, pie |
-| `ux` | Best practices, anti-patterns | animation, accessibility, z-index, loading |
-| `google-fonts` | Individual Google Fonts lookup | sans serif, monospace, japanese, variable font, popular |
-| `react` | React/Next.js performance | waterfall, bundle, suspense, memo, rerender, cache |
-| `web` | App interface guidelines (iOS/Android/React Native) | accessibilityLabel, touch targets, safe areas, Dynamic Type |
-| `prompt` | AI prompts, CSS keywords | (style name) |
-
-### Available Stacks
-
-| Stack | Focus |
-|-------|-------|
-| `react-native` | Components, Navigation, Lists |
-
----
-
-## Example Workflow
-
-**User request:** "Make an AI search homepage."
-
-### Step 1: Analyze Requirements
-- Product type: Tool (AI search engine)
-- Target audience: C-end users looking for fast, intelligent search
-- Style keywords: modern, minimal, content-first, dark mode
-- Stack: React Native
-
-### Step 2: Generate Design System (REQUIRED)
-
-```bash
-python3 scripts/search.py "AI search tool modern minimal" --design-system -p "AI Search"
-```
-
-**Output:** Complete design system with pattern, style, colors, typography, effects, and anti-patterns.
-
-### Step 3: Supplement with Detailed Searches (as needed)
-
-```bash
-# Get style options for a modern tool product
-python3 scripts/search.py "minimalism dark mode" --domain style
-
-# Get UX best practices for search interaction and loading
-python3 scripts/search.py "search loading animation" --domain ux
-```
-
-### Step 4: Stack Guidelines
-
-```bash
-python3 scripts/search.py "list performance navigation" --stack react-native
-```
-
-**Then:** Synthesize design system + detailed searches and implement the design.
-
----
-
-## Output Formats
-
-The `--design-system` flag supports two output formats:
-
-```bash
-# ASCII box (default) - best for terminal display
-python3 scripts/search.py "fintech crypto" --design-system
-
-# Markdown - best for documentation
-python3 scripts/search.py "fintech crypto" --design-system -f markdown
-```
-
----
-
-## Tips for Better Results
-
-### Query Strategy
-
-- Use **multi-dimensional keywords** — combine product + industry + tone + density: `"entertainment social vibrant content-dense"` not just `"app"`
-- Try different keywords for the same need: `"playful neon"` → `"vibrant dark"` → `"content-first minimal"`
-- Use `--design-system` first for full recommendations, then `--domain` to deep-dive any dimension you're unsure about
-- Always add `--stack react-native` for implementation-specific guidance
-
-### Common Sticking Points
-
-| Problem | What to Do |
-|---------|------------|
-| Can't decide on style/color | Re-run `--design-system` with different keywords |
-| Dark mode contrast issues | Quick Reference §6: `color-dark-mode` + `color-accessible-pairs` |
-| Animations feel unnatural | Quick Reference §7: `spring-physics` + `easing` + `exit-faster-than-enter` |
-| Form UX is poor | Quick Reference §8: `inline-validation` + `error-clarity` + `focus-management` |
-| Navigation feels confusing | Quick Reference §9: `nav-hierarchy` + `bottom-nav-limit` + `back-behavior` |
-| Layout breaks on small screens | Quick Reference §5: `mobile-first` + `breakpoint-consistency` |
-| Performance / jank | Quick Reference §3: `virtualize-lists` + `main-thread-budget` + `debounce-throttle` |
-
-### Pre-Delivery Checklist
-
-- Run `--domain ux "animation accessibility z-index loading"` as a UX validation pass before implementation
-- Run through Quick Reference **§1–§3** (CRITICAL + HIGH) as a final review
-- Test on 375px (small phone) and landscape orientation
-- Verify behavior with **reduced-motion** enabled and **Dynamic Type** at largest size
-- Check dark mode contrast independently (don't assume light mode values work)
-- Confirm all touch targets ≥44pt and no content hidden behind safe areas
-
----
-
-## Common Rules for Professional UI
-
-These are frequently overlooked issues that make UI look unprofessional:
-Scope notice: The rules below are for App UI (iOS/Android/React Native/Flutter), not desktop-web interaction patterns.
-
-### Icons & Visual Elements
-
-| Rule | Standard | Avoid | Why It Matters |
-|------|----------|--------|----------------|
-| **No Emoji as Structural Icons** | Use vector-based icons (e.g., Lucide, react-native-vector-icons, @expo/vector-icons). | Using emojis (🎨 🚀 ⚙️) for navigation, settings, or system controls. | Emojis are font-dependent, inconsistent across platforms, and cannot be controlled via design tokens. |
-| **Vector-Only Assets** | Use SVG or platform vector icons that scale cleanly and support theming. | Raster PNG icons that blur or pixelate. | Ensures scalability, crisp rendering, and dark/light mode adaptability. |
-| **Stable Interaction States** | Use color, opacity, or elevation transitions for press states without changing layout bounds. | Layout-shifting transforms that move surrounding content or trigger visual jitter. | Prevents unstable interactions and preserves smooth motion/perceived quality on mobile. |
-| **Correct Brand Logos** | Use official brand assets and follow their usage guidelines (spacing, color, clear space). | Guessing logo paths, recoloring unofficially, or modifying proportions. | Prevents brand misuse and ensures legal/platform compliance. |
-| **Consistent Icon Sizing** | Define icon sizes as design tokens (e.g., icon-sm, icon-md = 24pt, icon-lg). | Mixing arbitrary values like 20pt / 24pt / 28pt randomly. | Maintains rhythm and visual hierarchy across the interface. |
-| **Stroke Consistency** | Use a consistent stroke width within the same visual layer (e.g., 1.5px or 2px). | Mixing thick and thin stroke styles arbitrarily. | Inconsistent strokes reduce perceived polish and cohesion. |
-| **Filled vs Outline Discipline** | Use one icon style per hierarchy level. | Mixing filled and outline icons at the same hierarchy level. | Maintains semantic clarity and stylistic coherence. |
-| **Touch Target Minimum** | Minimum 44×44pt interactive area (use hitSlop if icon is smaller). | Small icons without expanded tap area. | Meets accessibility and platform usability standards. |
-| **Icon Alignment** | Align icons to text baseline and maintain consistent padding. | Misaligned icons or inconsistent spacing around them. | Prevents subtle visual imbalance that reduces perceived quality. |
-| **Icon Contrast** | Follow WCAG contrast standards: 4.5:1 for small elements, 3:1 minimum for larger UI glyphs. | Low-contrast icons that blend into the background. | Ensures accessibility in both light and dark modes. |
-
-
-### Interaction (App)
-
-| Rule | Do | Don't |
-|------|----|----- |
-| **Tap feedback** | Provide clear pressed feedback (ripple/opacity/elevation) within 80-150ms | No visual response on tap |
-| **Animation timing** | Keep micro-interactions around 150-300ms with platform-native easing | Instant transitions or slow animations (>500ms) |
-| **Accessibility focus** | Ensure screen reader focus order matches visual order and labels are descriptive | Unlabeled controls or confusing focus traversal |
-| **Disabled state clarity** | Use disabled semantics (`disabled`/native disabled props), reduced emphasis, and no tap action | Controls that look tappable but do nothing |
-| **Touch target minimum** | Keep tap areas >=44x44pt (iOS) or >=48x48dp (Android), expand hit area when icon is smaller | Tiny tap targets or icon-only hit areas without padding |
-| **Gesture conflict prevention** | Keep one primary gesture per region and avoid nested tap/drag conflicts | Overlapping gestures causing accidental actions |
-| **Semantic native controls** | Prefer native interactive primitives (`Button`, `Pressable`, platform equivalents) with proper accessibility roles | Generic containers used as primary controls without semantics |
-
-### Light/Dark Mode Contrast
-
-| Rule | Do | Don't |
-|------|----|----- |
-| **Surface readability (light)** | Keep cards/surfaces clearly separated from background with sufficient opacity/elevation | Overly transparent surfaces that blur hierarchy |
-| **Text contrast (light)** | Maintain body text contrast >=4.5:1 against light surfaces | Low-contrast gray body text |
-| **Text contrast (dark)** | Maintain primary text contrast >=4.5:1 and secondary text >=3:1 on dark surfaces | Dark mode text that blends into background |
-| **Border and divider visibility** | Ensure separators are visible in both themes (not just light mode) | Theme-specific borders disappearing in one mode |
-| **State contrast parity** | Keep pressed/focused/disabled states equally distinguishable in light and dark themes | Defining interaction states for one theme only |
-| **Token-driven theming** | Use semantic color tokens mapped per theme across app surfaces/text/icons | Hardcoded per-screen hex values |
-| **Scrim and modal legibility** | Use a modal scrim strong enough to isolate foreground content (typically 40-60% black) | Weak scrim that leaves background visually competing |
-
-### Layout & Spacing
-
-| Rule | Do | Don't |
-|------|----|----- |
-| **Safe-area compliance** | Respect top/bottom safe areas for all fixed headers, tab bars, and CTA bars | Placing fixed UI under notch, status bar, or gesture area |
-| **System bar clearance** | Add spacing for status/navigation bars and gesture home indicator | Let tappable content collide with OS chrome |
-| **Consistent content width** | Keep predictable content width per device class (phone/tablet) | Mixing arbitrary widths between screens |
-| **8dp spacing rhythm** | Use a consistent 4/8dp spacing system for padding/gaps/section spacing | Random spacing increments with no rhythm |
-| **Readable text measure** | Keep long-form text readable on large devices (avoid edge-to-edge paragraphs on tablets) | Full-width long text that hurts readability |
-| **Section spacing hierarchy** | Define clear vertical rhythm tiers (e.g., 16/24/32/48) by hierarchy | Similar UI levels with inconsistent spacing |
-| **Adaptive gutters by breakpoint** | Increase horizontal insets on larger widths and in landscape | Same narrow gutter on all device sizes/orientations |
-| **Scroll and fixed element coexistence** | Add bottom/top content insets so lists are not hidden behind fixed bars | Scroll content obscured by sticky headers/footers |
-
----
-
-## Pre-Delivery Checklist
-
-Before delivering UI code, verify these items:
-Scope notice: This checklist is for App UI (iOS/Android/React Native/Flutter).
-
-### Visual Quality
-- [ ] No emojis used as icons (use SVG instead)
-- [ ] All icons come from a consistent icon family and style
-- [ ] Official brand assets are used with correct proportions and clear space
-- [ ] Pressed-state visuals do not shift layout bounds or cause jitter
-- [ ] Semantic theme tokens are used consistently (no ad-hoc per-screen hardcoded colors)
-
-### Interaction
-- [ ] All tappable elements provide clear pressed feedback (ripple/opacity/elevation)
-- [ ] Touch targets meet minimum size (>=44x44pt iOS, >=48x48dp Android)
-- [ ] Micro-interaction timing stays in the 150-300ms range with native-feeling easing
-- [ ] Disabled states are visually clear and non-interactive
-- [ ] Screen reader focus order matches visual order, and interactive labels are descriptive
-- [ ] Gesture regions avoid nested/conflicting interactions (tap/drag/back-swipe conflicts)
-
-### Light/Dark Mode
-- [ ] Primary text contrast >=4.5:1 in both light and dark mode
-- [ ] Secondary text contrast >=3:1 in both light and dark mode
-- [ ] Dividers/borders and interaction states are distinguishable in both modes
-- [ ] Modal/drawer scrim opacity is strong enough to preserve foreground legibility (typically 40-60% black)
-- [ ] Both themes are tested before delivery (not inferred from a single theme)
+## 최종 배포 전 셀프 체크리스트 (Pre-Delivery Checklist)
+
+### 시각 품질 및 스타일
+- [ ] 구조적 네비게이션이나 컨트롤 영역에 이모지(🎨 🚀 ⚙️)를 아이콘 용도로 남용하지 않았는가 (SVG 벡터 아이콘으로 통일했는가)
+- [ ] 아이콘 제품군이 통일성 있게 구성되었는가 (선 두께, 모서리 라운딩 등)
+- [ ] 사용자가 터치할 때 위치가 튀는 레이아웃 시프트가 없는가
+- [ ] 모든 색상과 폰트 크기가 공통 CSS 변수/토큰을 기반으로 적용되었는가
+
+### 상호작용 및 반응성
+- [ ] 모든 클릭/터치 가능 요소에 즉각적인 시각 피드백(ripple, opacity 변화 등)이 제공되는가
+- [ ] 터치 가능 영역이 최소 44×44px 이상 확보되었는가
+- [ ] 상태 변화(호버, 마우스 다운, 모달 팝업 등) 시 모션이 부드럽고 적당한 속도(150~300ms)로 작동하는가
+- [ ] 데이터 요청 중에는 제출 버튼이 비활성화되고 스피너 등으로 상태를 설명하는가
+- [ ] 모달이나 사이드바를 취소/닫기 할 수 있는 명확한 탈출 경로가 제공되는가
+
+### 색상 대비 및 테마
+- [ ] 라이트/다크 모드 양쪽에서 글자와 배경 간의 명도비가 4.5:1 이상 확보되는가
+- [ ] 회색 배경에 회색 글씨 등 가독성을 저해하는 구간이 없는가
+- [ ] 보더선และ 디바이더선이 양쪽 테마에서 모두 유효하게 구분되는가
+- [ ] 다크 모드에서의 scrim 블러나 딤드 레이어가 콘텐츠를 적절히 격리해 가독성을 높이는가
 
 ### Layout
-- [ ] Safe areas are respected for headers, tab bars, and bottom CTA bars
-- [ ] Scroll content is not hidden behind fixed/sticky bars
-- [ ] Verified on small phone, large phone, and tablet (portrait + landscape)
-- [ ] Horizontal insets/gutters adapt correctly by device size and orientation
-- [ ] 4/8dp spacing rhythm is maintained across component, section, and page levels
-- [ ] Long-form text measure remains readable on larger devices (no edge-to-edge paragraphs)
+- [ ] Safe area가 헤더, 탭바, 하단 CTA바 등 고정형 요소에 모두 정상 적용되었는가
+- [ ] 스크롤 콘텐츠가 하부 고정바 뒤에 가려서 보이지 않는 상태가 없는가
+- [ ] 모바일(세로/가로) 및 태블릿 기기에서 화면 가로 폭이 넘치지 않는가
+- [ ] 반응형 가로 이셋/여백이 디바이스 크기와 오리엔테이션에 맞춰 적절히 가변하는가
+- [ ] 4/8dp 그리드 배수 리듬이 구성 요소 전반과 페이지 세션 간격에 유지되는가
+- [ ] 긴 본문 텍스트 너비가 과도하게 펼쳐지지 않도록 맥스 너비(max-width)가 적용되었는가
 
 ### Accessibility
-- [ ] All meaningful images/icons have accessibility labels
-- [ ] Form fields have labels, hints, and clear error messages
-- [ ] Color is not the only indicator
-- [ ] Reduced motion and dynamic text size are supported without layout breakage
-- [ ] Accessibility traits/roles/states (selected, disabled, expanded) are announced correctly
+- [ ] 의미 있는 모든 이미지와 아이콘에 적절한 대체 텍스트/접근성 레이블이 기재되었는가
+- [ ] 입력 폼에 레이블, 안내 텍스트, 명확한 오류 메일이 결합되었는가
+- [ ] 단순히 색상 차이만으로 중요한 상태나 정보를 식별하도록 설계되지 않았는가
+- [ ] Dynamic Type 폰트 스케일링 대응 시 레이아웃 텍스트가 겹치거나 깨지는 곳이 없는가
+- [ ] 스크린 리더용 역할(Accessibility roles/states - selected, disabled 등) 설정이 알맞게 처리되었는가

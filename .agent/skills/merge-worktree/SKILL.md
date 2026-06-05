@@ -1,154 +1,153 @@
-﻿---
+---
 name: merge-worktree
-description: Squash-merge the current worktree branch into the main branch (or a specified target). Analyzes git history and source code to craft a comprehensive commit message.
-argument-hint: "[target-branch]"
+description: 현재 작업 트리(worktree) 브랜치를 메인 브랜치(또는 지정된 대상)로 스쿼시 머지(squash-merge)합니다. Git 히스토리와 소스코드를 분석하여 포괄적인 커밋 메시지를 작성합니다.
+argument-hint: "[대상-브랜치]"
 disable-model-invocation: true
 ---
 
-# Merge Worktree
+# 작업 트리 병합 (Merge Worktree)
 
-Squash-merge the current worktree branch back into the target branch with a comprehensive, structured commit message.
+현재 작업 트리 브랜치를 상세하고 구조화된 커밋 메시지와 함께 대상 브랜치로 스쿼시 머지(squash-merge)합니다.
 
-## Current context
+## 현재 컨텍스트 (Current context)
 
-- Git dir: `!git rev-parse --git-dir`
-- Current branch: `!git branch --show-current`
-- Recent commits: `!git log --oneline -20`
-- Working tree status: `!git status --short`
+- Git 디렉토리: `!git rev-parse --git-dir`
+- 현재 브랜치: `!git branch --show-current`
+- 최근 커밋 내역: `!git log --oneline -20`
+- 작업 트리 상태: `!git status --short`
 
-## Instructions
+## 지침 (Instructions)
 
-Follow these phases exactly, in order. Do NOT skip phases.
-
----
-
-### Phase 1: Validation
-
-1. **Verify worktree**: Check if the current git directory is a worktree. The output of `git rev-parse --git-dir` must contain `/worktrees/`. If it does not, **stop immediately** and tell the user:
-   > "This skill must be run from inside a git worktree. Use `/worktree` to create one first."
-
-2. **Identify current branch**: Get the worktree branch name from `git branch --show-current`.
-
-3. **Resolve target branch**:
-   - If `$ARGUMENTS` is provided and non-empty, use it as the target branch.
-   - Otherwise, detect the default branch: check if `main` exists, else check `master`. If neither exists, stop and ask the user.
-
-4. **Identify the original repo path**: Parse the original repo root from the git-dir path. The worktree's `.git` file points back to the main repo — use `git rev-parse --git-common-dir` to find it, then derive the original repo working directory (its parent).
-
-5. **Clean working tree**: Run `git status --porcelain`. If there are uncommitted changes, stop and tell the user to commit or stash them first.
+아래 단계를 순서대로 정확하게 따르십시오. 단계를 건너뛰지 마십시오.
 
 ---
 
-### Phase 2: Research
+### 1단계: 유효성 검증 (Validation)
 
-This is the most critical phase. You must deeply understand what was done before writing any commit message.
+1. **작업 트리 확인**: 현재 Git 디렉토리가 작업 트리인지 확인합니다. `git rev-parse --git-dir` 명령어의 출력에 `/worktrees/`가 포함되어야 합니다. 포함되어 있지 않다면 **즉시 동작을 멈추고** 다음과 같이 사용자에게 보고하십시오:
+   > "이 스킬은 Git 작업 트리(worktree) 내부에서 실행되어야 합니다. 먼저 `/worktree` 등을 사용하여 작업 트리를 생성하십시오."
 
-1. **Commit history**: Run `git log --oneline <target>..HEAD` to see all commits on this worktree branch.
+2. **현재 브랜치 확인**: `git branch --show-current` 명령어를 통해 현재 작업 트리 브랜치명을 획득합니다.
 
-2. **File change summary**: Run `git diff <target>...HEAD --stat` to get an overview of what files changed and how much.
+3. **대상 브랜치 확인**:
+   - 인수(ARGUMENTS)가 제공된 경우 이를 대상 브랜치로 사용합니다.
+   - 인수가 없는 경우 기본 브랜치를 감지합니다. `main` 브랜치가 있는지 확인하고, 없으면 `master` 브랜치가 있는지 확인합니다. 둘 다 없다면 작업을 멈추고 사용자에게 문의합니다.
 
-3. **Full diff**: Run `git diff <target>...HEAD` to read the complete diff. Study it carefully.
+4. **원저장소 경로 확인**: 작업 트리의 `.git` 파일이 가리키는 원저장소 루트 경로를 구합니다. `git rev-parse --git-common-dir` 명령어로 기본 Git 공통 디렉토리를 찾은 뒤 원저장소 작업 디렉토리(부모 디렉토리)를 도출합니다.
 
-4. **Read key files**: For the most significantly changed files (largest diffs, new files, deleted files), use the Read tool to understand the full context — not just the diff lines.
-
-5. **Categorize changes**: Mentally group all changes into categories:
-   - Features (new functionality)
-   - Fixes (bug corrections)
-   - Refactors (code restructuring without behavior change)
-   - Tests (new or updated tests)
-   - Docs (documentation changes)
-   - Config/Chore (build, CI, tooling, dependencies)
-
-6. **Identify the dominant type**: Determine which conventional commit type (`feat`, `fix`, `refactor`, `docs`, `chore`, `test`) best represents the overall body of work.
+5. **작업 트리 청결 상태 검증**: `git status --porcelain`을 실행합니다. 커밋되지 않은 변경 사항이 있다면 작업을 멈추고 사용자에게 커밋하거나 스태시(stash)하도록 안내합니다.
 
 ---
 
-### Phase 3: Target branch preparation
+### 2단계: 사전 조사 (Research)
 
-1. **Get the original repo path** (from Phase 1 step 4).
+이 단계는 매우 중요합니다. 커밋 메시지를 작성하기 전에 변경 사항을 깊이 파악해야 합니다.
 
-2. **Check target branch state**: Run `git -C <original-repo-path> log --oneline -10 <target>` to see recent commits on the target branch.
+1. **커밋 히스토리 확인**: `git log --oneline <대상-브랜치>..HEAD`를 실행하여 해당 작업 트리 브랜치의 모든 커밋을 검토합니다.
 
-3. **Detect stray WIP commits**: If the target branch has commits that look like auto-generated WIP commits (e.g., messages starting with `wip:`, `auto-commit`, `WIP`), warn the user and ask if they want to reset to the last clean commit before merging.
+2. **파일 변경 요약 확인**: `git diff <대상-브랜치>...HEAD --stat`를 실행하여 어떤 파일이 얼마나 변경되었는지 확인합니다.
 
-4. **Fetch latest** (if remote exists): Run `git -C <original-repo-path> fetch origin <target> 2>/dev/null` to ensure target is up to date with remote. Do not fail if no remote.
+3. **전체 Diff 검토**: `git diff <대상-브랜치>...HEAD`를 실행하여 상세 차이점을 정독하고 분석합니다.
+
+4. **핵심 파일 조회**: 변경 사항이 큰 파일이나 새로 추가/삭제된 파일은 Diff만 보지 말고 읽기 도구(`view_file` 등)를 사용해 파일 전체 컨텍스트를 충분히 이해합니다.
+
+5. **변경 사항 분류**: 변경 내용을 머릿속으로 다음과 같이 그룹화합니다:
+   - Features (새 기능 추가)
+   - Fixes (버그 수정)
+   - Refactors (동작 변경 없는 코드 구조 개선)
+   - Tests (테스트 추가/수정)
+   - Docs (문서 작성/수정)
+   - Config/Chore (빌드, CI, 도구 설정, 의존성)
+
+6. **주요 커밋 타입 결정**: 전체 작업을 가장 잘 나타내는 커밋 타입(`feat`, `fix`, `refactor`, `docs`, `chore`, `test` 중 하나)을 결정합니다.
 
 ---
 
-### Phase 4: Squash merge
+### 3단계: 대상 브랜치 준비 (Target branch preparation)
 
-1. **Ensure target branch is checked out** in the original repo:
+1. **원저장소 경로 확보** (1단계 4번에서 구한 경로).
+
+2. **대상 브랜치 상태 점검**: 원저장소 경로에서 `git -C <원저장소-경로> log --oneline -10 <대상-브랜치>`를 실행하여 대상 브랜치의 최신 커밋 내역을 확인합니다.
+
+3. **미완성(WIP) 자동 커밋 감지**: 대상 브랜치에 `wip:`, `auto-commit`, `WIP` 등으로 시작하는 자동 생성 커밋이 남아있는 경우, 사용자에게 경고하고 머지 전에 마지막 정상 커밋으로 리셋할지 문의합니다.
+
+4. **최신 정보 가져오기 (Fetch)**: 원격 저장소가 있다면 `git -C <원저장소-경로> fetch origin <대상-브랜치> 2>/dev/null`을 실행하여 최신 상태로 동기화합니다. 원격 저장소가 없더라도 에러로 취급해 실패시키지 않습니다.
+
+---
+
+### 4단계: 스쿼시 머지 실행 (Squash merge)
+
+1. **대상 브랜치 체크아웃**: 원저장소에서 대상 브랜치로 체크아웃 상태를 확인 및 전환합니다:
    ```
-   git -C <original-repo-path> checkout <target>
-   ```
-
-2. **Perform the squash merge**:
-   ```
-   git -C <original-repo-path> merge --squash <worktree-branch>
+   git -C <원저장소-경로> checkout <대상-브랜치>
    ```
 
-3. **Handle conflicts**: If the merge reports conflicts:
-   - List all conflicted files
-   - Show the conflict markers
-   - **Stop and report to the user** — do NOT attempt to auto-resolve
-   - Tell them to resolve conflicts in the original repo and then run the skill again
+2. **스쿼시 머지 실행**:
+   ```
+   git -C <원저장소-경로> merge --squash <작업트리-브랜치>
+   ```
 
-4. If the merge succeeds (no conflicts), proceed to Phase 5.
+3. **충돌 처리**: 머지 과정에서 충돌(Conflict)이 발생하는 경우:
+   - 충돌이 발생한 파일 목록을 나열합니다.
+   - 충돌 마커(Conflict Marker)가 있는 부분을 보여줍니다.
+   - **자동 해결을 시도하지 말고 작업을 즉시 멈춘 뒤 사용자에게 보고**합니다.
+   - 원저장소에서 직접 충돌을 해결한 뒤 이 스킬을 다시 구동하도록 안내합니다.
+
+4. 머지가 충돌 없이 성공하면 5단계로 진행합니다.
 
 ---
 
-### Phase 5: Craft commit message and commit
+### 5단계: 커밋 메시지 작성 및 커밋 (Craft commit message and commit)
 
-Based on your Phase 2 research, write the commit message following this **exact structure**:
+2단계 조사 결과를 바탕으로 **반드시 아래 형식을 엄격히 준수**하여 커밋 메시지를 작성합니다:
 
 ```
-<type>: <concise summary in imperative mood, under 72 chars, no period>
+<type>: <72자 이내의 간결한 명령조 요약, 마침표 불필요>
 
-<2-4 sentence paragraph explaining what was done and WHY. Focus on the
-motivation and high-level approach, not implementation details.>
+<무엇을 왜 변경했는지 설명하는 2~4개 문장의 단락. 구현 세부 사항보다는
+변경 동기와 상위 수준의 접근 방식을 중점적으로 설명합니다.>
 
 Changes:
-- <grouped bullet points of what changed>
-- <use sub-bullets for details within a group>
+- <변경 사항의 그룹화된 글머리 기호 목록>
+- <세부 항목은 하위 글머리 기호 사용>
 
 Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
 ```
 
-**Rules:**
-- `<type>` must be one of: `feat`, `fix`, `refactor`, `docs`, `chore`, `test`
-- If changes span multiple types, use the dominant one
-- Summary line: imperative mood ("add", "fix", "refactor"), no period, max 72 chars
-- Body paragraph: explain the *why* and *context*, not just *what*
-- Changes: group related items together, most important first
-- Always end with `Co-Authored-By`
+**커밋 메시지 규칙:**
+- `<type>`은 `feat`, `fix`, `refactor`, `docs`, `chore`, `test` 중 하나여야 합니다.
+- 여러 속성이 섞여 있다면 가장 지배적인 속성을 타입으로 선정합니다.
+- 요약줄: 명령조로 작성하며("add", "fix", "refactor" 등 동사 원형 시작), 마침표를 찍지 않고 72자를 넘지 않습니다.
+- 본문 단락: '무엇을' 했는지뿐 아니라 '왜' 했는지 배경 컨텍스트를 충분히 설명합니다.
+- 변경 목록: 연관된 변경 건을 묶어서 가장 중요한 것부터 정렬합니다.
+- 메시지 끝에는 항상 `Co-Authored-By` 서명을 포함합니다.
 
-**Create the commit** in the original repo using a heredoc:
+**원저장소에 커밋 적용** (heredoc 구문을 활용):
 ```bash
-git -C <original-repo-path> commit -m "$(cat <<'EOF'
-<your commit message here>
+git -C <원저장소-경로> commit -m "$(cat <<'EOF'
+<작성한 커밋 메시지 내용>
 EOF
 )"
 ```
 
 ---
 
-### Phase 6: Verification
+### 6단계: 검증 및 보고 (Verification)
 
-1. **Confirm the commit**: Run `git -C <original-repo-path> log --oneline -3` and show the result to the user.
+1. **커밋 확인**: 원저장소 경로에서 `git -C <원저장소-경로> log --oneline -3`을 실행하여 머지 및 커밋 결과를 사용자에게 출력합니다.
 
-2. **Report summary**: Tell the user:
-   - The final commit hash
-   - The commit summary line
-   - Which branch it was merged into
-   - Remind them the worktree branch still exists — they can delete it with `git worktree remove <path>` if no longer needed
-   - Remind them to `git push` if they want to push to the remote
+2. **최종 요약 보고**: 사용자에게 다음 사항을 보고합니다:
+   - 생성된 커밋 해시 (commit hash)
+   - 커밋 요약줄 (commit summary line)
+   - 병합이 완료된 대상 브랜치명
+   - 현재 작업 트리 브랜치가 여전히 존재함을 알리고, 필요 없다면 `git worktree remove <경로>` 명령으로 정리할 수 있음을 상기시킵니다.
+   - 변경 사항을 원격 저장소에 반영하려면 `git push`를 실행해야 함을 안내합니다.
 
 ---
 
-## Important notes
+## 중요 유의 사항 (Important notes)
 
-- **Never force-push or use destructive git operations** without explicit user confirmation.
-- **Never skip pre-commit hooks** (`--no-verify`).
-- If anything unexpected happens at any phase, **stop and explain** rather than guessing.
-- The commit message quality is paramount — take time in Phase 2 to truly understand the changes.
-
+- 사용자의 명시적인 확인 없이 파괴적인 Git 조작이나 강제 푸시(`force-push`)를 **절대 실행하지 마십시오**.
+- pre-commit hook을 우회(`--no-verify`)하지 마십시오.
+- 예측하지 못한 상황이 발생하면 임의로 추측해 실행하지 말고 **즉시 멈추고 상황을 설명**하십시오.
+- 완성도 높은 커밋 메시지 작성이 최우선입니다. 2단계 사전 조사 단계에서 변경 내용을 충분히 분석하십시오.

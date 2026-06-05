@@ -1,182 +1,68 @@
 ---
 name: dispatching-parallel-agents
-description: Use when facing 2+ independent tasks that can be worked on without shared state or sequential dependencies
+description: 서로 의존성이 없고 상태를 공유하지 않는 2개 이상의 독립된 작업을 병렬로 처리할 때 사용합니다. (서브에이전트 병렬 구동)
 ---
 
-# Dispatching Parallel Agents
+# 🤖 병렬 서브에이전트 조율 규칙 (dispatching-parallel-agents)
 
-## Overview
+본 스킬은 격리된 컨텍스트를 지닌 서브에이전트에게 작업을 안전하게 위임하고, 병렬로 연산을 수행하게 한 뒤 최종적으로 메인 세션으로 수렴 및 검수하기 위한 규칙입니다.
 
-You delegate tasks to specialized agents with isolated context. By precisely crafting their instructions and context, you ensure they stay focused and succeed at their task. They should never inherit your session's context or history — you construct exactly what they need. This also preserves your own context for coordination work.
+독립된 여러 결함이 동시다발적으로 존재할 때(예: 다른 테스트 파일 오류, 각기 다른 서브시스템 버그 등) 이를 하나씩 순차적으로 고치는 것은 비효율적입니다. 각 결함은 병렬로 안전하게 분석 및 픽스될 수 있습니다.
 
-When you have multiple unrelated failures (different test files, different subsystems, different bugs), investigating them sequentially wastes time. Each investigation is independent and can happen in parallel.
+**핵심 원칙:** 독립된 문제 도메인별로 서브에이전트를 1개씩 할당하여 동시에 병렬로 작업을 가동합니다.
 
-**Core principle:** Dispatch one agent per independent problem domain. Let them work concurrently.
-
-## When to Use
+## 📋 언제 사용하는가?
 
 ```dot
 digraph when_to_use {
-    "Multiple failures?" [shape=diamond];
-    "Are they independent?" [shape=diamond];
-    "Single agent investigates all" [shape=box];
-    "One agent per problem domain" [shape=box];
-    "Can they work in parallel?" [shape=diamond];
-    "Sequential agents" [shape=box];
-    "Parallel dispatch" [shape=box];
+    "결함이 여러 개인가?" [shape=diamond];
+    "각 결함이 독립적인가?" [shape=diamond];
+    "단일 에이전트가 순차 해결" [shape=box];
+    "문제 영역당 1개 서브에이전트 매핑" [shape=box];
+    "병렬 작업이 가능한가?" [shape=diamond];
+    "순차 에이전트 구동" [shape=box];
+    "병렬 에이전트 구동 (디스패치)" [shape=box];
 
-    "Multiple failures?" -> "Are they independent?" [label="yes"];
-    "Are they independent?" -> "Single agent investigates all" [label="no - related"];
-    "Are they independent?" -> "Can they work in parallel?" [label="yes"];
-    "Can they work in parallel?" -> "Parallel dispatch" [label="yes"];
-    "Can they work in parallel?" -> "Sequential agents" [label="no - shared state"];
+    "결함이 여러 개인가?" -> "각 결함이 독립적인가?" [label="예"];
+    "각 결함이 독립적인가?" -> "단일 에이전트가 순차 해결" [label="아니오 - 서로 인과관계 있음"];
+    "각 결함이 독립적인가?" -> "병렬 작업이 가능한가?" [label="예"];
+    "병렬 작업이 가능한가?" -> "병렬 에이전트 구동 (디스패치)" [label="예"];
+    "병렬 작업이 가능한가?" -> "순차 에이전트 구동" [label="아니오 - 상태/자원 공유 필요"];
 }
 ```
 
-**Use when:**
-- 3+ test files failing with different root causes
-- Multiple subsystems broken independently
-- Each problem can be understood without context from others
-- No shared state between investigations
+### 적용 대상 (Use):
+- 서로 다른 원인을 가진 3개 이상의 테스트 파일이 실패할 때
+- 여러 독립된 서브시스템에서 각각 버그가 감지되었을 때
+- 각 결함 해결에 서로의 세부 맥락 지식이 불필요할 때
+- 작업 간에 수정할 공유 자원이나 파일이 겹치지 않을 때
 
-**Don't use when:**
-- Failures are related (fix one might fix others)
-- Need to understand full system state
-- Agents would interfere with each other
+### 적용 비대상 (Don't Use):
+- 결함들이 연쇄적인 경우 (하나를 고치면 다른 것들도 자동으로 해결될 여지가 있을 때)
+- 시스템 전체의 통합 구조를 먼저 깊게 이해해야 할 때
+- 수정할 소스 파일이 겹쳐 에이전트 간 코드 충돌이 일어날 때
 
-## The Pattern
+## ⚙️ 조율 프로세스
 
-### 1. Identify Independent Domains
+### 1. 독립 문제 도메인 식별
+- 결함별 영역 구분:
+  * 도메인 A: 사용자 권한 조회 에러
+  * 도메인 B: 파일 업로드 제한 에러
+  * 도메인 C: 데이터 필터 오작동
 
-Group failures by what's broken:
-- File A tests: Tool approval flow
-- File B tests: Batch completion behavior
-- File C tests: Abort functionality
+### 2. 서브에이전트 태스크 지시서 구체화
+각 서브에이전트 프롬프트에는 다음이 포함되어야 합니다:
+- **명확한 작업 범위**: 수정할 단일 파일이나 단일 기능 컴포넌트 명시
+- **성공 목표**: 해당 테스트가 통과하거나 버그가 완치될 것
+- **제약 조건**: 범위 밖의 인접 소스코드를 무단 수정하지 말 것
+- **기대 산출물**: 무엇이 문제였고 어떻게 고쳤는지 요약 보고서 제출
 
-Each domain is independent - fixing tool approval doesn't affect abort tests.
+### 3. 병렬 디스패치 및 비동기 대기
+- 여러 개의 독립 서브에이전트 태스크를 동시에 백그라운드로 작동시킵니다.
 
-### 2. Create Focused Agent Tasks
-
-Each agent gets:
-- **Specific scope:** One test file or subsystem
-- **Clear goal:** Make these tests pass
-- **Constraints:** Don't change other code
-- **Expected output:** Summary of what you found and fixed
-
-### 3. Dispatch in Parallel
-
-```typescript
-// In Claude Code / AI environment
-Task("Fix agent-tool-abort.test.ts failures")
-Task("Fix batch-completion-behavior.test.ts failures")
-Task("Fix tool-approval-race-conditions.test.ts failures")
-// All three run concurrently
-```
-
-### 4. Review and Integrate
-
-When agents return:
-- Read each summary
-- Verify fixes don't conflict
-- Run full test suite
-- Integrate all changes
-
-## Agent Prompt Structure
-
-Good agent prompts are:
-1. **Focused** - One clear problem domain
-2. **Self-contained** - All context needed to understand the problem
-3. **Specific about output** - What should the agent return?
-
-```markdown
-Fix the 3 failing tests in src/agents/agent-tool-abort.test.ts:
-
-1. "should abort tool with partial output capture" - expects 'interrupted at' in message
-2. "should handle mixed completed and aborted tools" - fast tool aborted instead of completed
-3. "should properly track pendingToolCount" - expects 3 results but gets 0
-
-These are timing/race condition issues. Your task:
-
-1. Read the test file and understand what each test verifies
-2. Identify root cause - timing issues or actual bugs?
-3. Fix by:
-   - Replacing arbitrary timeouts with event-based waiting
-   - Fixing bugs in abort implementation if found
-   - Adjusting test expectations if testing changed behavior
-
-Do NOT just increase timeouts - find the real issue.
-
-Return: Summary of what you found and what you fixed.
-```
-
-## Common Mistakes
-
-**❌ Too broad:** "Fix all the tests" - agent gets lost
-**✅ Specific:** "Fix agent-tool-abort.test.ts" - focused scope
-
-**❌ No context:** "Fix the race condition" - agent doesn't know where
-**✅ Context:** Paste the error messages and test names
-
-**❌ No constraints:** Agent might refactor everything
-**✅ Constraints:** "Do NOT change production code" or "Fix tests only"
-
-**❌ Vague output:** "Fix it" - you don't know what changed
-**✅ Specific:** "Return summary of root cause and changes"
-
-## When NOT to Use
-
-**Related failures:** Fixing one might fix others - investigate together first
-**Need full context:** Understanding requires seeing entire system
-**Exploratory debugging:** You don't know what's broken yet
-**Shared state:** Agents would interfere (editing same files, using same resources)
-
-## Real Example from Session
-
-**Scenario:** 6 test failures across 3 files after major refactoring
-
-**Failures:**
-- agent-tool-abort.test.ts: 3 failures (timing issues)
-- batch-completion-behavior.test.ts: 2 failures (tools not executing)
-- tool-approval-race-conditions.test.ts: 1 failure (execution count = 0)
-
-**Decision:** Independent domains - abort logic separate from batch completion separate from race conditions
-
-**Dispatch:**
-```
-Agent 1 → Fix agent-tool-abort.test.ts
-Agent 2 → Fix batch-completion-behavior.test.ts
-Agent 3 → Fix tool-approval-race-conditions.test.ts
-```
-
-**Results:**
-- Agent 1: Replaced timeouts with event-based waiting
-- Agent 2: Fixed event structure bug (threadId in wrong place)
-- Agent 3: Added wait for async tool execution to complete
-
-**Integration:** All fixes independent, no conflicts, full suite green
-
-**Time saved:** 3 problems solved in parallel vs sequentially
-
-## Key Benefits
-
-1. **Parallelization** - Multiple investigations happen simultaneously
-2. **Focus** - Each agent has narrow scope, less context to track
-3. **Independence** - Agents don't interfere with each other
-4. **Speed** - 3 problems solved in time of 1
-
-## Verification
-
-After agents return:
-1. **Review each summary** - Understand what changed
-2. **Check for conflicts** - Did agents edit same code?
-3. **Run full suite** - Verify all fixes work together
-4. **Spot check** - Agents can make systematic errors
-
-## Real-World Impact
-
-From debugging session (2025-10-03):
-- 6 failures across 3 files
-- 3 agents dispatched in parallel
-- All investigations completed concurrently
-- All fixes integrated successfully
-- Zero conflicts between agent changes
+### 4. 리뷰 및 병합 (Integration)
+- 서브에이전트들이 돌아오면:
+  1. 각 에이전트의 요약 보고서를 정독합니다.
+  2. 수정된 파일들이 겹치지 않고 정합성을 유지하는지 확인합니다.
+  3. 전체 빌드 및 테스트를 구동하여 최종 검증합니다.
+  4. 메인 브랜치(또는 워킹 트리)에 병합합니다.

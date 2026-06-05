@@ -1,21 +1,21 @@
 ---
 name: using-git-worktrees
-description: Use when starting feature work that needs isolation from current workspace or before executing implementation plans - ensures an isolated workspace exists via native tools or git worktree fallback
+description: 현재 작업 공간으로부터 격리가 필요한 새로운 기능 개발을 시작할 때, 또는 구현 계획을 실행하기 전에 이 스킬을 사용하여 격리된 작업 환경을 생성하고 검증합니다.
 ---
 
-# Using Git Worktrees
+# Git 작업 트리 활용 가이드 (Using Git Worktrees)
 
-## Overview
+## 개요 (Overview)
 
-Ensure work happens in an isolated workspace. Prefer your platform's native worktree tools. Fall back to manual git worktrees only when no native tool is available.
+독립된 작업 공간에서 안전하게 개발을 진행할 수 있도록 작업 환경을 격리합니다. 실행 환경(Harness)이나 플랫폼이 지원하는 고유의 네이티브 작업 공간 격리 도구가 있다면 이를 우선적으로 사용하고, 불가능한 경우에만 Git 작업 트리(git worktrees) 명령을 수동으로 실행합니다.
 
-**Core principle:** Detect existing isolation first. Then use native tools. Then fall back to git. Never fight the harness.
+**핵심 원칙:** 이미 격리된 환경인지 먼저 감지하고, 그 다음 플랫폼 고유 도구를 사용하며, 마지막 수단으로 Git 명령을 사용합니다. 실행 환경(Harness)의 제약을 우회하려고 하지 마십시오.
 
-**Announce at start:** "I'm using the using-git-worktrees skill to set up an isolated workspace."
+**시작 시 안내 메시지:** "격리된 작업 공간을 설정하기 위해 using-git-worktrees 스킬을 사용합니다."
 
-## Step 0: Detect Existing Isolation
+## 0단계: 기존 격리 여부 감지 (Detect Existing Isolation)
 
-**Before creating anything, check if you are already in an isolated workspace.**
+**새로 무언가를 생성하기 전에, 이미 격리된 작업 공간에 진입해 있는 상태인지 먼저 점검합니다.**
 
 ```bash
 GIT_DIR=$(cd "$(git rev-parse --git-dir)" 2>/dev/null && pwd -P)
@@ -23,97 +23,94 @@ GIT_COMMON=$(cd "$(git rev-parse --git-common-dir)" 2>/dev/null && pwd -P)
 BRANCH=$(git branch --show-current)
 ```
 
-**Submodule guard:** `GIT_DIR != GIT_COMMON` is also true inside git submodules. Before concluding "already in a worktree," verify you are not in a submodule:
+**서브모듈 방지 장치:** `GIT_DIR != GIT_COMMON` 조건은 Git 서브모듈(submodule) 내부인 경우에도 참이 됩니다. 이미 작업 트리 환경에 있는 것으로 잘못 판단하지 않도록 서브모듈 여부를 먼저 교차 검증합니다:
 
 ```bash
-# If this returns a path, you're in a submodule, not a worktree — treat as normal repo
+# 이 명령의 출력 결과로 경로가 반환된다면 작업 트리가 아니라 서브모듈 내부인 상태입니다. (일반 저장소로 처리)
 git rev-parse --show-superproject-working-tree 2>/dev/null
 ```
 
-**If `GIT_DIR != GIT_COMMON` (and not a submodule):** You are already in a linked worktree. Skip to Step 3 (Project Setup). Do NOT create another worktree.
+**`GIT_DIR != GIT_COMMON`이 참이고 서브모듈이 아닌 경우:** 이미 연결된 Git 작업 트리 내에서 실행 중인 상태입니다. 이 경우 3단계(프로젝트 설정)로 건너뜁니다. 추가로 작업 트리를 중복 생성하지 마십시오.
 
-Report with branch state:
-- On a branch: "Already in isolated workspace at `<path>` on branch `<name>`."
-- Detached HEAD: "Already in isolated workspace at `<path>` (detached HEAD, externally managed). Branch creation needed at finish time."
+현재 브랜치 상태와 함께 진행 상황을 보고합니다:
+- 특정 브랜치 진입 상태: "`<name>` 브랜치의 격리된 작업 공간 `<path>`에 이미 진입해 있습니다."
+- 분리된 HEAD (detached HEAD) 상태: "이미 외부에서 관리되는 작업 공간 `<path>` (detached HEAD 상태)에 진입해 있습니다. 작업 종료 시점에 브랜치 생성이 필요합니다."
 
-**If `GIT_DIR == GIT_COMMON` (or in a submodule):** You are in a normal repo checkout.
+**`GIT_DIR == GIT_COMMON`인 경우 (또는 서브모듈 내부인 경우):** 일반 저장소 환경입니다.
 
-Has the user already indicated their worktree preference in your instructions? If not, ask for consent before creating a worktree:
+사용자의 명시적 요청이나 지침서 내의 선호도가 지정되어 있지 않다면, 작업 트리를 생성하기 전에 사용자의 동의를 구합니다:
 
-> "Would you like me to set up an isolated worktree? It protects your current branch from changes."
+> "현재 브랜치와 작업 내역을 보호하기 위해 격리된 Git 작업 트리(worktree)를 설정할까요?"
 
-Honor any existing declared preference without asking. If the user declines consent, work in place and skip to Step 3.
+사용자가 사전에 지정한 선호도가 있다면 확인 과정 없이 이를 존중하여 실행합니다. 사용자가 동의하지 않는 경우, 현재 폴더 그대로 작업을 진행하고 3단계로 바로 건너뜁니다.
 
-## Step 1: Create Isolated Workspace
+## 1단계: 격리된 작업 공간 생성 (Create Isolated Workspace)
 
-**You have two mechanisms. Try them in this order.**
+**다음 순서에 따라 격리된 작업 공간을 확보합니다.**
 
-### 1a. Native Worktree Tools (preferred)
+### 1a. 플랫폼 네이티브 도구 우선 사용 (Native Worktree Tools - 우선 권장)
 
-The user has asked for an isolated workspace (Step 0 consent). Do you already have a way to create a worktree? It might be a tool with a name like `EnterWorktree`, `WorktreeCreate`, a `/worktree` command, or a `--worktree` flag. If you do, use it and skip to Step 3.
+1단계에서 사용자가 격리된 작업 공간 설정을 승인한 경우, 현재 플랫폼이나 에이전트 시스템에 기본 제공되는 격리 공간 설정 기능(예: `EnterWorktree`, `WorktreeCreate` 도구, `/worktree` 슬래시 명령, 또는 `--worktree` 플래그)이 있는지 확인합니다. 사용 가능한 플랫폼 도구가 있다면 이를 호출하여 생성하고, 3단계로 건너뜁니다.
 
-Native tools handle directory placement, branch creation, and cleanup automatically. Using `git worktree add` when you have a native tool creates phantom state your harness can't see or manage.
+네이티브 플랫폼 도구는 디렉토리 배치, 브랜치 생성 및 정리(cleanup) 작업을 안전하게 자동화해 줍니다. 이러한 도구가 있음에도 불구하고 임의로 수동 `git worktree add` 명령을 날리면 플랫폼 시스템이 이를 감지하지 못해 불일치 상태가 발생할 수 있습니다.
 
-Only proceed to Step 1b if you have no native worktree tool available.
+수동 Git 작업 트리는 플랫폼 고유 도구가 없을 때에만 1b 단계에 따라 생성합니다.
 
-### 1b. Git Worktree Fallback
+### 1b. Git 작업 트리 수동 생성 (Git Worktree Fallback)
 
-**Only use this if Step 1a does not apply** — you have no native worktree tool available. Create a worktree manually using git.
+**1a 단계의 전용 플랫폼 도구가 없는 경우에만 이 단계를 실행합니다.** Git 명령어를 사용해 수동으로 작업 트리를 설정합니다.
 
-#### Directory Selection
+#### 작업 디렉토리 선정
 
-Follow this priority order. Explicit user preference always beats observed filesystem state.
+아래의 우선순위에 따라 경로를 결정합니다. 사용자의 명시적인 지정이 최우선입니다.
 
-1. **Check your instructions for a declared worktree directory preference.** If the user has already specified one, use it without asking.
-
-2. **Check for an existing project-local worktree directory:**
+1. **지침서 내에 지정된 선호도 확인**: 이미 지정된 경로가 있다면 질문 없이 그 경로를 사용합니다.
+2. **프로젝트 내부의 기존 작업 트리 폴더 탐색**:
    ```bash
-   ls -d .worktrees 2>/dev/null     # Preferred (hidden)
-   ls -d worktrees 2>/dev/null      # Alternative
+   ls -d .worktrees 2>/dev/null     # 권장 (숨김 디렉토리)
+   ls -d worktrees 2>/dev/null      # 대안
    ```
-   If found, use it. If both exist, `.worktrees` wins.
-
-3. **Check for an existing global directory:**
+   존재하는 디렉토리를 사용하며, 둘 다 있다면 `.worktrees`를 우선적으로 사용합니다.
+3. **글로벌 기본 경로 점검**:
    ```bash
    project=$(basename "$(git rev-parse --show-toplevel)")
    ls -d ~/.config/superpowers/worktrees/$project 2>/dev/null
    ```
-   If found, use it (backward compatibility with legacy global path).
+   기존 이력이 감지되면 하위 호환성을 위해 이 경로를 사용합니다.
+4. **다른 가이드가 없는 경우**, 기본적으로 프로젝트 루트 하위에 `.worktrees/` 디렉토리를 생성하여 사용합니다.
 
-4. **If there is no other guidance available**, default to `.worktrees/` at the project root.
+#### 무시(Ignore) 설정 검증 (프로젝트 내부 디렉토리인 경우 필수)
 
-#### Safety Verification (project-local directories only)
-
-**MUST verify directory is ignored before creating worktree:**
+**작업 트리를 생성하기 전에, 해당 디렉토리가 git ignore 설정에 등록되어 있는지 반드시 확인해야 합니다:**
 
 ```bash
 git check-ignore -q .worktrees 2>/dev/null || git check-ignore -q worktrees 2>/dev/null
 ```
 
-**If NOT ignored:** Add to .gitignore, commit the change, then proceed.
+**Ignore 등록이 안 되어 있는 경우:** `.gitignore` 파일에 해당 디렉토리를 추가하고 이 변경 사항을 커밋한 후 다음으로 진행합니다.
 
-**Why critical:** Prevents accidentally committing worktree contents to repository.
+**이유**: 작업 트리 내의 전체 코드와 파일들이 원저장소 git에 중복 추적 및 커밋되는 참사를 방지하기 위함입니다.
 
-Global directories (`~/.config/superpowers/worktrees/`) need no verification.
+글로벌 경로(`~/.config/superpowers/worktrees/`)를 사용할 때는 이 검증 단계를 생략합니다.
 
-#### Create the Worktree
+#### 작업 트리 생성 및 이동
 
 ```bash
 project=$(basename "$(git rev-parse --show-toplevel)")
 
-# Determine path based on chosen location
-# For project-local: path="$LOCATION/$BRANCH_NAME"
-# For global: path="~/.config/superpowers/worktrees/$project/$BRANCH_NAME"
+# 선정된 위치에 따라 경로 결정
+# 프로젝트 내부 폴더: path="$LOCATION/$BRANCH_NAME"
+# 글로벌 폴더: path="~/.config/superpowers/worktrees/$project/$BRANCH_NAME"
 
 git worktree add "$path" -b "$BRANCH_NAME"
 cd "$path"
 ```
 
-**Sandbox fallback:** If `git worktree add` fails with a permission error (sandbox denial), tell the user the sandbox blocked worktree creation and you're working in the current directory instead. Then run setup and baseline tests in place.
+**권한 에러 발생 시 처리:** 만약 샌드박스 정책 등으로 인해 `git worktree add`가 권한 부족 에러로 실패하면, 사용자에게 상황을 알리고 현재 디렉토리 그대로 작업을 진행(sandbox fallback)합니다. 그 후 의존성 설치 및 baseline 테스트를 현재 폴더에서 수행합니다.
 
-## Step 3: Project Setup
+## 3단계: 프로젝트 설정 및 의존성 빌드 (Project Setup)
 
-Auto-detect and run appropriate setup:
+프로젝트 구성을 자동 감지하여 적합한 셋업 명령을 실행합니다:
 
 ```bash
 # Node.js
@@ -130,86 +127,80 @@ if [ -f pyproject.toml ]; then poetry install; fi
 if [ -f go.mod ]; then go mod download; fi
 ```
 
-## Step 4: Verify Clean Baseline
+## 4단계: 테스트 기준선 검증 (Verify Clean Baseline)
 
-Run tests to ensure workspace starts clean:
+작업 공간이 깨끗하고 정상적인 빌드 상태인지 확인하기 위해 기존 테스트 코드를 실행합니다:
 
 ```bash
-# Use project-appropriate command
+# 프로젝트에 적합한 테스트 러너 실행
 npm test / cargo test / pytest / go test ./...
 ```
 
-**If tests fail:** Report failures, ask whether to proceed or investigate.
+**테스트가 실패하는 경우:** 실패한 테스트 내역을 보고하고, 작업을 계속 진행할지 아니면 실패 원인 조사를 먼저 수행할지 사용자에게 문의합니다.
 
-**If tests pass:** Report ready.
+**테스트가 모두 통과하는 경우:** 구현 준비 완료 상태를 보고합니다.
 
-### Report
+### 완료 보고 형식
 
 ```
-Worktree ready at <full-path>
-Tests passing (<N> tests, 0 failures)
-Ready to implement <feature-name>
+작업 트리 준비 완료: <full-path>
+테스트 통과 검증 완료 (<N>개 테스트 통과, 0개 실패)
+<feature-name> 기능 구현을 시작할 준비가 되었습니다.
 ```
 
-## Quick Reference
+## 빠른 참조 (Quick Reference)
 
-| Situation | Action |
+| 상황 | 수행할 액션 |
 |-----------|--------|
-| Already in linked worktree | Skip creation (Step 0) |
-| In a submodule | Treat as normal repo (Step 0 guard) |
-| Native worktree tool available | Use it (Step 1a) |
-| No native tool | Git worktree fallback (Step 1b) |
-| `.worktrees/` exists | Use it (verify ignored) |
-| `worktrees/` exists | Use it (verify ignored) |
-| Both exist | Use `.worktrees/` |
-| Neither exists | Check instruction file, then default `.worktrees/` |
-| Global path exists | Use it (backward compat) |
-| Directory not ignored | Add to .gitignore + commit |
-| Permission error on create | Sandbox fallback, work in place |
-| Tests fail during baseline | Report failures + ask |
-| No package.json/Cargo.toml | Skip dependency install |
+| 이미 격리된 작업 트리 상태 | 0단계에 따라 생성 단계 건너뛰고 프로젝트 셋업 진행 |
+| Git 서브모듈 내부인 경우 | 일반 저장소와 동일하게 처리 (작업 트리 생성 시도) |
+| 네이티브 플랫폼 격리 도구가 있는 경우 | 1a 단계에 따라 해당 도구 호출 |
+| 네이티브 도구가 없는 경우 | 1b 단계에 따라 수동 Git 작업 트리 생성 |
+| `.worktrees/` 폴더가 이미 있는 경우 | 해당 경로 사용 (check-ignore 검증 필수) |
+| `worktrees/` 폴더가 이미 있는 경우 | 해당 경로 사용 (check-ignore 검증 필수) |
+| 둘 다 있는 경우 | `.worktrees/` 경로 우선 사용 |
+| 둘 다 없는 경우 | 지침 내 경로 확인 후 없으면 `.worktrees/` 생성 |
+| 기존 글로벌 백업 경로가 있는 경우 | 하위 호환성을 위해 사용 |
+| 생성 디렉토리가 check-ignore에 없음 | `.gitignore`에 추가 및 커밋 완료 후 생성 |
+| 권한 거부 에러 발생 시 | 현재 폴더에서 직접 작업 진행 (sandbox fallback) |
+| 기존 테스트 실패 시 | 실패 내역 보고 후 진행 여부 사용자 확인 |
+| 설정 파일(package.json 등)이 없는 경우 | 의존성 설치 단계 건너뜀 |
 
-## Common Mistakes
+## 자주 발생하는 실수 (Common Mistakes)
 
-### Fighting the harness
+### 시스템 환경(Harness)과의 충돌
+- **문제**: 플랫폼이 이미 자동으로 격리된 공간을 구성해 주었음에도 수동으로 `git worktree add`를 수행하여 이중 격리를 유발함.
+- **해결책**: 0단계에서 환경을 철저히 진단하고, 1a 단계의 네이티브 도구의 존재 여부를 최우선으로 점검하십시오.
 
-- **Problem:** Using `git worktree add` when the platform already provides isolation
-- **Fix:** Step 0 detects existing isolation. Step 1a defers to native tools.
+### 사전 격리 감지 생략
+- **문제**: 이미 작업 트리 내부인 상태에서 또다시 작업 트리를 중첩 생성함.
+- **해결책**: 무언가를 만들기 전에 반드시 0단계 Git 환경 검사 명령을 실행하십시오.
 
-### Skipping detection
+### ignore 검증 생략
+- **문제**: 작업 트리 내부의 수많은 빌드 파일들이 git status 상에 변경사항으로 추적되며 소스코드가 오염됨.
+- **해결책**: 프로젝트 로컬 폴더에 작업 트리를 생성할 때는 반드시 `git check-ignore` 명령어로 무시 설정 여부를 교차 검증하십시오.
 
-- **Problem:** Creating a nested worktree inside an existing one
-- **Fix:** Always run Step 0 before creating anything
+### 임의의 디렉토리 배치
+- **문제**: 프로젝트에서 약속된 경로 규격 외의 임의의 이름으로 폴더를 지저분하게 생성함.
+- **해결책**: 기존 폴더 구성 및 마스터 지침 선호도를 확인하고 약속된 네이밍 규칙을 준수하십시오.
 
-### Skipping ignore verification
+### 기존 테스트 실패 무시
+- **문제**: 새로 구현한 코드 때문에 깨진 버그인지, 원래 깨져 있던 버그인지 구분이 불가능해짐.
+- **해결책**: 셋업 완료 후 반드시 테스트 러너를 구동하여 깨끗한 상태(clean baseline)를 입증하십시오.
 
-- **Problem:** Worktree contents get tracked, pollute git status
-- **Fix:** Always use `git check-ignore` before creating project-local worktree
+## 금지 및 필수 사항 (Red Flags & Commitments)
 
-### Assuming directory location
+**절대 금지 (Never):**
+- 0단계에서 이미 격리 상태임이 확인되었음에도 작업 트리를 중복으로 생성
+- 플랫폼 전용 격리 도구(예: `EnterWorktree`)가 있음에도 불구하고 임의로 `git worktree add` 명령을 날림 (가장 흔히 저지르는 실수입니다)
+- ignore 검증 없이 로컬 디렉토리에 작업 트리 생성
+- 빌드/테스트 기준선(baseline) 확인 단계를 생략
+- 기존 테스트가 실패하는 상황에서 사용자의 승인 없이 멋대로 소스코드 수정 단계로 이행
 
-- **Problem:** Creates inconsistency, violates project conventions
-- **Fix:** Follow priority: existing > global legacy > instruction file > default
-
-### Proceeding with failing tests
-
-- **Problem:** Can't distinguish new bugs from pre-existing issues
-- **Fix:** Report failures, get explicit permission to proceed
-
-## Red Flags
-
-**Never:**
-- Create a worktree when Step 0 detects existing isolation
-- Use `git worktree add` when you have a native worktree tool (e.g., `EnterWorktree`). This is the #1 mistake — if you have it, use it.
-- Skip Step 1a by jumping straight to Step 1b's git commands
-- Create worktree without verifying it's ignored (project-local)
-- Skip baseline test verification
-- Proceed with failing tests without asking
-
-**Always:**
-- Run Step 0 detection first
-- Prefer native tools over git fallback
-- Follow directory priority: existing > global legacy > instruction file > default
-- Verify directory is ignored for project-local
-- Auto-detect and run project setup
-- Verify clean test baseline
+**항상 실행 (Always):**
+- 작업을 시작하기 전에 0단계 Git 환경 검사 실행
+- 수동 Git 명령어보다 플랫폼 고유 도구의 사용 가능 여부를 먼저 판별
+- 작업 트리 경로 선정 시 지정된 우선순위 규칙 준수
+- 프로젝트 내부 폴더 사용 시 ignore 무시 처리 검증 및 커밋 반영
+- 프로젝트 셋업 및 의존성 빌드 자동 처리
+- 코딩 시작 전 빌드 및 테스트 통과 기준선 입증

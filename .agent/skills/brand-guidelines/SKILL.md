@@ -1,73 +1,32 @@
 ---
 name: brand-guidelines
-description: Applies Anthropic's official brand colors and typography to any sort of artifact that may benefit from having Anthropic's look-and-feel. Use it when brand colors or style guidelines, visual formatting, or company design standards apply.
-license: Complete terms in LICENSE.txt
+description: QMS 시스템 및 관련 아티팩트에 적용할 공식 브랜드 색상, 타이포그래피 및 시각 레이아웃 가이드라인 스킬.
 ---
 
-# Anthropic Brand Styling
+# 🎨 QMS 브랜드 및 시각 스타일 가이드 (brand-guidelines)
 
-## Overview
+본 가이드는 QMS v2 시스템 및 산출물(보고서, UI 컴포넌트 등)을 디자인할 때 시각적 일관성을 확보하고 프리미엄 브랜드 정체성을 유지하기 위한 디자인 가이드라인입니다.
 
-To access Anthropic's official brand identity and style resources, use this skill.
+## 1. QMS 기본 브랜드 색상 (Color Palette)
+일반적이고 촌스러운 원색을 지양하고, HSL 기반의 모던하고 신뢰감을 주는 색상 조합을 채택합니다.
 
-**Keywords**: branding, corporate identity, visual identity, post-processing, styling, brand colors, typography, Anthropic brand, visual formatting, visual design
+### 메인 테마 색상
+- **Dark (어두운 배경/텍스트)**: `#1e1e24` (매우 짙은 그레이, 소프트 다크 테마 기본 배경)
+- **Light (밝은 배경/텍스트)**: `#f8f9fa` (깔끔한 연한 회백색)
+- **Mid Gray (보조 요소)**: `#a0aab2` (차분한 보조 그레이)
+- **Light Gray (은은한 구분선/배경)**: `#e9ecef` (은은한 카드 배경 및 테두리)
 
-## Brand Guidelines
+### 포인트/강조 색상 (Accent Colors)
+- **Primary Accent (주요 강조)**: `#3b82f6` (신뢰감을 주는 모던 블루, 신우밸브 브랜드 테마)
+- **Secondary Accent (경고/이슈)**: `#ef4444` (가시성이 높은 에러/경고용 레드)
+- **Success Accent (성공/정상)**: `#10b981` (안정감을 주는 완료/성공용 에메랄드 그린)
 
-### Colors
+## 2. 타이포그래피 (Typography)
+- **제목 (Headings)**: `Outfit` 또는 `Inter` (없을 경우 `system-ui` 또는 `sans-serif`로 부드럽게 대체)
+- **본문 (Body)**: `Inter` 또는 `Roboto` (기본 브라우저 가독성 극대화)
+- **주의**: 한글 폰트의 가독성을 최우선으로 고려하며, 고딕(sans-serif) 계열을 사용하여 깔끔함을 유지합니다.
 
-**Main Colors:**
-
-- Dark: `#141413` - Primary text and dark backgrounds
-- Light: `#faf9f5` - Light backgrounds and text on dark
-- Mid Gray: `#b0aea5` - Secondary elements
-- Light Gray: `#e8e6dc` - Subtle backgrounds
-
-**Accent Colors:**
-
-- Orange: `#d97757` - Primary accent
-- Blue: `#6a9bcc` - Secondary accent
-- Green: `#788c5d` - Tertiary accent
-
-### Typography
-
-- **Headings**: Poppins (with Arial fallback)
-- **Body Text**: Lora (with Georgia fallback)
-- **Note**: Fonts should be pre-installed in your environment for best results
-
-## Features
-
-### Smart Font Application
-
-- Applies Poppins font to headings (24pt and larger)
-- Applies Lora font to body text
-- Automatically falls back to Arial/Georgia if custom fonts unavailable
-- Preserves readability across all systems
-
-### Text Styling
-
-- Headings (24pt+): Poppins font
-- Body text: Lora font
-- Smart color selection based on background
-- Preserves text hierarchy and formatting
-
-### Shape and Accent Colors
-
-- Non-text shapes use accent colors
-- Cycles through orange, blue, and green accents
-- Maintains visual interest while staying on-brand
-
-## Technical Details
-
-### Font Management
-
-- Uses system-installed Poppins and Lora fonts when available
-- Provides automatic fallback to Arial (headings) and Georgia (body)
-- No font installation required - works with existing system fonts
-- For best results, pre-install Poppins and Lora fonts in your environment
-
-### Color Application
-
-- Uses RGB color values for precise brand matching
-- Applied via python-pptx's RGBColor class
-- Maintains color fidelity across different systems
+## 3. 프리미엄 디자인 구성 가이드
+- **둥근 모서리 (Border Radius)**: 카드는 `rounded-2xl` (1rem), 버튼은 `rounded-lg` (0.5rem)를 사용하여 유연하고 모던한 느낌을 부여합니다.
+- **그림자 (Shadow)**: 강렬하고 검은 그림자를 배제하고, `shadow-sm` 또는 입체감이 있는 `backdrop-blur` (글래스모피즘) 효과를 적절히 융합합니다.
+- **애니메이션**: 버튼 호버 시 `transition-all duration-300 hover:scale-102` 등 미세하고 자연스러운 미크로-인터랙션을 적용합니다.
