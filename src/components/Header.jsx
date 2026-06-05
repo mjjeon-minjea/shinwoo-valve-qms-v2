@@ -1,9 +1,11 @@
 import { useState } from 'react';
+import { Eye, EyeOff } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import logo from '../assets/logo.png';
 
 const Header = ({ isLoggedIn, onLogout, currentUser, onUpdateProfile }) => {
     const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
 
     const handleProfileSubmit = (e) => {
         e.preventDefault();
@@ -79,7 +81,12 @@ const Header = ({ isLoggedIn, onLogout, currentUser, onUpdateProfile }) => {
                                                 </div>
                                                 <div>
                                                     <label className="block text-xs font-medium text-slate-700 mb-1">비밀번호 변경</label>
-                                                    <input name="password" type="password" defaultValue={currentUser?.password || ''} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 text-sm" placeholder="새 비밀번호" />
+                                                    <div className="relative">
+                                                        <input name="password" type={showPassword ? "text" : "password"} defaultValue={currentUser?.password || ''} className="w-full px-3 py-2 pr-10 border rounded-lg focus:ring-2 focus:ring-primary-500 text-sm" placeholder="새 비밀번호" />
+                                                        <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 focus:outline-none">
+                                                            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                                        </button>
+                                                    </div>
                                                 </div>
 
                                                 <div className="pt-2 flex gap-2">
