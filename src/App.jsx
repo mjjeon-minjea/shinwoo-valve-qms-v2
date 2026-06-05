@@ -108,9 +108,24 @@ const AppContent = () => {
     const handleUpdateProfile = async (updatedData) => {
         if (!user) return;
         try {
+            // 비밀번호 변경 여부 파악
+            const isPasswordChange = updatedData.password && updatedData.password.trim() !== '';
+
+            if (isPasswordChange) {
+                // 1. Supabase Auth 비밀번호 갱신 (로그인에 실제 사용되는 비밀번호)
+                const { error: authError } = await supabase.auth.updateUser({
+                    password: updatedData.password.trim()
+                });
+                if (authError) throw authError;
+            }
+
+            // 2. users 테이블 업데이트 (이름, 부서, 직급, 비밀번호 컬럼)
             const { error } = await supabase.from('users').update(updatedData).eq('email', user.email);
             if (error) throw error;
-            alert('프로필이 수정되었습니다. (새로고침 시 반영)');
+
+            alert(isPasswordChange
+                ? '프로필 및 비밀번호가 수정되었습니다. 다음 로그인부터 새 비밀번호를 사용하세요.'
+                : '프로필이 수정되었습니다. (새로고침 시 반영)');
         } catch (err) {
             alert('수정 실패: ' + err.message);
         }
