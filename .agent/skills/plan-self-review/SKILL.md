@@ -37,11 +37,11 @@
 
 ### 2단계: 잠긴 표면 침범 여부 확인
 
-`04_harness_constraints.md`의 잠긴 표면 목록과 계획서의 수정 대상을 대조한다.
+`GEMINI.md` §5-1의 잠긴 표면 목록과 계획서의 수정 대상을 대조한다.
 
 ```
 □ .eslintrc.cjs를 수정하려 하지 않는가?
-□ .agent/rules/04_harness_constraints.md를 수정하려 하지 않는가?
+□ .agent/rules/GEMINI.md의 §5 하네스 제약 섹션을 무단 수정하려 하지 않는가?
 □ .agent/skills/qms-orchestrator/scripts/ 하위 파일을 건드리지 않는가?
 ```
 
