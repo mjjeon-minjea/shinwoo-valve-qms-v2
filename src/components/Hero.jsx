@@ -275,12 +275,19 @@ const Hero = ({ onLogin, onSignup, migrationState, onMigrate, onCancelMigration 
                                                 <Lock className="h-4.5 w-4.5 text-slate-400" />
                                             </div>
                                             <input
-                                                type="password"
+                                                type={showPassword ? "text" : "password"}
                                                 id="password"
                                                 required
-                                                className="block w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-slate-900 focus:border-transparent transition-all placeholder:text-slate-400 text-sm"
+                                                className="block w-full pl-11 pr-10 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-slate-900 focus:border-transparent transition-all placeholder:text-slate-400 text-sm"
                                                 placeholder="••••••••"
                                             />
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowPassword(!showPassword)}
+                                                className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 focus:outline-none"
+                                            >
+                                                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                            </button>
                                         </div>
                                     </div>
 
