@@ -10,6 +10,9 @@
  *   PROD_SERVICE_ROLE_KEY    — 메인 DB service-role JWT
  *   VITE_SUPABASE_URL        — 테스트 DB HTTP URL
  *   SUPABASE_SERVICE_ROLE_KEY — 테스트 DB service-role JWT
+ *
+ * ⚠️ 운영 규칙: 테스트 DB 포함 모든 스키마 변경(ALTER/CREATE/DROP)은
+ *   대화창에서 차장님 사전 승인 후에만 실행한다. (GEMINI.md §5-2)
  */
 
 import { createClient } from '@supabase/supabase-js';
@@ -58,14 +61,15 @@ const stagingDb = createClient(stagingUrl, stagingKey, { auth: { persistSession:
 // ── 복제 대상 테이블 ──
 const TARGET_TABLES = [
   'users',
+  'dev_notes',
+  'notices',
   'weekly_reports',
+  'process_inspections',
   'inspections',
   'item_master',
-  'process_inspections',
-  'calendar_events',
   'inquiries',
-  'resources',
   'suggestions',
+  'settings',
 ];
 
 // ── 메인 실행 ──

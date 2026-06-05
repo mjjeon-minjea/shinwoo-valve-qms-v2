@@ -17,7 +17,7 @@
 
 ## 4. 성찰 및 예방
 - 데이터베이스 트랜잭션과 실물 IO 간의 지연 편차는 로컬 개발 서버에서 흔히 간과하기 쉬운 단골 실패 패턴입니다.
-- 이 대책은 하네스 룰셋 [.agent/rules/04_harness_constraints.md](file:///C:/Users/mjjeon/Desktop/QMS%20프로젝트/shinwoo-valve-qms/.agent/rules/04_harness_constraints.md)에 정식 등재되어 향후 비동기 동기화 로직 구현 시 에이전트의 망각을 원천 차단하게 됩니다.
+- 이 대책은 하네스 룰셋 [.agent/rules/GEMINI.md §5](file:///C:/Users/mjjeon/Desktop/QMS%20프로젝트/shinwoo-valve-qms/.agent/rules/GEMINI.md)에 정식 등재되어 향후 비동기 동기화 로직 구현 시 에이전트의 망각을 원천 차단하게 됩니다.
 
 ---
 * **최종 조치일:** 2026-04-07

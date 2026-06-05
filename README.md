@@ -1,6 +1,6 @@
 # 🏢 신우밸브주식회사 품질보증부 QMS 홈페이지 (v2)
 
-> **AI 에이전트 전역 안내 조항**: 이 프로젝트를 작업하는 모든 AI 에이전트는 진짜 전역 규칙 파일인 `C:\Users\mjjeon\.gemini\GEMINI.md` 및 프로젝트 로컬 규칙인 `.agent/rules/` 디렉토리를 **반드시 세션 시작 즉시 1순위로 필독**하여 한글 소통 의무와 하네스 DNAS 3단계 결재 프로세스, 그리고 영구 금지 규칙 13가지를 철저히 준수해야 합니다.
+> **AI 에이전트 전역 안내 조항**: 이 프로젝트를 작업하는 모든 AI 에이전트는 진짜 전역 규칙 파일인 `C:\Users\mjjeon\.gemini\GEMINI.md` 및 프로젝트 로컬 규칙인 `.agent/rules/GEMINI.md`를 **반드시 세션 시작 즉시 1순위로 필독**하여 한글 소통 의무와 하네스 DNAS 3단계 결재 프로세스, 그리고 영구 금지 규칙 13가지를 철저히 준수해야 합니다.
 
 ---
 
@@ -36,11 +36,7 @@
 ```
 ├── .agent/
 │   ├── rules/
-│   │   ├── GEMINI.md       # 마스터 규칙 (진짜 전역 규칙 상속 선언 및 하부 룰 이정표)
-│   │   ├── 01_tech_stack.md# 기술 스택, PowerShell 터미널 및 환경변수 코드 규칙
-│   │   ├── 02_dnas_process.md # 3단계 결재 DNAS 및 다단계 승인 배포 프로토콜
-│   │   ├── 03_archiving.md # 지식 자산화 4대 대화 분석 아카이빙 규칙
-│   │   └── 04_harness_constraints.md # 하네스 제약, 영구 금지 룰 및 자가검토 의무화
+│   │   └── GEMINI.md       # 통합 워크스페이스 규칙 (기술스택/결재/아카이빙/스킬/하네스 전부 통합)
 │   └── skills/
 │       ├── qms-orchestrator/ # QMS v2 오케스트레이터 및 검증 모듈
 │       ├── revision-archiver/ # Plan/Walkthrough 리비전 자동 아카이버 스킬
