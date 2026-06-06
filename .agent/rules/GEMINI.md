@@ -47,12 +47,12 @@ trigger: always_on
 * **revision-archiver (리비전 관리)**
   * **경로**: `.agent/skills/revision-archiver/SKILL.md`
   * **상황**: 아티팩트 리비전 관리 시
-  * **철칙**: 아티팩트 수정 시 원본 파일 덮어쓰기 금지 및 리비전 넘버링 정적 백업
+  * **철칙**: 아티팩트 수정 시 원본 덮어쓰기 금지 및 한글 '연/월/일' 폴더 하위에 리비전 분리 저장
 
 * **image-archiver (이미지 아카이브)**
   * **경로**: `.agent/skills/image-archiver/SKILL.md`
   * **상황**: 이미지 생성 및 보관 시
-  * **철칙**: 생성형 이미지 생성 즉시 프로젝트 공식 이전 경로로 복사 보존
+  * **철칙**: 생성형 이미지 생성 즉시 한글 '연/월/일' 이미지 아카이브 폴더로 자동 이전 보존
 
 * **harness-constraints (시스템 제약)**
   * **경로**: `.agent/skills/harness-constraints/SKILL.md`
