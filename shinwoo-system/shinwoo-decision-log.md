@@ -186,3 +186,20 @@
 - **이유**: 기존 이중 카피의 정합성 유실 및 에이전트 폭주 버그를 근본적으로 무력화하고, 안티그래비티 2.0의 파일 자동 감지 명세(`GEMINI.md` 파일명 강제)와 전역-로컬 영토 격리 사상을 완벽하게 조화시킴.
 - **영향**: 로컬 `GEMINI.md` 한 권으로 전역 규칙 자동 연동 및 하부 01~04번 규칙들의 구동 지도가 한눈에 스캔되어 룰셋 응집도가 200% 극대화됨.
 - **주의**: 새 에이전트 세션 구동 시, 로컬의 `GEMINI.md` 파일명을 `qms_rules.md` 등으로 무단 변경하지 말 것 (파일명 감지 로더 연동 실패 유발).
+
+### DEC-023: 스킬 명칭 kebab-case 표준화 및 react-best-practices name 일치화
+- **날짜**: 2026-06-06 (대화 14436e7d)
+- **결정**: `dnas_process` -> `dnas-process`, `tech_stack` -> `tech-stack`, `harness_constraints` -> `harness-constraints`, `knowledge_archiving` -> `knowledge-archiving`으로 스킬 명칭 및 폴더명을 kebab-case로 전면 변환하고, `react-best-practices` 스킬의 frontmatter name을 `react-best-practices`로 통일함.
+- **이유**: 일관된 명명 규칙을 적용하고, 린트 및 파서의 오작동 확률을 영구적으로 제거하기 위함.
+- **영향**: 메인 규칙 `GEMINI.md`와 하위 스킬의 정합성이 극대화됨.
+
+### DEC-024: qms-orchestrator 스킬 생성 및 _shared 중복 소거
+- **날짜**: 2026-06-06 (대화 14436e7d)
+- **결정**: 누락된 `qms-orchestrator` 스킬 정의 파일 `SKILL.md`를 신규 생성하고, `.agent/_shared` 하위의 중복 파일(`dnas_process.md`, `tech_stack.md`)을 영구 삭제함.
+- **이유**: 단일 진실 공급원(SOT) 원칙을 수호하고 스킬 자동 감지 시스템의 누락을 제거하기 위함.
+
+### DEC-025: 저장소 하이진 강화 및 API 설정 중앙화
+- **날짜**: 2026-06-06 (대화 01aac506-d800-4b80-9014-318315ccbea5)
+- **결정**: `.gitignore` 보강 및 `git rm --cached` 일대일 대응을 통해 환경변수 변형, 백업 덤프, 캐시(`graphify-out/`), 스크래치(`scratch/`), 옵시디언 설정을 추적 해제하되, 옵시디언 위키 콘텐츠와 `GEMINI.md`는 안전하게 예외처리하여 보존함. 더불어 `src/config/config.js`로 `localhost:3001` 주소를 일원화함.
+- **이유**: 민감 정보의 잔존 유출 방지 및 저장소 청결 극대화, 그리고 포트 변경에 대비한 설정 유지보수성 확보를 위함.
+- **주의**: 옵시디언 위키와 핵심 헌법인 `GEMINI.md`가 유실되지 않도록 `!.obsidian/wiki/` 및 `!.obsidian/GEMINI.md` 패턴을 지켜야 함.

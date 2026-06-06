@@ -1,29 +1,40 @@
 # 🤝 QMS v2 세션 통합 메모리 및 인수인계 파일 (HANDOFF.md)
 
-* **최종 갱신일:** 2026년 06월 05일 (오후 세션)
+* **최종 갱신일:** 2026년 06월 06일 (오후 세션)
 * **작성자:** QMS AI 전담 비서 안티그래비티
 * **인계대상:** 다음 세션 구동 AI 에이전트 및 전민재 차장님
 
 ---
 
-## 1. 오늘 세션 주요 성과 (2026-06-05 오후)
+## 1. 오늘 세션 주요 성과 (2026-06-06)
 
-### 📋 1. 팩트체크 후속 조치 [E][D][F] 완료
-- **[E] clone-db TARGET_TABLES 교정**: 9종 → 10종 (`dev_notes`, `notices`, `settings` 추가 / `calendar_events`, `resources` 제외)
-- **복제 결과**: 10개 테이블, 총 2,894건 복제, 메인 DB 쓰기 0건
-- **[D] DDL 승인 게이트**: `clone-db.js` 상단에 차장님 사전 승인 규칙 주석 명기
-- **[F] Database password**: 메인 DB 비밀번호 로테이션 완료
-- **스키마 보정**: 테스트 DB `dev_notes.manager`(text), `notices.files`(jsonb) 컬럼 ALTER TABLE 추가
+### 📋 1. 저장소 하이진(위생) 보강 완수 (오후)
+- **추적 파일 700여 개 대량 해제**: 시크릿 변형(`.env.local.bak` 등), 백업 데이터 덤프(`db.json`, `mes_process_inspections.json` 등), 빌드로그, 임시 스크래치(`scratch/`), 생성 캐시(`graphify-out/`) 등의 git 추적을 완벽하게 해제(`git rm --cached`).
+- **옵시디언 위키 콘텐츠 완전 보존**: `.obsidian` 에디터 개인 설정 및 캐시만 무시하도록 `.gitignore`를 보강하되, 실제 위키 콘텐츠 파일(`.obsidian/wiki/` 97개 문서)과 헌법인 `.obsidian/GEMINI.md`는 안전하게 예외처리하여 추적을 정상 보존.
+- **.env.example 템플릿 신규 생성**: 환경변수 설정 명세 템플릿을 신규 생성하여 git 추적에 추가.
 
-### 📂 2. 규칙 통합 및 정비
-- `.agent/rules/` 하위 01~04 개별 파일 삭제 → `GEMINI.md` 단일 파일로 통합
-- 전역 규칙, plan-self-review 스킬, README.md, HANDOFF.md, docs 2건의 참조를 전부 수정
-- `GEMINI.md` 섹션 제목에서 `(구 XX)` 출처 표시 제거
+### ⚙️ 2. localhost:3001 API 설정 중앙화 (오후)
+- **config.js 신규 주입**: `src/config/config.js`를 생성하여 인트라넷 API 호출 주소(`LOCAL_API_URL`)를 중앙화.
+- **소스코드 이관 및 가드 보존**: `PostApproval.jsx` 및 `DevNotes.jsx`에서 하드코딩되었던 주소를 상수로 대체. 빌드 후 프로덕션 환경과의 분기를 위해 `import.meta.env.DEV` 가드 조건은 철저하게 보존.
 
-### 🗂️ 3. HANDOFF 경로 공식화
-- **공식 경로 확정**: `shinwoo-system\HANDOFF.md` (프로젝트 루트 기준)
-- 전역 규칙 [조항 5], 워크스페이스 규칙 §3-2, knowledge-extractor 스킬에 경로 명시
-- 루트 `HANDOFF.md` → `shinwoo-system\HANDOFF.md`로 이동 완료
+### 🗑️ 3. 중복 및 임시 파일 정리 (오후)
+- 루트 경로에 방치되어 있던 중복 `HANDOFF.md` 및 `scratch/clean_obsidian_wiki.js` 파일을 삭제하여 저장소 위생 극대화.
+
+### 🚀 4. 스테이징 및 메인 배포 완료 (오후)
+- 원격 fetch refspec 설정 오류를 진단·수정하고, 수정 완료된 모든 소스를 `staging` 및 `main` 브랜치에 각각 정상 푸시 완료.
+
+### 📋 5. Claude 구조점검 대응 및 스킬 정규화 완료 (오전)
+- **Claude 지적사항 팩트체크 및 반박**: NUL 바이트 손상 지적이 허위임을 Node.js 바이너리 전수 조사를 통해 규명 (Null count = 0).
+- **kebab-case 개편**: `dnas_process`, `tech_stack`, `harness_constraints`, `knowledge_archiving` 4종 스킬을 kebab-case 폴더명 및 스킬명(`dnas-process`, `tech-stack`, `harness-constraints`, `knowledge-archiving`)으로 변경하고 `rules/GEMINI.md`와 동기화 완료.
+- **오케스트레이터 보완**: 누락되었던 `qms-orchestrator/SKILL.md`를 신규 생성 및 주입.
+- **SOT(단일 진실 공급원) 수립**: `.agent/_shared` 하위의 중복 파일(`dnas_process.md`, `tech_stack.md`)을 완전히 제거하여 중복을 차단.
+- **react-best-practices name 일치**: frontmatter name을 `react-best-practices`로 수정하여 폴더명과 일치 완료.
+
+### 📂 2. 규칙 리포트 및 완료보고서 공식 이관
+- **공식 이관 완료**: [Plan R4](file:///C:/Users/mjjeon/Desktop/QMS%20프로젝트/shinwoo-valve-qms/안티그래비티/plan/2026-06-06_QMS_규칙통합_및_스킬화_R4.md) 및 [Walkthrough R2](file:///C:/Users/mjjeon/Desktop/QMS%20프로젝트/shinwoo-valve-qms/안티그래비티/walkthrough/2026-06-06_QMS_규칙통합_및_스킬화_R2.md)를 공식 이관하여 정식 저장.
+
+### 🚀 3. 스테이징 및 메인 배포 완료
+- 수정 완료된 소스를 `staging` 및 `main` 브랜치에 각각 정상 푸시 완료.
 
 ---
 
@@ -53,14 +64,15 @@
 
 1. **메인웹 Vercel 설정 확인** (W4 — 차장님 수동)
 2. **구 GitHub Pages 비활성화** (W7 — 차장님 수동)
-3. **빌드 OOM**: 로컬 `npx vite build` 시 메모리 부족 크래시 — Vercel 서버 빌드에는 무영향
-4. **service_role key 로테이션**: Supabase에서 개별 로테이션 기능 확인 필요 (보류)
+3. **API 설정 변경에 따른 실배포 모니터링**: Vercel 프로덕션 배포 시 Supabase API fetch 동작 무결성 모니터링
 
 ---
 
 ## 5. 인수인계 핵심 사항
 
-1. **규칙 체계**: `.agent/rules/GEMINI.md` 단일 파일로 통합됨. 01~04 개별 파일은 삭제됨.
-2. **문서 4종 작성 시**: `.agent/rules/GEMINI.md` §4-3 표준 연계 순서 준수 (writing-plans → plan-self-review → revision-archiver)
+1. **규칙 체계**: `.agent/rules/GEMINI.md` 단일 파일로 유지되며 모든 스킬은 kebab-case 명명 규칙으로 통일됨.
+2. **오케스트레이터 가동**: 변경 시 반드시 `check-structure.js`와 `verify-integration.js`를 수동 수행하여 구조 무결성을 확보할 것.
 3. **지식 저장 시**: `shinwoo-system\` 폴더에 저장. 다른 위치 생성 금지.
-4. **clone-db 재실행**: `node scripts/clone-db.js` (`.env.local`에 키 설정 완료)
+4. **저장소 위생 및 옵시디언 예외**: `.obsidian/` 내 에디터 설정 및 캐시는 무시하되, 위키 콘텐츠 및 `GEMINI.md` 파일은 `!.obsidian/wiki/`, `!.obsidian/GEMINI.md` 예외 처리를 통해 항상 git 추적을 보존해야 함.
+5. **로컬 API 설정**: 로컬 인트라넷 API 주소는 `src/config/config.js`의 `LOCAL_API_URL` 상수로 일원화하여 관리함.
+
