@@ -126,3 +126,36 @@ dist-ssr
 DB_BACKUPS/
 DB_PARSED/
 
+# Env (환경변수 변형 전체 차단)
+.env*
+!.env.example
+*.bak
+
+# 데이터 덤프 / 백업 (실제 데이터 파일만 무시)
+db.json
+dev_notes_rows.json
+*_backup.json
+src/data/mes_process_inspections.json
+
+# 빌드 로그
+build*.log
+build*.txt
+
+# 생성 캐시/그래프 산출물
+graphify-out/
+
+# 스크래치 폴더 전체 무시
+scratch/
+
+# 옵시디언 개인 에디터 설정 및 캐시 선별 무시 (wiki 및 GEMINI.md 보존)
+.obsidian/*.json
+.obsidian/*.MD
+.obsidian/*.md
+.obsidian/.obsidian/
+.obsidian/plugins/
+.obsidian/raw/
+.obsidian/output/
+.obsidian/graphify-out/
+!.obsidian/wiki/
+!.obsidian/GEMINI.md
+
