@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { LayoutDashboard, Search, ChevronLeft, ChevronRight, Hash } from 'lucide-react';
 import { api, supabase } from '../lib/api';
 
+import { LOCAL_API_URL } from '../config/config';
+
 // ✅ 시맨틱 버전(vX.Y.Z) 정렬용 헬퍼 함수
 const compareVersions = (a, b) => {
     // 1. 숫자가 아닌 배열 요소가 나오면 무조건 0으로 덮어씀 (안전장치)
@@ -38,7 +40,7 @@ const DevNotes = ({ user }) => {
             let data;
             // ✅ 하이브리드 로직: 실서버(Vercel)는 Supabase에서, 로컬(개발환경)은 db.json에서
             if (import.meta.env.DEV) {
-                const res = await fetch('http://localhost:3001/dev_notes');
+                const res = await fetch(`${LOCAL_API_URL}/dev_notes`);
                 if (!res.ok) throw new Error('네트워크 응답이 올바르지 않습니다.');
                 data = await res.json();
             } else {

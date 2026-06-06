@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Settings, CheckCircle, Clock, Hash, XCircle, Eye, Cloud } from 'lucide-react';
 import { api, supabase } from '../lib/api';
+import { LOCAL_API_URL } from '../config/config';
 
 // ✅ 시맨틱 버전(vX.Y.Z) 정렬용 헬퍼 함수
 const compareVersions = (a, b) => {
@@ -29,7 +30,7 @@ const PostApproval = ({ user }) => {
             let data;
             // ✅ 하이브리드 로직: 실서버(Vercel)는 Supabase에서, 로컬(개발환경)은 db.json에서
             if (import.meta.env.DEV) {
-                const res = await fetch('http://localhost:3001/dev_notes');
+                const res = await fetch(`${LOCAL_API_URL}/dev_notes`);
                 if (!res.ok) throw new Error('네트워크 응답이 올바르지 않습니다.');
                 data = await res.json();
             } else {
@@ -73,7 +74,7 @@ const PostApproval = ({ user }) => {
 
         setLoading(true);
         try {
-            const res = await fetch(`http://localhost:3001/dev_notes/${note.id}`, {
+            const res = await fetch(`${LOCAL_API_URL}/dev_notes/${note.id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -120,7 +121,7 @@ const PostApproval = ({ user }) => {
             if (syncErr) throw syncErr;
 
             // 3. 로컬 DB에 동기화 완료 상태 업데이트
-            const res = await fetch(`http://localhost:3001/dev_notes/${note.id}`, {
+            const res = await fetch(`${LOCAL_API_URL}/dev_notes/${note.id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ is_synced: true })
@@ -169,7 +170,7 @@ const PostApproval = ({ user }) => {
                 if (syncErr) throw syncErr;
 
                 // 로컬 DB 갱신
-                await fetch(`http://localhost:3001/dev_notes/${note.id}`, {
+                await fetch(`${LOCAL_API_URL}/dev_notes/${note.id}`, {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ is_synced: true })
@@ -191,7 +192,7 @@ const PostApproval = ({ user }) => {
         setLoading(true);
         try {
             const target = [...drafts, ...published].find(d => d.id === id);
-            const res = await fetch(`http://localhost:3001/dev_notes/${id}`, {
+            const res = await fetch(`${LOCAL_API_URL}/dev_notes/${id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
