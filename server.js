@@ -277,6 +277,20 @@ server.post('/api/admin-update-member', async (req, res) => {
     }
 });
 
+// =====================================================
+// [보안 조치] 로컬 API 동기화 라우트 (Vercel Serverless Function 호출 대행)
+// POST /api/sync-sheets
+// =====================================================
+server.post('/api/sync-sheets', async (req, res) => {
+    try {
+        const syncSheets = await import('./api/sync-sheets.js');
+        await syncSheets.default(req, res);
+    } catch (error) {
+        console.error('[Local Sync Route Error]', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 server.use(router);
 
 server.listen(PORT, '0.0.0.0', () => {

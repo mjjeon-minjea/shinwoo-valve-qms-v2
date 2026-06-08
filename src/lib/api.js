@@ -3,6 +3,8 @@ import { createClient } from '@supabase/supabase-js';
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
+export const LOCAL_API_URL = import.meta.env.VITE_LOCAL_API_URL || 'http://localhost:3001';
+
 export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
     auth: {
         storageKey: 'qms-auth-v2'

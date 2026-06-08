@@ -1,7 +1,7 @@
 /* src/components/InboundHistory.jsx */
 import { useState, useEffect } from 'react';
 import { Search, Filter, RefreshCw, ChevronLeft, ChevronRight, X, AlertTriangle, CloudLightning, Database, Plus, Edit2, Trash2, Calendar, HardDrive, CheckCircle2 } from 'lucide-react';
-import { api, supabase } from '../lib/api';
+import { api, supabase, LOCAL_API_URL } from '../lib/api';
 import ProgressModal from './ProgressModal';
 
 const formatDate = (val) => {
@@ -102,132 +102,46 @@ const InboundHistory = () => {
         fetchInspections();
     }, []);
 
-    // 🌐 브라우저 Direct 구글 스프레드시트 ➔ Gemini ➔ Supabase 연동 코어 엔진
+    // 🌐 백엔드 API 경유 구글 스프레드시트 ➔ Gemini ➔ Supabase 연동 엔진
     const handleGoogleSync = async () => {
         if (syncing) return;
         setSyncing(true);
-        setSyncStatus(prev => ({ ...prev, status: 'idle', message: '구글 스프레드시트 연결 및 데이터를 분류 중입니다...' }));
-        updateProgress(10, 100, 'sync');
+        setSyncStatus(prev => ({ ...prev, status: 'idle', message: '백엔드 서버를 통해 구글 스프레드시트 연동 및 데이터를 분석 중입니다...' }));
+        updateProgress(30, 100, 'sync');
 
         try {
-            let csvData = '';
-            // 로컬/운영 환경 변수에서 구글 시트 CSV 주소 참조
-            const sheetUrl = import.meta.env.VITE_GOOGLE_SHEETS_CSV_URL || "https://docs.google.com/spreadsheets/d/e/2PACX-1vSz-OGELs_8JhV7Vrf14kdF8rrdx-VdcJXLAAc-Tr2FvdC32E4Flol7QeMoJbCVnr32SOpCX5kDsZPo/pub?gid=2043099098&single=true&output=csv";
+            // 호스트네임에 따라 백엔드 주소 동적 결정
+            const targetUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+                ? `${LOCAL_API_URL}/api/sync-sheets`
+                : '/api/sync-sheets';
 
-            if (sheetUrl) {
-                const response = await fetch(sheetUrl);
-                if (!response.ok) throw new Error(`구글 시트 로드 실패. 코드: ${response.status}`);
-                csvData = await response.text();
-            } else {
-                // 환경변수가 없을 경우 로컬 테스트용 Mock 데이터 가동
-                csvData = MOCK_CSV;
-            }
+            updateProgress(60, 100, 'sync');
 
-            updateProgress(30, 100, 'sync');
-
-            // CSV 파싱
-            const rows = parseCSV(csvData);
-            if (rows.length === 0) {
-                throw new Error('CSV 데이터가 비어 있습니다.');
-            }
-
-            updateProgress(50, 100, 'sync');
-
-            // 비정형 부적합 유형 중복 제거 추출
-            const uniqueDefectTypes = [...new Set(rows.map(r => r['부적합 유형'] || '').filter(val => val.trim() !== ''))];
-            const defectCategoryMap = { '': '합격' };
-
-            // Gemini 2.5 Flash API 직접 브라우저단에서 호출 (기밀 보관 키 활용)
-            const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-            const modelName = import.meta.env.VITE_GEMINI_MODEL || 'gemini-2.5-flash';
-
-            if (uniqueDefectTypes.length > 0 && apiKey) {
-                for (let i = 0; i < uniqueDefectTypes.length; i++) {
-                    const originalType = uniqueDefectTypes[i];
-                    updateProgress(50 + Math.round((i / uniqueDefectTypes.length) * 30), 100, 'sync');
-                    
-                    const standardCategory = await classifyDefectTypeWithGemini(originalType, apiKey, modelName);
-                    defectCategoryMap[originalType] = standardCategory;
-                }
-            }
-
-            updateProgress(85, 100, 'sync');
-
-            // 가공 및 Upsert 데이터 리스트 빌드
-            const inspectionsToUpsert = rows.map((row, index) => {
-                const supplier = (row['업체명'] || '').trim();
-                const itemName = (row['제품명'] || '').trim();
-                const date = (row['입고일'] || '').trim();
-                const totalQuantity = parseInt((row['입고'] || '0').replace(/,/g, ''), 10);
-                const inspectionQuantity = parseInt((row['검사(함수)'] || '0').replace(/,/g, ''), 10);
-                const defectQuantity = parseInt((row['부적합'] || '0').replace(/,/g, ''), 10);
-                const inspectionReportNo = (row['인수검사 보고서 번호'] || '없음').trim();
-                const itemType = (row['업태(함수)'] || '외주가공').trim();
-                const originalDefectType = (row['부적합 유형'] || '').trim();
-                const itemCode = (row['품목번호'] || '').trim();
-
-                const rawId = `${supplier}_${itemName}_${date}_${totalQuantity}`;
-                const hashPart = btoa(unescape(encodeURIComponent(rawId))).replace(/[^a-zA-Z0-9]/g, '').substring(0, 20);
-                const safeId = `${hashPart}_${index}`;
-                const defectCategory = defectCategoryMap[originalDefectType] || '합격';
-
-                return {
-                    id: safeId,
-                    date: date || new Date().toISOString().split('T')[0],
-                    supplier: supplier || '미지정업체',
-                    itemName: itemName || '미지정제품',
-                    totalQuantity: isNaN(totalQuantity) ? 0 : totalQuantity,
-                    inspectionQuantity: isNaN(inspectionQuantity) ? 0 : inspectionQuantity,
-                    defectQuantity: isNaN(defectQuantity) ? 0 : defectQuantity,
-                    result: defectQuantity > 0 ? '불합격' : '합격',
-                    defectType: originalDefectType ? `[${defectCategory}] ${originalDefectType}` : '',
-                    inspectionReportNo: inspectionReportNo || '없음',
-                    itemType: itemType || '외주가공',
-                    item_code: itemCode
-                };
+            const response = await fetch(targetUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
             });
 
-            updateProgress(90, 100, 'sync');
-
-            // Supabase Cloud DB 에 무결성 일괄 Upsert 진행
-            const { error: upsertError } = await supabase
-                .from('inspections')
-                .upsert(inspectionsToUpsert, { onConflict: 'id' });
-
-            if (upsertError) {
-                // [EMERGENCY Fallback] 스키마에 item_code 컬럼이 없거나(42703/PGRST100) 에러 메시지에 item_code가 포함된 경우 자동 우회 보존
-                if (upsertError.code === '42703' || upsertError.code === 'PGRST100' || String(upsertError.message || '').includes('item_code')) {
-                    const fallbackData = inspectionsToUpsert.map(item => {
-                        const cleanItem = { ...item };
-                        if (cleanItem.item_code) {
-                            cleanItem.inspectionReportNo = `${cleanItem.inspectionReportNo} [품목:${cleanItem.item_code}]`;
-                        }
-                        delete cleanItem.item_code;
-                        return cleanItem;
-                    });
-
-                    const { error: fallbackError } = await supabase
-                        .from('inspections')
-                        .upsert(fallbackData, { onConflict: 'id' });
-
-                    if (fallbackError) throw fallbackError;
-                } else {
-                    throw upsertError;
-                }
+            if (!response.ok) {
+                const errJson = await response.json().catch(() => ({}));
+                throw new Error(errJson.error || errJson.message || `서버 에러: ${response.status}`);
             }
 
+            const result = await response.json();
+            
             updateProgress(100, 100, 'sync');
             const nowStr = new Date().toLocaleString('ko-KR');
             localStorage.setItem('qms_last_sync_time', nowStr);
             setSyncStatus({
                 lastSuccess: nowStr,
                 status: 'success',
-                message: `${inspectionsToUpsert.length}개의 구글 시트 데이터를 성공적으로 연동하고 Gemini Flash로 정형화했습니다!`
+                message: `${result.processedCount || 0}개의 구글 시트 데이터를 백엔드에서 성공적으로 처리하고 완료했습니다!`
             });
+
             const dbName = window.location.hostname.includes('-v2') 
                 ? 'Supabase Production DB (메인)' 
                 : 'Supabase Staging DB (테스트)';
-            alert(`동기화 완수!\n${inspectionsToUpsert.length}건이 ${dbName}에 안전하게 반영되었습니다.`);
+            alert(`동기화 완수!\n${result.processedCount || 0}건이 ${dbName}에 안전하게 반영되었습니다.`);
             fetchInspections();
 
         } catch (error) {
@@ -237,7 +151,7 @@ const InboundHistory = () => {
                 status: 'error',
                 message: `동기화 에러: ${error.message}`
             }));
-            alert(`동기화 중 에러 발생: ${error.message}\n기존 저장 데이터를 복구해 화면에 보존 중입니다.`);
+            alert(`동기화 중 에러 발생: ${error.message}`);
         } finally {
             setSyncing(false);
             closeProgress();
@@ -287,64 +201,6 @@ const InboundHistory = () => {
             }
         }
         return results;
-    };
-
-    // Gemini 2.5 Flash API 브라우저 직접 연동
-    const classifyDefectTypeWithGemini = async (defectType, apiKey, model) => {
-        const systemInstruction = `너는 신우밸브주식회사 품질보증부의 인수검사 데이터 정제 전문가이다.
-제공되는 입고/검사 데이터의 [부적합 유형] 텍스트를 정밀 분석하여, 아래 정의된 JSON 스키마 규격에 맞춰 정확히 매핑된 데이터만을 반환해야 한다. 절대 설명이나 마크다운 태그를 붙이지 말고 순수 JSON만 반환하라.
-
-[부적합 유형(defectCategory) 매핑 규칙]
-- 외관 불량, 흠집, 도장 불량, 사출 들뜸, 외관부적합 ➔ "외관부적합"
-- 나사산 가공 불량, 리머 가공 오류, 홀 누락, 조립부 가공 오차, 가공부적합 ➔ "가공부적합"
-- 치수 미달, 공차 초과, 금형 변형, 주물치수부적합, 주물부적합, 주물 부적합 ➔ "주물치수부적합"
-- 조립 뻑뻑함, 부품 누락, 유격 오류, 조립부적합 ➔ "조립부적합"
-- 재질 상이, 성적서 불일치, 인장 강도 미달, 재질부적합 ➔ "재질부적합"
-- 해당 없음, 합격, 빈 문자열 또는 공란 ➔ "합격"
-- 그 외 어떤 매핑 규칙에도 속하지 않는 경우 ➔ "기타"`;
-
-        const fewShots = [
-            { input: '주물 치수 부적합', output: '주물치수부적합' },
-            { input: '가공부적합', output: '가공부적합' },
-            { input: '외관부적합', output: '외관부적합' },
-            { input: '사출 들뜸', output: '외관부적합' },
-            { input: '', output: '합격' },
-            { input: '주물부적합', output: '주물치수부적합' }
-        ];
-
-        const fewShotPrompt = fewShots.map(f => `입력: "${f.input}" ➔ 출력 JSON: {"defectCategory": "${f.output}"}`).join('\n');
-        const userPrompt = `아래 입력 텍스트를 분류하여 JSON으로만 대답해라.\n---\n입력: "${defectType}"`;
-        const fullPrompt = `${systemInstruction}\n\n[입출력 예시]\n${fewShotPrompt}\n\n${userPrompt}`;
-
-        try {
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{ parts: [{ text: fullPrompt }] }],
-                    generationConfig: { responseMimeType: 'application/json' }
-                })
-            });
-
-            if (!response.ok) throw new Error(`Gemini 응답 실패: ${response.status}`);
-            const resJson = await response.json();
-            const responseText = resJson.candidates?.[0]?.content?.parts?.[0]?.text || '';
-            const cleanText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
-
-            const result = JSON.parse(cleanText);
-            return result.defectCategory || '기타';
-        } catch (err) {
-            console.error('Gemini error:', err);
-            // 자체 안전 정규 매핑 백업
-            const text = defectType.toLowerCase();
-            if (text.includes('외관') || text.includes('도장') || text.includes('흠집') || text.includes('사출')) return '외관부적합';
-            if (text.includes('가공') || text.includes('나사') || text.includes('리머') || text.includes('홀')) return '가공부적합';
-            if (text.includes('치수') || text.includes('공차') || text.includes('금형') || text.includes('주물')) return '주물치수부적합';
-            if (text.includes('조립') || text.includes('뻑뻑') || text.includes('유격')) return '조립부적합';
-            if (text.includes('재질') || text.includes('성적') || text.includes('강도')) return '재질부적합';
-            return '기타';
-        }
     };
 
     const handleSave = async (e) => {
