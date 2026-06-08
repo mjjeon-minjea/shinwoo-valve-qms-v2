@@ -20,8 +20,11 @@
 
 ## 보고서 저장 경로
 
-- 플랜 검토 → `클로드/Plan Review Report/`
-- 그 외 → `클로드/Report/`
+모든 보고서는 생성 당일 기준 '연/월/일' 3단계 서브 폴더를 기계적으로 생성하여 보존한다.
+
+- 플랜 검토 → `클로드/Plan Review Report/YYYY년/MM월/DD일/`
+- 그 외 → `클로드/Report/YYYY년/MM월/DD일/`
+- 파일명: `YYYY-MM-DD_제목_키워드_R[N].md`
 
 ## 주의
 
