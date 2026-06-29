@@ -71,7 +71,7 @@ export const api = {
             if (id) {
                 query = query.eq('id', id);
             } else {
-                query = query.neq('id', '0');
+                throw new Error('DELETE requires an id (full delete blocked)');
             }
 
             const { error } = await query;
