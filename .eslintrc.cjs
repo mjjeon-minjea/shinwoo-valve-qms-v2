@@ -51,7 +51,8 @@ module.exports = {
       {
         type: 'root',
         pattern: 'src/*.jsx'
-      }
+      },
+      { type: 'config', pattern: '**/src/config/**' }
     ]
   },
   plugins: ['react-refresh', 'boundaries'],
@@ -70,7 +71,7 @@ module.exports = {
         rules: [
           {
             from: 'components',
-            allow: ['lib', 'contexts', 'data', 'components', 'assets']
+            allow: ['lib', 'contexts', 'data', 'components', 'assets', 'config']
           },
           {
             from: 'contexts',
