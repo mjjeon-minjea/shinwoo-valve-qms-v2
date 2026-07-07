@@ -263,3 +263,5 @@ node scripts/clone-db.js
 - 메인 DB에는 **읽기만** 수행 (Proxy 래퍼로 `insert`/`update`/`upsert`/`delete` 물리 차단)
 - `PROD_SUPABASE_URL` 미설정 시 스크립트가 즉시 종료되어 실행 불가
 - 메인 DB에 대한 쓰기 시도: **항상 0건**
+
+<!-- 자동검증 테스트: qms-staging-watch 실증 (2026-07-02) -->
