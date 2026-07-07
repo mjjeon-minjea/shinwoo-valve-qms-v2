@@ -7,19 +7,34 @@ dotenv.config({ path: './.env.local' });
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SUPABASE_KEY = SUPABASE_SERVICE_ROLE_KEY;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
 const GEMINI_MODEL = process.env.VITE_GEMINI_MODEL || 'gemini-2.5-flash';
+const GEMINI_RUN_LIMIT = Number(process.env.GEMINI_RUN_LIMIT || 50);
+const GEMINI_DAILY_LIMIT = Number(process.env.GEMINI_DAILY_LIMIT || 200);
+const SYNC_LOCK_WINDOW_MINUTES = Number(process.env.SYNC_LOCK_WINDOW_MINUTES || 15);
+const GEMINI_INPUT_KRW_PER_1K_TOKENS = process.env.GEMINI_INPUT_KRW_PER_1K_TOKENS;
+const GEMINI_OUTPUT_KRW_PER_1K_TOKENS = process.env.GEMINI_OUTPUT_KRW_PER_1K_TOKENS;
 
-// Supabase 관리자 클라이언트 생성 (RLS 우회 및 무제한 CRUD 수행)
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+const STANDARD_CATEGORIES = new Set([
+  '외관부적합',
+  '가공부적합',
+  '주물치수부적합',
+  '조립부적합',
+  '재질부적합',
+  '합격',
+  '기타'
+]);
+
+// Supabase 클라이언트 생성. RLS-enabled cache/log tables require service_role access.
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // 로컬 검증 단계(STAGE 1)용 가상 Mock CSV 데이터 (구글 시트가 없을 때의 폴백)
 const MOCK_CSV = `품목번호,제품명,입고일,업체명,입고,검사(함수),부적합,인수검사 보고서 번호,업태(함수),부적합 유형
 ITEM-SW-V01,게이트밸브 100A,2026-05-29,강남금속,150,150,2,SR-20260529-001,외주가공,주물치수부적합
 ITEM-SW-V02,글로브밸브 50A,2026-05-29,신우산업,80,80,0,SR-20260529-002,주물류,
 ITEM-SW-V03,체크밸브 80A,2026-05-29,한성정밀,120,120,5,SR-20260529-003,외주가공,흠집 및 도장 불량
-ITEM-SW-V04,스트레이너 65A,2026-05-29,삼영금속,200,200,3,SR-20260529-004,주물류,주물부적합
-ITEM-SW-V05,감압밸브 40A,2026-05-29,신우정밀,50,50,1,SR-20260529-005,외주가공,나사산 가공 오류
+ITEM-SW-V04,스트레이너 65A,2026-05-29,삼영금속,200,200,3,SR-20260529-004,주물류,주물부적합ITEM-SW-V05,감압밸브 40A,2026-05-29,신우정밀,50,50,1,SR-20260529-005,외주가공,나사산 가공 오류
 ITEM-SW-V06,버터플라이밸브 150A,2026-05-29,동양금속,90,90,4,SR-20260529-006,외주가공,조립 뻑뻑함`;
 
 // Vercel Serverless Function 핸들러
@@ -35,25 +50,39 @@ export default async function handler(req, res) {
 
   console.log('[Sync Engine] Starting Google Sheets Synchronization...');
   const logs = [];
+  let syncLogId = null;
+  let geminiCalls = 0;
+  let promptTokens = 0;
+  let outputTokens = 0;
+  let totalTokens = 0;
+  let dailyCallsBefore = 0;
+  let dailyCallsAfter = 0;
+  let estimatedCostKrw = 0;
+  let costBasis = 'usageMetadata token-based estimate';
+  let fallbackCount = 0;
+
   const log = (msg) => {
     console.log(`[Sync Engine] ${msg}`);
     logs.push(`[${new Date().toISOString()}] ${msg}`);
   };
 
   try {
+    if (!SUPABASE_SERVICE_ROLE_KEY) {
+      throw new Error('SUPABASE_SERVICE_ROLE_KEY가 없어 sync cache/log 테이블에 접근할 수 없습니다. Staging 환경변수에 service_role 키를 설정해 주세요.');
+    }
+
     let csvData = '';
-    const sheetUrl = process.env.GOOGLE_SHEETS_CSV_URL || "https://docs.google.com/spreadsheets/d/e/2PACX-1vSz-OGELs_8JhV7Vrf14kdF8rrdx-VdcJXLAAc-Tr2FvdC32E4Flol7QeMoJbCVnr32SOpCX5kDsZPo/pub?gid=2043099098&single=true&output=csv";
+    const sheetUrl = process.env.GOOGLE_SHEETS_CSV_URL || 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSz-OGELs_8JhV7Vrf14kdF8rrdx-VdcJXLAAc-Tr2FvdC32E4Flol7QeMoJbCVnr32SOpCX5kDsZPo/pub?gid=2043099098&single=true&output=csv';
 
     if (sheetUrl) {
-      log(`Fetching remote Google Sheet CSV from URL...`);
+      log('Fetching remote Google Sheet CSV from URL...');
       const response = await fetch(sheetUrl);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch sheet. Status: ${response.status}`);
+      if (!response.ok) {        throw new Error(`Failed to fetch sheet. Status: ${response.status}`);
       }
       csvData = await response.text();
       log(`Remote CSV load success. Byte size: ${csvData.length}`);
     } else {
-      log(`[WARNING] GOOGLE_SHEETS_CSV_URL is empty! Falling back to Local Mock CSV for simulation.`);
+      log('[WARNING] GOOGLE_SHEETS_CSV_URL is empty! Falling back to Local Mock CSV for simulation.');
       csvData = MOCK_CSV;
     }
 
@@ -65,24 +94,52 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, message: 'CSV에 데이터가 존재하지 않습니다.', logs });
     }
 
-    // 1단계: 비정형 부적합 유형 분류를 위해 Gemini API용 대상 추출
-    const uniqueDefectTypes = [...new Set(rows.map(r => r['부적합 유형'] || '').filter(val => val.trim() !== ''))];
-    log(`Found ${uniqueDefectTypes.length} unique non-empty defect types to analyze.`);
+    const termMap = buildNormalizedTermMap(rows);
+    const rawTerms = [...new Set(rows.map(r => (r['부적합 유형'] || '').trim()).filter(Boolean))];
+    const nonemptyDefectRows = rows.filter(r => (r['부적합 유형'] || '').trim()).length;
 
-    // Gemini 매핑 사전 구축
-    const defectCategoryMap = {};
-    
-    // 빈 문자열이나 공란은 즉시 '합격' 처리 (Gemini API 호출 절약)
-    defectCategoryMap[''] = '합격';
+    syncLogId = await createSyncLog({
+      status: 'running',
+      sheet_url: sheetUrl,
+      sheet_gid: extractGid(sheetUrl),
+      processed_rows: rows.length,
+      nonempty_defect_rows: nonemptyDefectRows,
+      unique_raw_terms: rawTerms.length,
+      unique_normalized_terms: termMap.size,
+      model: GEMINI_MODEL
+    }, log);
 
-    if (uniqueDefectTypes.length > 0) {
-      log(`Invoking Gemini 2.5 Flash content generation for standard category mapping...`);
-      for (const originalType of uniqueDefectTypes) {
-        const standardCategory = await classifyDefectTypeWithGemini(originalType, log);
-        defectCategoryMap[originalType] = standardCategory;
-        log(`Mapping resolved: "${originalType}" ➔ "${standardCategory}"`);
-      }
-    }
+    await enforceNoRecentRunningSync(log, syncLogId);
+
+    const cachedMap = await loadCachedCategories([...termMap.keys()]);
+    await touchCacheHits(cachedMap, log);
+
+    let missingTerms = [...termMap.keys()].filter(key => !cachedMap[key]);
+    const seededMap = await seedCachedCategoriesFromExistingInspections(missingTerms, termMap, log);
+    Object.assign(cachedMap, seededMap);
+    missingTerms = [...termMap.keys()].filter(key => !cachedMap[key]);    dailyCallsBefore = await getDailyGeminiCalls();
+    enforceGeminiGuards(missingTerms.length, dailyCallsBefore);
+
+    const classificationResult = await classifyMissingTerms(missingTerms, termMap, log);
+    geminiCalls = classificationResult.geminiCalls;
+    promptTokens = classificationResult.promptTokens;
+    outputTokens = classificationResult.outputTokens;
+    totalTokens = classificationResult.totalTokens;
+    fallbackCount = classificationResult.fallbackCount;
+
+    await saveNewCategories(classificationResult.categories, log);
+
+    dailyCallsAfter = dailyCallsBefore + geminiCalls;
+    const costResult = estimateGeminiCostKrw(promptTokens, outputTokens);
+    estimatedCostKrw = costResult.estimatedCostKrw;
+    costBasis = costResult.costBasis;
+
+    const defectCategoryMap = {
+      '': '합격',
+      ...expandToOriginalMap(termMap, cachedMap, classificationResult.categories)
+    };
+
+    log(`Defect category cache: total=${termMap.size}, cacheHit=${Object.keys(cachedMap).length}, newGeminiTerms=${missingTerms.length}, geminiCalls=${geminiCalls}`);
 
     // 2단계: 데이터 가공 및 Supabase Upsert 리스트 생성
     const inspectionsToUpsert = rows.map((row, index) => {
@@ -92,8 +149,7 @@ export default async function handler(req, res) {
       const totalQuantity = parseInt((row['입고'] || '0').replace(/,/g, ''), 10);
       const inspectionQuantity = parseInt((row['검사(함수)'] || '0').replace(/,/g, ''), 10);
       const defectQuantity = parseInt((row['부적합'] || '0').replace(/,/g, ''), 10);
-      const inspectionReportNo = (row['인수검사 보고서 번호'] || '없음').trim();
-      const itemType = (row['업태(함수)'] || '외주가공').trim();
+      const inspectionReportNo = (row['인수검사 보고서 번호'] || '없음').trim();      const itemType = (row['업태(함수)'] || '외주가공').trim();
       const originalDefectType = (row['부적합 유형'] || '').trim();
       const itemCode = (row['품목번호'] || '').trim();
 
@@ -101,7 +157,7 @@ export default async function handler(req, res) {
       const hashPart = Buffer.from(rawId).toString('base64').replace(/[^a-zA-Z0-9]/g, '').substring(0, 20);
       const safeId = `${hashPart}_${index}`;
 
-      // Gemini 분류 맵에서 카테고리 획득
+      // 분류 캐시 맵에서 카테고리 획득
       const defectCategory = defectCategoryMap[originalDefectType] || '합격';
 
       return {
@@ -123,15 +179,14 @@ export default async function handler(req, res) {
     log(`Upserting ${inspectionsToUpsert.length} records into Supabase "inspections" table...`);
 
     // Supabase Upsert 쿼리 가동 (중복 키는 UPDATE 처리)
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('inspections')
       .upsert(inspectionsToUpsert, { onConflict: 'id' });
 
     if (error) {
-      // 만약 'item_code' 컬럼이 DB 스키마에 없어서 42703 에러가 날 경우, 
-      // 예외 대응으로 item_code 컬럼을 뺀 안전본으로 2차 Upsert를 롤백 수행합니다. (피드백 루프 작동)
-      if (error.code === '42703' || error.code === 'PGRST204' || (error.message && error.message.includes('item_code'))) {
-        log(`[EMERGENCY ROLLBACK] Column "item_code" does not exist! Running secondary fallback sync...`);
+      // 만약 'item_code' 컬럼이 DB 스키마에 없어서 42703 에러가 날 경우,
+      // 예외 대응으로 item_code 컬럼을 뺀 안전본으로 2차 Upsert를 롤백 수행합니다. (피드백 루프 작동)      if (error.code === '42703' || error.code === 'PGRST204' || (error.message && error.message.includes('item_code'))) {
+        log('[EMERGENCY ROLLBACK] Column "item_code" does not exist! Running secondary fallback sync...');
         const fallbackInspections = inspectionsToUpsert.map(item => {
           const cleanItem = { ...item };
           // 임시방편: item_code가 없으므로 inspectionReportNo 필드 뒤에 품목번호를 병합 저장하여 데이터를 보존함
@@ -149,24 +204,85 @@ export default async function handler(req, res) {
         if (fallbackError) {
           throw new Error(`Fallback sync failed: ${fallbackError.message}`);
         }
-        log(`[SUCCESS] Emergency fallback sync completed without schema error.`);
+        log('[SUCCESS] Emergency fallback sync completed without schema error.');
       } else {
         throw error;
       }
     } else {
-      log(`Supabase batch Upsert successfully completed.`);
+      log('Supabase batch Upsert successfully completed.');
     }
+
+    const finalStatus = fallbackCount > 0 ? 'partial_success' : 'success';
+    await finalizeSyncLog(syncLogId, {
+      status: finalStatus,
+      finished_at: new Date().toISOString(),
+      cache_hits: Object.keys(cachedMap).length,
+      new_terms: missingTerms.length,
+      gemini_calls: geminiCalls,
+      prompt_tokens: promptTokens,
+      output_tokens: outputTokens,
+      total_tokens: totalTokens,
+      daily_calls_before: dailyCallsBefore,
+      daily_calls_after: dailyCallsAfter,      estimated_cost_krw: estimatedCostKrw,
+      cost_basis: costBasis,
+      upsert_count: inspectionsToUpsert.length
+    }, log);
 
     return res.status(200).json({
       success: true,
       message: '구글 스프레드시트 동기화 완수 완료',
       processedCount: inspectionsToUpsert.length,
+      geminiUsage: {
+        cacheHits: Object.keys(cachedMap).length,
+        newTerms: missingTerms.length,
+        geminiCalls,
+        runLimit: GEMINI_RUN_LIMIT,
+        dailyCallsBefore,
+        dailyCallsAfter,
+        dailyLimit: GEMINI_DAILY_LIMIT,
+        promptTokens,
+        outputTokens,
+        totalTokens,
+        estimatedCostKrw,
+        costBasis
+      },
       logs
     });
 
   } catch (error) {
     console.error('[Sync Engine Error]', error);
     log(`[ERROR] Sync aborted: ${error.message}`);
+
+    const blocked = error.code === 'RUN_LIMIT_EXCEEDED' || error.code === 'DAILY_LIMIT_EXCEEDED' || error.code === 'SYNC_ALREADY_RUNNING';
+    await finalizeSyncLog(syncLogId, {
+      status: blocked ? 'blocked' : 'failed',
+      finished_at: new Date().toISOString(),
+      blocked_reason: blocked ? error.code : null,
+      error_message: error.message,
+      gemini_calls: geminiCalls,
+      prompt_tokens: promptTokens,
+      output_tokens: outputTokens,
+      total_tokens: totalTokens,
+      daily_calls_before: dailyCallsBefore,
+      daily_calls_after: blocked ? dailyCallsBefore : dailyCallsAfter,
+      estimated_cost_krw: estimatedCostKrw,
+      cost_basis: costBasis,
+      upsert_count: 0
+    }, log);
+
+    if (blocked) {
+      return res.status(429).json({
+        success: false,
+        blocked: true,
+        reason: error.code,        message: error.message,
+        runLimit: GEMINI_RUN_LIMIT,
+        dailyLimit: GEMINI_DAILY_LIMIT,
+        dailyCallsBefore,
+        plannedCalls: error.plannedCalls || 0,
+        logs
+      });
+    }
+
     return res.status(500).json({
       success: false,
       message: '구글 동기화 엔진 장애 발생',
@@ -174,6 +290,302 @@ export default async function handler(req, res) {
       logs
     });
   }
+}
+
+function normalizeDefectTerm(value) {
+  return String(value || '').trim().replace(/\s+/g, '');
+}
+
+function normalizeStandardCategory(value) {
+  const category = String(value || '').trim();
+  return STANDARD_CATEGORIES.has(category) ? category : '기타';
+}
+
+function buildNormalizedTermMap(rows) {
+  const termMap = new Map();
+  for (const row of rows) {
+    const original = (row['부적합 유형'] || '').trim();
+    if (!original) continue;
+    const normalized = normalizeDefectTerm(original);
+    if (!normalized) continue;
+    const item = termMap.get(normalized) || { representativeOriginal: original, originals: new Set() };
+    item.originals.add(original);
+    termMap.set(normalized, item);
+  }
+  return termMap;
+}
+
+async function loadCachedCategories(normalizedTerms) {
+  if (normalizedTerms.length === 0) return {};
+  const { data, error } = await supabase
+    .from('defect_category_map')
+    .select('normalized_term, standard_category, use_count')
+    .in('normalized_term', normalizedTerms);
+
+  if (error) {
+    throw new Error(`defect_category_map cache read failed: ${error.message}`);
+  }
+
+  return Object.fromEntries((data || []).map(row => [row.normalized_term, {
+    standardCategory: normalizeStandardCategory(row.standard_category),
+    useCount: row.use_count || 0,    source: 'cache'
+  }]));
+}
+
+async function touchCacheHits(cachedMap, log) {
+  const entries = Object.entries(cachedMap);
+  if (entries.length === 0) return;
+
+  for (const [normalizedTerm, row] of entries) {
+    const { error } = await supabase
+      .from('defect_category_map')
+      .update({
+        last_used_at: new Date().toISOString(),
+        use_count: (row.useCount || 0) + 1,
+        updated_at: new Date().toISOString()
+      })
+      .eq('normalized_term', normalizedTerm);
+
+    if (error) {
+      log(`[WARNING] cache hit touch failed for "${normalizedTerm}": ${error.message}`);
+    }
+  }
+}
+
+async function seedCachedCategoriesFromExistingInspections(missingTerms, termMap, log) {
+  if (missingTerms.length === 0) return {};
+  const wanted = new Set(missingTerms);
+  const seeded = {};
+  let from = 0;
+  const pageSize = 1000;
+
+  while (from < 20000 && wanted.size > 0) {
+    const { data, error } = await supabase
+      .from('inspections')
+      .select('defectType')
+      .range(from, from + pageSize - 1);
+
+    if (error) {
+      log(`[WARNING] existing inspection seed skipped: ${error.message}`);
+      break;
+    }
+    if (!data || data.length === 0) break;
+
+    for (const row of data) {
+      const match = String(row.defectType || '').match(/^\[([^\]]+)\]\s*(.+)$/);
+      if (!match) continue;
+      const standardCategory = normalizeStandardCategory(match[1]);
+      const original = match[2].trim();
+      const normalized = normalizeDefectTerm(original);
+      if (!wanted.has(normalized)) continue;
+
+      const termInfo = termMap.get(normalized);      seeded[normalized] = { standardCategory, source: 'existing_inspections' };
+      wanted.delete(normalized);
+
+      const { error: upsertError } = await supabase
+        .from('defect_category_map')
+        .upsert({
+          original_term: termInfo?.representativeOriginal || original,
+          normalized_term: normalized,
+          standard_category: standardCategory,
+          source: 'existing_inspections',
+          model: null,
+          first_classified_at: new Date().toISOString(),
+          last_used_at: new Date().toISOString(),
+          use_count: 1,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'normalized_term' });
+
+      if (upsertError) {
+        log(`[WARNING] existing inspection seed upsert failed for "${original}": ${upsertError.message}`);
+      }
+    }
+
+    if (data.length < pageSize) break;
+    from += pageSize;
+  }
+
+  log(`Existing inspection seed reused ${Object.keys(seeded).length} categories without Gemini calls.`);
+  return seeded;
+}
+
+async function enforceNoRecentRunningSync(log, currentSyncLogId = null) {
+  const since = new Date(Date.now() - SYNC_LOCK_WINDOW_MINUTES * 60 * 1000).toISOString();
+  let query = supabase
+    .from('sync_logs')
+    .select('id, started_at')
+    .eq('status', 'running')
+    .gte('started_at', since);
+
+  if (currentSyncLogId) {
+    query = query.neq('id', currentSyncLogId);
+  }
+
+  const { data, error } = await query.limit(1);
+
+  if (error) {
+    throw new Error(`sync lock check failed: ${error.message}`);
+  }
+
+  if (data && data.length > 0) {    const lockError = new Error(`최근 ${SYNC_LOCK_WINDOW_MINUTES}분 내 sync 실행이 아직 running 상태입니다. 중복 실행 방지를 위해 이번 요청을 중단합니다.`);
+    lockError.code = 'SYNC_ALREADY_RUNNING';
+    lockError.plannedCalls = 0;
+    throw lockError;
+  }
+  log(`Sync lock clear: no running sync in last ${SYNC_LOCK_WINDOW_MINUTES} minutes.`);
+}
+
+async function getDailyGeminiCalls() {
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+  const { data, error } = await supabase
+    .from('sync_logs')
+    .select('gemini_calls')
+    .gte('started_at', today.toISOString())
+    .in('status', ['success', 'partial_success', 'blocked', 'failed']);
+
+  if (error) {
+    throw new Error(`sync_logs daily usage read failed: ${error.message}`);
+  }
+
+  return (data || []).reduce((sum, row) => sum + Number(row.gemini_calls || 0), 0);
+}
+
+function enforceGeminiGuards(plannedCalls, dailyCallsBefore) {
+  if (plannedCalls > GEMINI_RUN_LIMIT) {
+    const error = new Error(`Gemini 신규 분류 ${plannedCalls}건이 1회 실행 상한 ${GEMINI_RUN_LIMIT}콜을 초과했습니다. 캐시 선적재 또는 수동 분류 후 다시 실행해 주세요.`);
+    error.code = 'RUN_LIMIT_EXCEEDED';
+    error.plannedCalls = plannedCalls;
+    throw error;
+  }
+
+  if (dailyCallsBefore + plannedCalls > GEMINI_DAILY_LIMIT) {
+    const error = new Error(`Gemini 일일 예상 호출 ${dailyCallsBefore + plannedCalls}건이 1일 상한 ${GEMINI_DAILY_LIMIT}콜을 초과합니다. 내일 다시 실행하거나 차장님 승인 후 상한을 조정해 주세요.`);
+    error.code = 'DAILY_LIMIT_EXCEEDED';
+    error.plannedCalls = plannedCalls;
+    throw error;
+  }
+}
+
+async function classifyMissingTerms(missingTerms, termMap, log) {
+  const categories = {};
+  let geminiCalls = 0;
+  let promptTokens = 0;
+  let outputTokens = 0;  let totalTokens = 0;
+  let fallbackCount = 0;
+
+  if (missingTerms.length > 0) {
+    log(`Invoking Gemini content generation for ${missingTerms.length} new normalized defect terms...`);
+  }
+
+  for (const normalizedTerm of missingTerms) {
+    const original = termMap.get(normalizedTerm)?.representativeOriginal || normalizedTerm;
+    const result = await classifyDefectTypeWithGemini(original, log);
+    categories[normalizedTerm] = {
+      standardCategory: normalizeStandardCategory(result.standardCategory),
+      originalTerm: original,
+      source: result.source,
+      model: GEMINI_MODEL
+    };
+    geminiCalls += result.geminiCalls;
+    promptTokens += result.promptTokens;
+    outputTokens += result.outputTokens;
+    totalTokens += result.totalTokens;
+    if (result.source === 'rule_fallback') fallbackCount += 1;
+    log(`Mapping resolved: "${original}" ➔ "${categories[normalizedTerm].standardCategory}"`);
+  }
+
+  return { categories, geminiCalls, promptTokens, outputTokens, totalTokens, fallbackCount };
+}
+
+async function saveNewCategories(classifications, log) {
+  const rows = Object.entries(classifications)
+    // rule_fallback is execution-local only: do not persist transient Gemini/API failures as a trusted cache.
+    .filter(([, item]) => item.source !== 'rule_fallback')
+    .map(([normalizedTerm, item]) => ({
+    original_term: item.originalTerm,
+    normalized_term: normalizedTerm,
+    standard_category: normalizeStandardCategory(item.standardCategory),
+    source: item.source,
+    model: item.model,
+    first_classified_at: new Date().toISOString(),
+    last_used_at: new Date().toISOString(),
+    use_count: 1,    updated_at: new Date().toISOString()
+  }));
+
+  if (rows.length === 0) return;
+
+  const { error } = await supabase
+    .from('defect_category_map')
+    .upsert(rows, { onConflict: 'normalized_term' });
+
+  if (error) {
+    throw new Error(`defect_category_map cache save failed: ${error.message}`);
+  }
+
+  log(`Saved ${rows.length} new defect category cache rows.`);
+}
+
+function expandToOriginalMap(termMap, cachedMap, newClassifications) {
+  const result = {};
+  for (const [normalizedTerm, item] of termMap.entries()) {
+    const category = cachedMap[normalizedTerm]?.standardCategory || newClassifications[normalizedTerm]?.standardCategory || '합격';
+    for (const original of item.originals) {
+      result[original] = normalizeStandardCategory(category);
+    }
+  }
+  return result;
+}
+
+async function createSyncLog(payload, log) {
+  const { data, error } = await supabase
+    .from('sync_logs')
+    .insert(payload)
+    .select('id')
+    .single();
+
+  if (error) {
+    throw new Error(`sync_logs start write failed: ${error.message}`);
+  }
+
+  log(`sync_logs started: ${data.id}`);
+  return data.id;
+}
+
+async function finalizeSyncLog(id, patch, log = () => {}) {
+  if (!id) return;
+  const { error } = await supabase
+    .from('sync_logs')
+    .update(patch)
+    .eq('id', id);
+
+  if (error) {
+    log(`[WARNING] sync_logs finalize failed: ${error.message}`);
+  }
+}
+
+function extractGid(sheetUrl) {
+  try {
+    return new URL(sheetUrl).searchParams.get('gid') || null;
+  } catch {
+    return null;
+  }
+}
+
+function estimateGeminiCostKrw(promptTokens, outputTokens) {
+  const inputRate = Number(GEMINI_INPUT_KRW_PER_1K_TOKENS);  const outputRate = Number(GEMINI_OUTPUT_KRW_PER_1K_TOKENS);
+
+  if (!Number.isFinite(inputRate) || !Number.isFinite(outputRate)) {
+    return {
+      estimatedCostKrw: 0,
+      costBasis: 'TOKEN_PRICE_UNSET: prompt/output token counts recorded, KRW estimate not finalized'
+    };
+  }
+
+  return {
+    estimatedCostKrw: Number((((promptTokens / 1000) * inputRate) + ((outputTokens / 1000) * outputRate)).toFixed(4)),
+    costBasis: `usageMetadata token-based estimate: input=${inputRate} KRW/1K, output=${outputRate} KRW/1K`
+  };
 }
 
 // 쉼표와 큰따옴표가 꼬여있는 정규화 CSV 파서
@@ -188,14 +600,14 @@ function parseCSV(text) {
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i].trim();
     if (!line) continue;
-    
+
     const values = parseCSVLine(line);
     const row = {};
-    
+
     headers.forEach((header, index) => {
       row[header] = values[index] || '';
     });
-    
+
     if (row['제품명'] || row['업체명']) {
       results.push(row);
     }
@@ -224,11 +636,17 @@ function parseCSVLine(line) {
   return result;
 }
 
-// Gemini 2.5 Flash API 활용 비정형 카테고리 태깅 엔진
-async function classifyDefectTypeWithGemini(defectType, log) {
+// Gemini 2.5 Flash API 활용 비정형 카테고리 태깅 엔진async function classifyDefectTypeWithGemini(defectType, log) {
   if (!GEMINI_API_KEY) {
-    log(`[WARNING] Gemini API key is missing. Assigning fallback: "기타"`);
-    return '기타';
+    log('[WARNING] Gemini API key is missing. Assigning fallback: "기타"');
+    return {
+      standardCategory: '기타',
+      source: 'rule_fallback',
+      geminiCalls: 0,
+      promptTokens: 0,
+      outputTokens: 0,
+      totalTokens: 0
+    };
   }
 
   // 1회 크론 한계 및 Few-shot 6 주물부적합 완벽 보완 프롬프트
@@ -260,8 +678,7 @@ async function classifyDefectTypeWithGemini(defectType, log) {
 
   const fullPrompt = `${systemInstruction}\n\n[입출력 예시 (Few-shot)]\n${fewShotPrompt}\n\n${userPrompt}`;
 
-  try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+  try {    const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
     const payload = {
       contents: [{ parts: [{ text: fullPrompt }] }],
       generationConfig: {
@@ -280,23 +697,43 @@ async function classifyDefectTypeWithGemini(defectType, log) {
     }
 
     const resJson = await response.json();
+    const usage = resJson.usageMetadata || {};
+    const promptTokenCount = Number(usage.promptTokenCount || 0);
+    const candidatesTokenCount = Number(usage.candidatesTokenCount || 0);
+    const totalTokenCount = Number(usage.totalTokenCount || 0);
+    if (!resJson.usageMetadata) {
+      log(`[WARNING] Gemini usageMetadata missing for "${defectType}"`);
+    }
+
     const responseText = resJson.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    const cleanText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+    const cleanText = responseText.replace(//g, '').trim();
 
     const result = JSON.parse(cleanText);
-    if (result && result.defectCategory) {
-      return result.defectCategory;
-    }
-    return '기타';
+    return {
+      standardCategory: normalizeStandardCategory(result?.defectCategory),
+      source: 'gemini',
+      geminiCalls: 1,
+      promptTokens: promptTokenCount,
+      outputTokens: candidatesTokenCount,
+      totalTokens: totalTokenCount
+    };
   } catch (err) {
     log(`[ERROR] Gemini classification failed for "${defectType}": ${err.message}`);
     // 안전한 폴백: 텍스트에 포함된 단어를 기준으로 1차 자체 매핑 시도
-    const text = defectType.toLowerCase();
-    if (text.includes('외관') || text.includes('도장') || text.includes('흠집') || text.includes('사출')) return '외관부적합';
-    if (text.includes('가공') || text.includes('나사') || text.includes('리머') || text.includes('홀')) return '가공부적합';
-    if (text.includes('치수') || text.includes('공차') || text.includes('금형') || text.includes('주물')) return '주물치수부적합';
-    if (text.includes('조립') || text.includes('뻑뻑') || text.includes('유격')) return '조립부적합';
-    if (text.includes('재질') || text.includes('성적') || text.includes('강도')) return '재질부적합';
-    return '기타';
+    const text = defectType.toLowerCase();    let fallbackCategory = '기타';
+    if (text.includes('외관') || text.includes('도장') || text.includes('흠집') || text.includes('사출')) fallbackCategory = '외관부적합';
+    else if (text.includes('가공') || text.includes('나사') || text.includes('리머') || text.includes('홀')) fallbackCategory = '가공부적합';
+    else if (text.includes('치수') || text.includes('공차') || text.includes('금형') || text.includes('주물')) fallbackCategory = '주물치수부적합';
+    else if (text.includes('조립') || text.includes('뻑뻑') || text.includes('유격')) fallbackCategory = '조립부적합';
+    else if (text.includes('재질') || text.includes('성적') || text.includes('강도')) fallbackCategory = '재질부적합';
+
+    return {
+      standardCategory: fallbackCategory,
+      source: 'rule_fallback',
+      geminiCalls: GEMINI_API_KEY ? 1 : 0,
+      promptTokens: 0,
+      outputTokens: 0,
+      totalTokens: 0
+    };
   }
 }
