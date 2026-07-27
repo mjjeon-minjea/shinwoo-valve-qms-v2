@@ -1,8 +1,22 @@
 import { useState, useEffect } from 'react';
 import { useUser } from '../contexts/UserContext';
 import { api } from '../lib/api';
+import {
+    clearWeeklyReportDraft,
+    createWeeklyReportDraftUpdater,
+    isWeeklyReportEditable,
+    loadWeeklyReportDraft
+} from '../lib/weeklyReportDraft';
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks } from 'date-fns';
 import { Save, Send, CheckCircle, AlertCircle, Plus, Trash2, Calendar as CalendarIcon, FileText, CheckSquare, Package, AlertTriangle, Copy } from 'lucide-react';
+
+const getDraftStorage = () => {
+    try {
+        return window.sessionStorage;
+    } catch {
+        return null;
+    }
+};
 
 const WeeklyReport = ({ user: propUser }) => {
     const { user: contextUser } = useUser();
@@ -21,7 +35,7 @@ const WeeklyReport = ({ user: propUser }) => {
     useEffect(() => {
         fetchReports();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [user, weekKey]);
+    }, [user?.id, weekKey]);
 
     const fetchReports = async () => {
         if (!user) return;
@@ -31,34 +45,46 @@ const WeeklyReport = ({ user: propUser }) => {
             if (response.ok) {
                 const data = await response.json();
                 // Ensure data is an array to prevent crashes
-                setReports(Array.isArray(data) ? data : []);
+                const availableReports = Array.isArray(data) ? data : [];
+                setReports(availableReports);
                 
                 // Find current user's report for this week
-                const myReport = data.find(r => 
+                const myReport = availableReports.find(r =>
                     String(r.authorId) === String(user.id) && r.weekStartDate === weekKey
                 );
 
-                if (myReport) {
-                    setReport(myReport);
-                } else {
-                    // Initialize blank report
-                    setReport({
-                        authorId: user.id,
-                        authorName: user.name,
-                        weekStartDate: weekKey,
-                        status: 'draft',
-                        schedule: [],
-                        projects: [],
-                        issues: [],
-                        samples: []
-                    });
-                }
+                const serverReport = myReport || {
+                    authorId: user.id,
+                    authorName: user.name,
+                    weekStartDate: weekKey,
+                    status: 'draft',
+                    schedule: [],
+                    projects: [],
+                    issues: [],
+                    samples: []
+                };
+                const draftReport = loadWeeklyReportDraft({
+                    storage: getDraftStorage(),
+                    authorId: user.id,
+                    weekStartDate: weekKey,
+                    serverReport
+                });
+                setReport(draftReport || serverReport);
             }
         } catch (error) {
             console.error('Error fetching reports:', error);
         } finally {
             setLoading(false);
         }
+    };
+
+    const updateReportDraft = update => {
+        setReport(createWeeklyReportDraftUpdater({
+            storage: getDraftStorage(),
+            authorId: user?.id,
+            weekStartDate: weekKey,
+            update
+        }));
     };
 
     const handleLoadPreviousReport = async () => {
@@ -77,7 +103,7 @@ const WeeklyReport = ({ user: propUser }) => {
                 );
 
                 if (prevReport) {
-                    setReport(prev => ({
+                    updateReportDraft(prev => ({
                         ...prev,
                         projects: [...prev.projects, ...(prevReport.projects || [])],
                         issues: [...prev.issues, ...(prevReport.issues || [])],
@@ -143,6 +169,11 @@ const WeeklyReport = ({ user: propUser }) => {
             if (response.ok) {
                 const savedData = await response.json();
                 setReport(savedData);
+                clearWeeklyReportDraft({
+                    storage: getDraftStorage(),
+                    authorId: user.id,
+                    weekStartDate: weekKey
+                });
                 alert(submit ? '보고서가 제출되었습니다.' : '임시 저장되었습니다.');
                 
                 // Optimsitic update: Update list locally to avoid stale read from immediate refetch
@@ -247,6 +278,11 @@ const WeeklyReport = ({ user: propUser }) => {
             });
 
             if (response.ok) {
+                clearWeeklyReportDraft({
+                    storage: getDraftStorage(),
+                    authorId: user.id,
+                    weekStartDate: weekKey
+                });
                 alert('보고서가 삭제되었습니다.');
                 // Refresh to blank state
                 setReport({
@@ -274,21 +310,21 @@ const WeeklyReport = ({ user: propUser }) => {
     };
 
     const addRow = (section, template) => {
-        setReport(prev => ({
+        updateReportDraft(prev => ({
             ...prev,
             [section]: [...(prev[section] || []), template]
         }));
     };
 
     const removeRow = (section, index) => {
-        setReport(prev => ({
+        updateReportDraft(prev => ({
             ...prev,
             [section]: prev[section].filter((_, i) => i !== index)
         }));
     };
 
     const updateRow = (section, index, field, value) => {
-        setReport(prev => {
+        updateReportDraft(prev => {
             const newItems = [...(prev[section] || [])];
             newItems[index] = { ...newItems[index], [field]: value };
             return { ...prev, [section]: newItems };
@@ -359,8 +395,9 @@ const WeeklyReport = ({ user: propUser }) => {
     if (!user) return <div className="p-8">로그인이 필요합니다. (사용자 전환을 이용해주세요)</div>;
     if (loading) return <div className="p-8">로딩 중...</div>;
 
-    const isReadOnly = report && report.status !== 'draft' && report.status !== 'rejected' && String(report.authorId) === String(user.id);
     const isReviewMode = report && String(report.authorId) !== String(user.id);
+    const isEditable = isWeeklyReportEditable(report, user?.id);
+    const isReadOnly = report && !isReviewMode && !isEditable;
     const canReview = (user.role === 'manager' || user.role === 'admin') && report?.status === 'submitted';
     // Allow Director to approve. Manager Self-Approval is removed.
     const canApprove = (user.role === 'director' || user.role === 'admin') && (report?.status === 'reviewed' || report?.status === 'submitted');
