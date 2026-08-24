@@ -36,6 +36,10 @@ import EquipmentAnalysis from './EquipmentAnalysis';
 import ModelCategoryAnalysis from './ModelCategoryAnalysis';
 import InboundAnalysis from './InboundAnalysis';
 import InboundHistory from './InboundHistory';
+import NCRCreate from './NCRCreate';
+import NCRInbox from './NCRInbox';
+import NCRLedger from './NCRLedger';
+import { myTurnV101 as ncrMyTurnCheck, fetchNcrSettings } from './NCRDetail';
 // --- Helper Functions ---
 
 // Helper: Convert Excel Serial Date to YYYY-MM-DD
@@ -588,7 +592,30 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
     const [inboundExpanded, setInboundExpanded] = useState(true);
     const [processExpanded, setProcessExpanded] = useState(true);
     const [adminExpanded, setAdminExpanded] = useState(true);
+    const [ncrExpanded, setNcrExpanded] = useState(true);
     const [showPopup, setShowPopup] = useState(false);
+
+    /* NCR Phase 4: 결재함 사이드바 배지 — 내 차례 건수(결재 가능 + 내 반려 문서) */
+    const [ncrSettings, setNcrSettings] = useState(null); // 없어도 canApprove가 기본 true로 간주
+    const [ncrMyTurn, setNcrMyTurn] = useState(0);
+
+    useEffect(() => { fetchNcrSettings().then(setNcrSettings).catch(() => {}); }, []);
+
+    useEffect(() => {
+        let alive = true;
+        const refresh = () => {
+            api.fetch('/ncr_reports')
+                .then(r => r.json())
+                .then(rows => {
+                    if (!alive) return;
+                    setNcrMyTurn((rows || []).filter(r => ncrMyTurnCheck(user, r, ncrSettings)).length);
+                })
+                .catch(() => {});
+        };
+        refresh(); // mount + activeTab 변경 시
+        const timer = setInterval(refresh, 60000); // 60초 폴링
+        return () => { alive = false; clearInterval(timer); };
+    }, [activeTab, user, ncrSettings]);
 
     // [QA 적용본] 이탈 방지용 깃발 및 히스토리 제어 로직 
     const isPopStateRef = useRef(false);
@@ -663,6 +690,9 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
             case 'process_by_model_category': return <ModelCategoryAnalysis />;
             case 'process_history': return <ProcessHistory />;
             case 'final': return <PlaceholderView title="최종검사 현황" icon={CheckCircle} />;
+            case 'ncr_create': return user?.company === '품질보증부' ? <NCRCreate user={user} /> : <NCRInbox user={user} />;
+            case 'ncr_inbox': return <NCRInbox user={user} />;
+            case 'ncr_ledger': return <NCRLedger user={user} />;
             case 'dev_notes': return <DevNotes user={user} />;
             case 'suggestions': return <Suggestions user={user} />;
             case 'post_approval': return isAdmin ? <PostApproval user={user} /> : null;
@@ -846,6 +876,53 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
                                 최종검사
                             </div>
                         </button>
+
+                        {/* NCR (부적합 관리) Menu Group */}
+                        <div>
+                            <button
+                                onClick={() => setNcrExpanded(!ncrExpanded)}
+                                className={`w-full flex items-center justify-between px-3 py-2.5 text-sm font-semibold rounded-lg transition-all ${activeTab.startsWith('ncr_')
+                                    ? 'bg-slate-800 text-white border-l-4 border-blue-500'
+                                    : 'text-slate-300 hover:bg-slate-800/60'
+                                    }`}
+                            >
+                                <div className="flex items-center">
+                                    <AlertTriangle className={`mr-3 h-5 w-5 ${activeTab.startsWith('ncr_') ? 'text-blue-400' : 'text-slate-400'}`} />
+                                    부적합 관리
+                                </div>
+                                <ChevronDown className={`w-4 h-4 transition-transform ${ncrExpanded ? 'transform rotate-180' : ''} ${activeTab.startsWith('ncr_') ? 'text-white' : 'text-slate-400'}`} />
+                            </button>
+
+                            {ncrExpanded && (
+                                <div className="mt-1.5 space-y-1.5 pl-6 border-l border-slate-700/50 ml-5">
+                                    {user?.company === '품질보증부' && (
+                                        <button
+                                            onClick={() => setActiveTab('ncr_create')}
+                                            className={`w-full flex items-center px-3 py-2 text-xs font-medium rounded-md transition-all ${activeTab === 'ncr_create' ? 'text-blue-400 font-bold bg-slate-800/40' : 'text-slate-400 hover:text-white'}`}
+                                        >
+                                            보고서 작성
+                                        </button>
+                                    )}
+                                    <button
+                                        onClick={() => setActiveTab('ncr_inbox')}
+                                        className={`w-full flex items-center px-3 py-2 text-xs font-medium rounded-md transition-all ${activeTab === 'ncr_inbox' ? 'text-blue-400 font-bold bg-slate-800/40' : 'text-slate-400 hover:text-white'}`}
+                                    >
+                                        결재함
+                                        {ncrMyTurn > 0 && (
+                                            <span className="ml-auto min-w-[18px] h-[18px] px-1 inline-flex items-center justify-center text-[10px] font-bold rounded-full bg-red-500 text-white">
+                                                {ncrMyTurn}
+                                            </span>
+                                        )}
+                                    </button>
+                                    <button
+                                        onClick={() => setActiveTab('ncr_ledger')}
+                                        className={`w-full flex items-center px-3 py-2 text-xs font-medium rounded-md transition-all ${activeTab === 'ncr_ledger' ? 'text-blue-400 font-bold bg-slate-800/40' : 'text-slate-400 hover:text-white'}`}
+                                    >
+                                        부적합 대장
+                                    </button>
+                                </div>
+                            )}
+                        </div>
 
                         {isAdmin && (
                             <div>
