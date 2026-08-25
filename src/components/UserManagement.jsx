@@ -197,6 +197,7 @@ const UserManagement = ({ members, onDeleteMember, onEditMember, onAddMember, on
                                     <option value="employee">작성</option>
                                     <option value="manager">작성+검토</option>
                                     <option value="director">작성+검토+승인</option>
+                                    {editingUser.role === 'admin' && <option value="admin">최고 관리자 (통합 승인)</option>}
                                 </select>
                             </div>
                             <div>

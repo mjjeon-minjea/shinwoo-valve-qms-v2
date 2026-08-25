@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/api';
+import { DEFAULT_USER_ROLE } from '../lib/ncrRoles';
 
 const UserContext = createContext();
 
@@ -45,7 +46,7 @@ export const UserProvider = ({ children }) => {
                 const fallback = await supabase.from('users').select('*').eq('email', authUser.email).single();
                 data = fallback.data;
             }
-            const profile = data || { name: '알수없음', email: authUser.email, role: '사원', status: 'Pending' };
+            const profile = data || { name: '알수없음', email: authUser.email, role: DEFAULT_USER_ROLE, status: 'Pending' };
             const finalUser = {
                 ...profile,
                 id: authUser.id, // 진짜 Auth UUID 부여
@@ -132,7 +133,7 @@ export const UserProvider = ({ children }) => {
             email, name: profileData.name,
             company: profileData.company || '품질보증부',
             rank: profileData.rank || '사원',
-            role: 'user', status: 'Pending',
+            role: DEFAULT_USER_ROLE, status: 'Pending',
             date: new Date().toISOString().split('T')[0]
         };
         const { error: dbError } = await supabase.from('users').upsert([newUserProfile]);

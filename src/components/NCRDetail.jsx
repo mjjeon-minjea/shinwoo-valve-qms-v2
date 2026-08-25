@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { X, CheckCircle2, XCircle, Printer, Undo2, Stamp, FlaskConical, Users, ClipboardCheck, Ban, Coins, Plus, Trash2, File as FileIcon } from 'lucide-react';
 import { api } from '../lib/api';
 import { isLegacyFlow, isNewFlow, statusLabel } from '../lib/ncrFlow';
+import { canApprove, roleOf, techApprovalDecision } from '../lib/ncrRoles';
 /* v10.2 H-③ 처리확인 증빙 첨부 — 작성화면과 「같은 규칙」(1280px 축소 · 비이미지 5MB)을 쓰려고
    lib/attach.jsx의 공용 함수를 그대로 가져다 쓴다(NCRCreate에 있던 것을 lib로 옮긴 것). */
 import { ATT_CAT, processAnyFile, isImageAtt, useCapturePaste, PasteZone } from '../lib/attach.jsx';
@@ -85,38 +86,6 @@ export const fetchNcrSettings = async () => {
     }
 };
 
-/* ── 역할 판정 (규약 §역할) ── */
-export const roleOf = (user, settings) => {
-    const co = user?.company || '', rank = user?.rank || '', role = user?.role || '';
-    const isQaHead = co === '품질보증부' && (rank === '부장' || ['admin', 'director'].includes(role));
-    return {
-        company: co, rank,
-        isQa: co === '품질보증부',
-        isQaHead,
-        isQaStaff: co === '품질보증부' && !isQaHead,
-        isTechStaff: co === '응용기술팀' && rank !== '기술부서장',
-        isTechHead: co === '응용기술팀' && rank === '기술부서장',
-        isDeptHead: (dept) => co === dept && (rank === '부장' || rank === '소장' || rank === '기술부서장'),
-        /* C영역 회귀 실측(08-22) — settings가 아직 null인 로딩 창(실측 약 2.8초)에서
-           `settings?.allow_deputy !== false`가 true로 낙관 해석돼, allow_deputy=false인데도
-           차장에게 대결 권한이 열렸다. 「모르면 막는다」로 뒤집는다 — 설정을 못 읽은 동안은 대결 불가.
-           조회 실패·approval 행 부재도 같은 이유로 false를 준다(fetchNcrSettings 참조) —
-           「모르면 막는다」. 대신 차장에게는 잠긴 이유를 배너로 드러내 조용한 마비를 막는다. */
-        isDeptDeputy: (dept) => co === dept && rank === '차장' && settings?.allow_deputy === true,
-        isDeptStaff: (dept) => co === dept && !['부장', '소장', '차장', '기술부서장'].includes(rank)
-    };
-};
-
-/* ── 레거시(v10.0) 단선 결재 판정 — 구문서 전용 유지 ── */
-export const canApprove = (user, report, settings) => {
-    if (!user || !report) return false;
-    /* 위와 같은 이유로 레거시 단선 결재도 fail-closed (설정 미로딩 중 차장 대결 차단) */
-    const rankOk = user.rank === '부장' || (settings?.allow_deputy === true && user.rank === '차장') || ['admin', 'director'].includes(user.role);
-    if (report.status === '발행') return rankOk && user.company === report.dept;
-    if (report.status === '특채 판단') return rankOk && user.company === '품질보증부';
-    return false;
-};
-
 /* ── 내 차례 판정 (결재함 공용) — 레거시는 단선 결재 규칙으로, 그 외는 v10.1 게이트로 ── */
 export const myTurnV101 = (user, r, settings) => {
     if (isLegacyFlow(r)) return canApprove(user, r, settings) || (r.status === '반려' && r.author_email === user?.email);
@@ -124,11 +93,11 @@ export const myTurnV101 = (user, r, settings) => {
     const rv = r.reviews || {};
     switch (r.status) {
         case '작성중': return r.author_email === user?.email && !!r.reject_note;
-        case '발행승인 대기': case '특채승인 대기': case '최종승인 대기': case '종결승인 대기': case '무효승인 대기': return ro.isQaHead;
+        case '발행승인 대기': case '특채승인 대기': case '최종승인 대기': case '종결승인 대기': case '무효승인 대기': return ro.isQaApprover;
         case '기술문의': {
             const t = rv['응용기술팀'];
             if (!t || t.state === 'skip') return false;
-            return (t.state === 'wait' && ro.isTechStaff) || (t.state === 'staffDone' && ro.isTechHead);
+            return (t.state === 'wait' && ro.isTechStaff) || (t.state === 'staffDone' && ro.isTechApprover);
         }
         case '특채판단': case '종합검토': case '처리중': return ro.isQaStaff;
         case '회람중': {
@@ -348,8 +317,10 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
         act('회람회신', { reviews: { ...reviews, '응용기술팀': t } }, `[기술 검토·${opinion === 'approve' ? '승인 의견' : '반려 의견'}] ${comment.trim()}`);
     };
     const doTechHead = () => {
+        const gate = techApprovalDecision(user, settings);
+        if (!gate.allowed) return setErr('기술 회신 확정 권한이 없습니다. 결재 설정과 사용자 역할을 확인해 주십시오.');
         const t = reviews['응용기술팀'] || {};
-        const upd = { ...t, state: 'done', head_name: user?.name, head_cmt: comment.trim(), head_at: nowIso() };
+        const upd = { ...t, state: 'done', head_name: user?.name, head_cmt: comment.trim(), head_at: nowIso(), deputy: gate.deputy };
         act('기술회신', { status: '특채판단', reviews: { ...reviews, '응용기술팀': upd }, tech_reply: { summary: t.staff_cmt || comment.trim(), at: nowIso() } }, comment || '기술 회신 확정');
     };
     const doJudgeSubmit = () => {
@@ -400,7 +371,7 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
     };
     /* 부서장 결재 자격 — 쓰기 직전 다시 판정한다.
        B-20 #1의 교훈: 렌더 가드만 두면 화면이 잠깐 잘못 뜨는 순간에 결재가 실제로 완주된다.
-       설정을 아직 못 읽었으면 「모른다」이므로 통과시키지 않는다(부장은 설정과 무관하므로 그대로 통과). */
+       설정을 아직 못 읽었으면 「모른다」이므로 통과시키지 않는다(director는 설정과 무관하므로 그대로 통과). */
     const deptHeadGate = () => {
         if (ro.isDeptHead(ro.company)) return { ok: true, deputy: false };
         if (!settings) return { ok: false, msg: '결재 설정을 불러오는 중입니다 — 잠시 후 다시 시도해 주십시오.' };
@@ -618,8 +589,8 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
     };
 
     const myTurn = myTurnV101(user, report, settings);
-    /* 설정 미로딩·조회실패로 차석 대결이 잠겼고, 하필 이 문서가 그 차장의 대결 차례인 경우에만 안내한다. */
-    const deputyLockNotice = ro.rank === '차장' && settings && (!settings.loaded || !settings.approval_row) && (
+    /* 설정 미로딩·조회실패로 차석 대결이 잠겼고, 하필 manager의 대결 차례인 경우에만 안내한다. */
+    const deputyLockNotice = ro.role === 'manager' && settings && (!settings.loaded || !settings.approval_row) && (
         newFlow
             ? (report.status === '회람중' && reviews[ro.company]?.state === 'staffDone')
             : ((report.status === '발행' && ro.company === report.dept) || (report.status === '특채 판단' && ro.isQa))
@@ -950,7 +921,7 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
                                 <label key={o} className="flex items-center gap-1.5"><input type="radio" name="opn" checked={opinion === o} onChange={() => setOpinion(o)} />{o === 'approve' ? '승인 의견' : '반려 의견'}</label>
                             ))}</div>
                         </Panel> :
-                        mode === 'techHead' ? <Panel {...panelBase} title="기술 회신 확정 (기술부서장) — 특채 판단으로 회신" onSubmit={doTechHead} submitLabel="회신 확정" color="bg-violet-700 hover:bg-violet-800" /> :
+                        mode === 'techHead' ? <Panel {...panelBase} title={`기술 회신 확정 (${ro.isTechDeputy && !ro.isTechHead ? '차석 대결' : '기술부서장'}) — 특채 판단으로 회신`} onSubmit={doTechHead} submitLabel="회신 확정" color="bg-violet-700 hover:bg-violet-800" /> :
                         mode === 'judge' ? <Panel {...panelBase} title="특채 여부 판단 상신 (품질부서장 승인 요청)" onSubmit={doJudgeSubmit} submitLabel="판단 상신" color="bg-amber-600 hover:bg-amber-700" needComment commentLabel="(판단 사유 — 필수)">
                             <div className="space-y-2 text-sm">
                                 <div className="flex gap-4">{[['special', '특채(Concession)로 진행'], ['normal', '일반 처리로 전환']].map(([k, l]) => (
@@ -1175,18 +1146,18 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
                             )}
                             {canWithdrawV101 && <button onClick={() => openPanel('withdraw')} className={`${btnO} mr-auto flex items-center`}><Undo2 className="w-4 h-4 mr-1.5" /> 회수</button>}
                             {canVoid && <button onClick={() => openPanel('void')} className={`${btnO} mr-auto flex items-center`}><Ban className="w-4 h-4 mr-1.5" /> 즉시종결(무효)</button>}
-                            {newFlow && myTurn && report.status === '무효승인 대기' && ro.isQaHead && (<>
+                            {newFlow && myTurn && report.status === '무효승인 대기' && ro.isQaApprover && (<>
                                 <button onClick={() => openPanel('voidNo')} className={`${btnO} text-red-600 border-red-200 hover:bg-red-50`}>반려</button>
                                 <button onClick={() => openPanel('voidOk')} className={`${btnP} bg-slate-800 hover:bg-slate-900 flex items-center`}><Ban className="w-4 h-4 mr-1.5" /> 무효 승인</button>
                             </>)}
-                            {newFlow && myTurn && report.status === '발행승인 대기' && ro.isQaHead && (<>
+                            {newFlow && myTurn && report.status === '발행승인 대기' && ro.isQaApprover && (<>
                                 <button onClick={() => openPanel('issueNo')} className={`${btnO} text-red-600 border-red-200 hover:bg-red-50`}>반려</button>
                                 <button onClick={() => openPanel('issueOk')} className={`${btnP} bg-blue-600 hover:bg-blue-700 flex items-center`}><Stamp className="w-4 h-4 mr-1.5" /> 발행 승인</button>
                             </>)}
                             {newFlow && myTurn && report.status === '기술문의' && ro.isTechStaff && <button onClick={() => openPanel('techStaff')} className={`${btnP} bg-violet-600 hover:bg-violet-700`}>기술 검토 회신</button>}
-                            {newFlow && myTurn && report.status === '기술문의' && ro.isTechHead && <button onClick={() => openPanel('techHead')} className={`${btnP} bg-violet-700 hover:bg-violet-800`}>회신 확정 (기술부서장)</button>}
+                            {newFlow && myTurn && report.status === '기술문의' && ro.isTechApprover && <button onClick={() => openPanel('techHead')} className={`${btnP} bg-violet-700 hover:bg-violet-800`}>회신 확정 ({ro.isTechDeputy && !ro.isTechHead ? '차석 대결' : '기술부서장'})</button>}
                             {newFlow && myTurn && report.status === '특채판단' && (<button onClick={() => { openPanel('judge'); setJudgeDepts((settings?.routing?.default_depts || []).filter(d => allDepts.includes(d))); }} className={`${btnP} bg-amber-600 hover:bg-amber-700`}>특채 여부 판단 상신</button>)}
-                            {newFlow && myTurn && report.status === '특채승인 대기' && ro.isQaHead && (<>
+                            {newFlow && myTurn && report.status === '특채승인 대기' && ro.isQaApprover && (<>
                                 <button onClick={() => openPanel('specialNo')} className={`${btnO} text-red-600 border-red-200 hover:bg-red-50`}>반려</button>
                                 <button onClick={() => openPanel('specialOk')} className={`${btnP} bg-amber-600 hover:bg-amber-700 flex items-center`}><Stamp className="w-4 h-4 mr-1.5" /> 특채 승인 — 본회람 발사</button>
                             </>)}
@@ -1200,12 +1171,12 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
                                 <button onClick={() => openPanel('requery')} className={`${btnO} text-orange-600 border-orange-200 hover:bg-orange-50`}>해당 부서만 재질의</button>
                                 <button onClick={() => openPanel('qaSubmit')} className={`${btnP} bg-indigo-600 hover:bg-indigo-700`}>종합검토 상신</button>
                             </>)}
-                            {newFlow && myTurn && report.status === '최종승인 대기' && ro.isQaHead && (<>
+                            {newFlow && myTurn && report.status === '최종승인 대기' && ro.isQaApprover && (<>
                                 <button onClick={() => openPanel('finalNo')} className={`${btnO} text-red-600 border-red-200 hover:bg-red-50`}>반려</button>
                                 <button onClick={() => openPanel('finalOk')} className={`${btnP} bg-purple-600 hover:bg-purple-700 flex items-center`}><Stamp className="w-4 h-4 mr-1.5" /> 최종 승인 (전결)</button>
                             </>)}
                             {newFlow && myTurn && report.status === '처리중' && <button onClick={() => openPanel('close')} className={`${btnP} bg-teal-600 hover:bg-teal-700 flex items-center`}><Coins className="w-4 h-4 mr-1.5" /> 완료확인 · 비용 마감</button>}
-                            {newFlow && myTurn && report.status === '종결승인 대기' && ro.isQaHead && (<>
+                            {newFlow && myTurn && report.status === '종결승인 대기' && ro.isQaApprover && (<>
                                 <button onClick={() => openPanel('closeNo')} className={`${btnO} text-red-600 border-red-200 hover:bg-red-50`}>반려</button>
                                 <button onClick={() => openPanel('closeOk')} className={`${btnP} bg-emerald-600 hover:bg-emerald-700 flex items-center`}><CheckCircle2 className="w-4 h-4 mr-1.5" /> 종결 승인</button>
                             </>)}

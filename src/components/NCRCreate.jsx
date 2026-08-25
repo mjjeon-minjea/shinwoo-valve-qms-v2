@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { FileText, Save, Send, AlertTriangle, ChevronDown, ChevronRight, Plus, Trash2, ImagePlus, File as FileIcon, FilePlus2, RotateCcw, Info, Users } from 'lucide-react';
 import { api, supabase } from '../lib/api';
+import { isNcrRouteStaff } from '../lib/ncrRoles';
 /* v10.2 H-① 캡처 붙여넣기 복원 — 축소·용량제한·붙여넣기 규칙은 lib/attach.jsx 한 곳에만 둔다(중복 정의 금지).
    결재화면(NCRDetail 처리확인 증빙)이 같은 함수를 쓰므로 이 파일에 다시 정의하지 않는다. */
 import { shrinkImage, processAnyFile, isImageAtt, useCapturePaste, PasteZone } from '../lib/attach.jsx';
@@ -20,7 +21,6 @@ const CODE_GROUPS = [                   // 코드 접두 → optgroup 라벨 (�
     { key: 'A', label: 'A 주물' }, { key: 'B', label: 'B 가공' },
     { key: 'C', label: 'C 조립' }, { key: 'D', label: 'D 기타' }
 ];
-const HEAD_RANKS = ['부장', '차장', '소장', '기술부서장'];             // 담당자(사원급) select 제외 직급
 const ROUTE_EXCLUDE = ['품질보증부', '응용기술팀'];      // 회람 지정 대상에서 제외(주관·선행회람 부서)
 const CONCESSION = '특채(Concession)';                   // v9.3 onDispChange 규칙 대상 처리방안
 
@@ -302,7 +302,7 @@ const NCRCreate = ({ user }) => {
 
     /* v10.1 회람 지정 대상 부서 — users.company 중 품질보증부·응용기술팀 제외 */
     const routeDepts = depts.filter(d => !ROUTE_EXCLUDE.includes(d));
-    const staffOf = (dept) => staffAll.filter(u => u.company === dept && !HEAD_RANKS.includes(u.rank));
+    const staffOf = (dept) => staffAll.filter(u => u.company === dept && isNcrRouteStaff(u));
     const isRouted = (dept) => form.routing_depts.some(x => x.dept === dept);
     const routeOf = (dept) => form.routing_depts.find(x => x.dept === dept);
 
