@@ -236,8 +236,9 @@ const NCRPrint = ({ report, history, attachments, onClose }) => {
     const dispChangeDept = Object.entries(report.reviews || {})
         .filter(([, r]) => r?.disp_req?.resolved === '수락')
         .map(([d]) => d).join('·');
-    const dispChangeNote = report.disposition_prev
-        ? `← ${report.disposition_prev}에서 변경 (${dispChangeDept ? `요청 ${dispChangeDept} · ` : ''}${aFinal ? '승인 품질부서장 최종승인' : '최종승인 전'})`
+    /* 미정('')에서 바뀐 경우도 변경으로 표기한다 — 빈 문자열은 거짓값이라 누락됐다(260829). */
+    const dispChangeNote = (report.disposition_prev !== null && report.disposition_prev !== undefined)
+        ? `← ${report.disposition_prev || '미정'}에서 변경 (${dispChangeDept ? `요청 ${dispChangeDept} · ` : ''}${aFinal ? '승인 품질부서장 최종승인' : '최종승인 전'})`
         : '';
 
     const aprCells = [
@@ -382,6 +383,10 @@ const NCRPrint = ({ report, history, attachments, onClose }) => {
                 <tr>
                     <th>처리방안</th><td>{dispoFull || '미정'}{dispChangeNote && <span className="ncrp-chg">{dispChangeNote}</span>}{judgePendingText && <span className="ncrp-chg">← 상신 「{judgePendingText}」 · 품질부서장 승인 전</span>}</td>
                     <th>처리부서</th><td>{report.dept || '—'}</td>
+                </tr>
+                {/* FORM 933-07 「Recommended by」 — 처리방안 마련자. 발행 시 확정되며 트랙이 바뀌어도 유지된다. */}
+                <tr>
+                    <th>처리방안 마련자</th><td colSpan={3}>{report.disposition_by || '—'}<small>{report.disposition_by ? ' (품질보증부)' : ''}</small></td>
                 </tr>
                 <tr>
                     <th>작 성 자</th>
@@ -536,6 +541,7 @@ const NCRPrint = ({ report, history, attachments, onClose }) => {
                 <span>2. 처리방안 — <span className="dispo">{dispoFull || '미정'}</span>{dispChangeNote && <span className="ncrp-chg">{dispChangeNote}</span>}{judgePendingText && <span className="ncrp-chg">← 상신 「{judgePendingText}」 · 품질부서장 승인 전</span>}</span>
                 {isSpecial && <span className="ncrp-badge spec">{judgePending ? '특채 — 승인 대기' : '특채 — 품질부서장 전결'}</span>}
                 {aIssue && <small>(발행승인 {fmtDate(aIssue.at)} {aIssue.actor_name})</small>}
+                {report.disposition_by && <small>(마련 {report.disposition_by})</small>}
             </h4>
             {judge?.note && <div className="ncrp-pre s" style={{ marginBottom: 6 }}>{judge.note}</div>}
             {judge?.depts?.length > 0 && (

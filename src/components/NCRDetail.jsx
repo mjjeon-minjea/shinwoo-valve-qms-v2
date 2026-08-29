@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { X, CheckCircle2, XCircle, Printer, Undo2, Stamp, FlaskConical, Users, ClipboardCheck, Ban, Coins, Plus, Trash2, File as FileIcon } from 'lucide-react';
 import { api } from '../lib/api';
 import { isLegacyFlow, isNewFlow, statusLabel } from '../lib/ncrFlow';
-import { canApprove, roleOf, techApprovalDecision } from '../lib/ncrRoles';
+import { roleOf, canApprove, techApprovalDecision } from '../lib/ncrRoles';
 /* v10.2 H-③ 처리확인 증빙 첨부 — 작성화면과 「같은 규칙」(1280px 축소 · 비이미지 5MB)을 쓰려고
    lib/attach.jsx의 공용 함수를 그대로 가져다 쓴다(NCRCreate에 있던 것을 lib로 옮긴 것). */
 import { ATT_CAT, processAnyFile, isImageAtt, useCapturePaste, PasteZone } from '../lib/attach.jsx';
@@ -46,7 +46,7 @@ const ACTION_DOT = {
     '기술회신': 'bg-violet-500', '특채판단 상신': 'bg-amber-500', '특채승인': 'bg-amber-600', '특채반려': 'bg-red-500',
     '회람회신': 'bg-blue-400', '부서승인': 'bg-blue-600', '부서내 재검토': 'bg-orange-400', '품질반려': 'bg-red-500',
     '재질의': 'bg-orange-500', '종합검토 상신': 'bg-indigo-500', '최종승인': 'bg-purple-600', '최종반려': 'bg-red-500',
-    '처분방안 변경': 'bg-amber-500',
+    '처분방안 변경': 'bg-amber-500', '요청 반송': 'bg-orange-500',
     '완료확인': 'bg-teal-600', '종결승인': 'bg-emerald-600', '종결반려': 'bg-red-500',
     '회수': 'bg-slate-500', '무효상신': 'bg-slate-500', '무효승인': 'bg-slate-700', '무효반려': 'bg-red-500', '무효': 'bg-slate-600',
     /* 레거시 */
@@ -86,6 +86,14 @@ export const fetchNcrSettings = async () => {
     }
 };
 
+/* ── 역할 판정 ──
+   판정 정본은 src/lib/ncrRoles.js 한 곳이다(스테이징 staging@4553aa5과 동일 원문).
+   과거 이 자리에 있던 직급(rank) 문자열 비교는 두 가지로 깨져 제거했다.
+     ① 부서장이 '부장'이 아닌 경우(최용석 이사·황사빈 이사) 결재자가 사라짐
+     ② 실무자가 '차장'인 경우(정준길) 결재자로 오인됨
+   기존 import 호환을 위해 여기서 그대로 재export 한다. */
+export { roleOf, canApprove };
+
 /* ── 내 차례 판정 (결재함 공용) — 레거시는 단선 결재 규칙으로, 그 외는 v10.1 게이트로 ── */
 export const myTurnV101 = (user, r, settings) => {
     if (isLegacyFlow(r)) return canApprove(user, r, settings) || (r.status === '반려' && r.author_email === user?.email);
@@ -111,6 +119,17 @@ export const myTurnV101 = (user, r, settings) => {
     }
 };
 
+/* 되돌림 표기 — 「부서장 재검토 지시」(부서 내·품질 미경유)와 「품질 반송」(특채요청 심사 결과)은
+   담당자가 취해야 할 조치가 다르다. 접두어로 구분해 라벨을 분리한다(실측 결함 260829). */
+/* 처분방안 변경 여부는 disposition_prev의 참·거짓이 아니라 「값이 있는가」로 본다.
+   실측 결함(260829, 예림 독립검토): 처리방안 미정('')인 문서가 특채로 바뀌면 disposition_prev=''가 되는데,
+   ''는 거짓값이라 최종반려해도 원복이 안 되고 요청만 다시 열려 상태가 어긋났다.
+   개발웹 25건 중 미정 문서가 11건이라 실제로 자주 닿는 경로다. */
+const hasDispChange = (r) => r?.disposition_prev !== null && r?.disposition_prev !== undefined;
+const dispPrevLabel = (r) => r?.disposition_prev || '미정';
+const QA_REMAND = '[품질 반송]';
+const remandLabel = (note) => String(note || '').startsWith(QA_REMAND) ? '품질 반송' : '부서장 재검토 지시';
+const remandBody = (note) => String(note || '').replace(QA_REMAND, '').trim();
 const nowIso = () => new Date().toISOString();
 const fmtWon = (n) => '₩' + Number(n || 0).toLocaleString();
 
@@ -118,7 +137,17 @@ const fmtWon = (n) => '₩' + Number(n || 0).toLocaleString();
    폐기 ↔ 불채용(반송)만 허용한다. 둘 다 「물건을 안 쓰는」 처리라 변경해도 위험이 늘지 않는다.
    수리·현상태 사용 등 「쓰는 처리」로는 기술 검토가 선행되어야 하므로 기존대로 회수 → 특채 트랙. */
 const UNUSED_DISPS = ['폐기', '불채용(반송)'];
-const dispChangeTargets = (cur) => UNUSED_DISPS.includes(cur) ? UNUSED_DISPS.filter(d => d !== cur) : [];
+const CONCESSION = '특채(Concession)';
+/* 특채 전환(차장 확정 260829) — 회수·재발행 없이 같은 문서에 이력으로 남긴다.
+   위험이 큰 「쓰는 처리」이므로 안전장치를 둘로 둔다.
+     ① 수락 시 특채 유형을 반드시 고른다 (절차서 5.3.4·5.3.7)
+     ② 수락한 문서는 기존 흐름대로 최종승인 대기로 올라가 품질부서장 결재를 받는다
+   마련 주체는 트랙과 무관하게 품질보증부다(disposition_by는 바뀌지 않는다). */
+const dispChangeTargets = (cur) => {
+    const t = UNUSED_DISPS.includes(cur) ? UNUSED_DISPS.filter(d => d !== cur) : [];
+    if (cur !== CONCESSION) t.push(CONCESSION);
+    return t;
+};
 
 /* ── B-21 품질비용 공통 검증(1차·2차 공용) ──
    기존 doCloseSubmit의 금액 검증 3종을 함수로 분리해 회람 검토 회신·종합검토·완료확인이 모두 같은 규칙을 쓴다. */
@@ -227,7 +256,8 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
     /* B-20 처분방안 변경 요청 */
     const [dispReqOn, setDispReqOn] = useState(false);      // 회람 담당: 변경 요청 체크
     const [dispReqTo, setDispReqTo] = useState('');         // 변경 목표 처리방안
-    const [dispDecisions, setDispDecisions] = useState({}); // 종합검토: { [부서]: '수락'|'거절' }
+    const [dispDecisions, setDispDecisions] = useState({}); // 종합검토: { [부서]: '수락'|'거절'|'반송' }
+    const [concPick, setConcPick] = useState('');          // 특채 수락 시 특채 유형
     /* B-21 품질비용 2단 산출 */
     const [deptCostOn, setDeptCostOn] = useState(false);                       // 회람 담당: 품질비용 있음 체크
     const [deptCosts, setDeptCosts] = useState([{ label: '', amount: '' }]);   // 회람 담당 입력 항목
@@ -284,6 +314,8 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
     const pendingDispReqs = Object.entries(reviews)                            // 종합검토에서 판단해야 할 미해결 변경 요청
         .filter(([, rv]) => rv?.disp_req && !rv.disp_req.resolved)
         .map(([dept, rv]) => ({ dept, req: rv.disp_req }));
+    const dispRemandOn = pendingDispReqs.some(({ dept }) => dispDecisions[dept] === '반송');
+    const dispConcOn = pendingDispReqs.some(({ dept, req }) => dispDecisions[dept] === '수락' && req.to === CONCESSION);
     const collectDeptCosts = () => Object.entries(reviews)                     // 부서가 회람에서 올린 비용 항목 → 1차 미리채움
         .flatMap(([dept, rv]) => (rv?.cost_items || []).map(c => ({ label: c.label || '', amount: String(c.amount ?? ''), dept })));
     const seedStage1 = () => {
@@ -316,12 +348,16 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
         const t = { ...(reviews['응용기술팀'] || {}), state: 'staffDone', staff_email: user?.email, staff_name: user?.name, opinion, staff_cmt: comment.trim(), staff_at: nowIso() };
         act('회람회신', { reviews: { ...reviews, '응용기술팀': t } }, `[기술 검토·${opinion === 'approve' ? '승인 의견' : '반려 의견'}] ${comment.trim()}`);
     };
+    /* 기술 회신 확정 자격 — 부서장 결재(deptHeadGate)와 같은 원칙으로 쓰기 직전 다시 판정한다.
+       렌더 가드만 두면 화면이 잘못 뜨는 순간에 확정이 실제로 완주된다. 설정을 못 읽었으면 대결은 막는다. */
     const doTechHead = () => {
-        const gate = techApprovalDecision(user, settings);
-        if (!gate.allowed) return setErr('기술 회신 확정 권한이 없습니다. 결재 설정과 사용자 역할을 확인해 주십시오.');
+        const g = techApprovalDecision(user, settings);
+        if (!g.allowed) return setErr(settings
+            ? '기술 회신을 확정할 권한이 없습니다 — 이 시스템은 차석 대결을 허용하지 않도록 설정돼 있습니다.'
+            : '결재 설정을 불러오는 중입니다 — 잠시 후 다시 시도해 주십시오.');
         const t = reviews['응용기술팀'] || {};
-        const upd = { ...t, state: 'done', head_name: user?.name, head_cmt: comment.trim(), head_at: nowIso(), deputy: gate.deputy };
-        act('기술회신', { status: '특채판단', reviews: { ...reviews, '응용기술팀': upd }, tech_reply: { summary: t.staff_cmt || comment.trim(), at: nowIso() } }, comment || '기술 회신 확정');
+        const upd = { ...t, state: 'done', head_name: user?.name, head_cmt: comment.trim(), head_at: nowIso(), deputy: g.deputy };
+        act('기술회신', { status: '특채판단', reviews: { ...reviews, '응용기술팀': upd }, tech_reply: { summary: t.staff_cmt || comment.trim(), at: nowIso() } }, `${comment || '기술 회신 확정'}${g.deputy ? ' (차석 대결)' : ''}`);
     };
     const doJudgeSubmit = () => {
         if (!comment.trim()) return setErr('판단 사유는 필수입니다.');
@@ -404,9 +440,22 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
     };
     const doQaSubmit = () => {
         if (!comment.trim()) return setErr('종합검토 의견은 필수입니다 (부서 회신 요약 + 처리방안 확정 사유).');
-        /* B-20 — 미해결 변경 요청은 수락/거절을 반드시 정하고 넘어간다 */
+        /* B-20 — 미해결 변경 요청은 수락·거절·반송 중 하나를 반드시 정하고 넘어간다 */
         for (const p of pendingDispReqs) {
-            if (!dispDecisions[p.dept]) return setErr(`처분방안 변경 요청(${p.dept})에 대해 수락 또는 거절을 선택하세요.`);
+            if (!dispDecisions[p.dept]) return setErr(`처분방안 변경 요청(${p.dept})에 대해 수락·거절·반송 중 하나를 선택하세요.`);
+        }
+        /* 반송(차장 확정 260829) — 요청을 판단하지 않고 요청 부서로 되돌린다.
+           문서는 회람중으로 돌아가고 해당 부서만 다시 회신한다. 다른 부서 회신은 그대로 둔다.
+           상신이 아니므로 비용 확정 절차를 타지 않는다. */
+        const remandList = pendingDispReqs.filter(({ dept }) => dispDecisions[dept] === '반송');
+        if (remandList.length) {
+            if (remandList.length !== pendingDispReqs.length) return setErr('반송은 다른 판단과 섞을 수 없습니다 — 전부 반송하거나, 반송을 빼고 수락·거절로 정하세요.');
+            const rvR = { ...reviews };
+            remandList.forEach(({ dept, req }) => {
+                rvR[dept] = { ...(rvR[dept] || {}), state: 'wait', remand_note: `${QA_REMAND} ${comment.trim()}`, disp_req: { ...req, remanded_by: user?.name || '', remanded_at: nowIso() } };
+            });
+            act('요청 반송', { status: '회람중', reviews: rvR }, `[처분방안 변경 요청 반송 → ${remandList.map(r => r.dept).join('·')}] ${comment.trim()}`);
+            return;
         }
         /* B-21 1차 — 처리방안 비용 확정 (합계 0원이면 사유 필수) */
         const cerr = validateCosts(stage1Items); if (cerr) return setErr(cerr);
@@ -422,8 +471,11 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
         const allowedTo = dispChangeTargets(cur);
         const acceptList = pendingDispReqs.filter(({ dept }) => dispDecisions[dept] === '수락');
         for (const { req } of acceptList) {
-            if (!allowedTo.includes(req.to)) return setErr('허용되지 않는 처리방안 전환입니다 — 「쓰는 처리」로 바꾸려면 회수 후 특채 결재를 새로 받아야 합니다.');
+            if (!allowedTo.includes(req.to)) return setErr(`허용되지 않는 처리방안 전환입니다 (${cur} → ${req.to}).`);
         }
+        /* 특채 수락 — 유형 선택을 강제한다(절차서 5.3.4·5.3.7). 유형 없는 특채는 인쇄물·이력에서 근거가 비게 된다. */
+        const concAccepted = acceptList.some(({ req }) => req.to === CONCESSION);
+        if (concAccepted && !concPick) return setErr('특채로 전환하려면 특채 유형을 선택하세요 (현상태 사용·수리·재등급 부여·관련부품 수정).');
         /* B-20 — 처리방안 변경은 1회만 적용한다. 서로 다른 목표를 동시에 수락하면 마지막 것만 남고
            disposition_prev가 중간값으로 오염되므로 아예 막는다. */
         const acceptTargets = [...new Set(acceptList.map(({ req }) => req.to))];
@@ -450,7 +502,12 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
             reviews: rv,
             cost_stage1: { items, total, zero_why: total === 0 ? zeroWhy.trim() : '', at: nowIso(), by: user?.name || '' }
         };
-        if (accepted) { patch.disposition = disp; patch.disposition_prev = prev; }
+        if (accepted) {
+            patch.disposition = disp;
+            patch.disposition_prev = prev;
+            /* 특채로 바뀐 경우에만 유형을 쓴다. 특채가 아닌 전환은 기존 유형을 지운다. */
+            patch.concession_type = disp === CONCESSION ? concPick : '';
+        }
         act('종합검토 상신', patch, comment, extra);
     };
     const doRequery = () => {
@@ -467,9 +524,33 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
         act('재질의', { status: '회람중', reviews: { ...reviews, [requeryDept]: mine } }, `[재질의 → ${requeryDept}] ${comment.trim()}`);
     };
     const doFinalApprove = () => act('최종승인', { status: '처리중' }, comment || '최종 승인 (품질부서장 전결)');
+    /* 최종반려 = 「종합검토를 다시 하라」.
+       실측 결함(260829): 종합검토 상신 시점에 처분방안 변경이 이미 적용되므로, 부서장이
+       「특채 근거 불충분」으로 반려해도 처리방안은 특채인 채로 남고 요청은 수락 처리된 상태라
+       담당이 되돌릴 수단이 없었다. 특채인 채로 재상신하는 것 말고는 길이 없다.
+       그래서 반려 시 ①변경된 처분방안을 원래 값으로 되돌리고 ②판단이 끝난 요청을 다시 미해결로 열어
+       담당이 처음부터 다시 판단하게 한다. 폐기↔불채용 변경(B-20)에도 같은 규칙이 적용된다. */
     const doFinalReject = () => {
         if (!comment.trim()) return setErr('반려 사유는 필수입니다.');
-        act('최종반려', { status: '종합검토', qa_summary: null }, comment);
+        const patch = { status: '종합검토', qa_summary: null };
+        if (hasDispChange(report)) {
+            patch.disposition = report.disposition_prev;
+            patch.disposition_prev = null;
+            patch.concession_type = '';
+        }
+        const rv = { ...reviews };
+        let reopened = 0;
+        Object.keys(rv).forEach(k => {
+            const q = rv[k]?.disp_req;
+            if (q && q.resolved) {
+                const { resolved, resolved_by, resolved_at, ...rest } = q;
+                rv[k] = { ...rv[k], disp_req: rest };
+                reopened += 1;
+            }
+        });
+        if (reopened) patch.reviews = rv;
+        const tag = patch.disposition ? ` (처리방안 ${report.disposition} → ${patch.disposition} 원복)` : '';
+        act('최종반려', patch, `${comment}${tag}`);
     };
     const doCloseSubmit = () => {
         const items = cleanCosts(costItems);
@@ -642,7 +723,7 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
             setDispReqOn(!!openReq && dispTargets.length > 0);
             setDispReqTo(openReq && dispTargets.includes(openReq.to) ? openReq.to : (dispTargets[0] || ''));
         }
-        if (m === 'qaSubmit') { setDispDecisions({}); setStage1Items(seedStage1()); setZeroWhy(report.cost_stage1?.zero_why || ''); }
+        if (m === 'qaSubmit') { setDispDecisions({}); setConcPick(''); setStage1Items(seedStage1()); setZeroWhy(report.cost_stage1?.zero_why || ''); }
         /* H-③: 패널을 열 때 증빙 담아둔 것도 비운다 — 직전에 열었다 닫은 문서의 사진이 남아 잘못 올라가는 것 방지 */
         if (m === 'close') { setS1Edits({}); setCostItems([{ label: '', amount: '' }]); setZeroWhy(''); setClosedAtts([]); setAttErr(null); pz.setHover(null); pz.pin(null); }
     };
@@ -664,16 +745,17 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
                     <label className="flex items-center gap-2 text-sm font-semibold text-amber-800">
                         <input type="checkbox" checked={dispReqOn}
                             onChange={e => { setDispReqOn(e.target.checked); if (e.target.checked && !dispReqTo) setDispReqTo(dispTargets[0]); }} />
-                        처분방안 변경 요청
+                        처분방안 변경 · 특채 요청
                     </label>
                     {dispReqOn && (<>
                         <select value={dispReqTo} onChange={e => setDispReqTo(e.target.value)} className={inputCls} aria-label="변경할 처분방안">
                             <option value="">— 선택 —</option>
                             {dispTargets.map(d => <option key={d} value={d}>{d}</option>)}
                         </select>
-                        <p className="text-[11px] text-amber-700">현재 <b>{report.disposition}</b> → 변경 요청. 위 검토 의견이 변경 사유로 함께 전달됩니다.</p>
+                        <p className="text-[11px] text-amber-700">현재 <b>{report.disposition || '미정'}</b> → 변경 요청. 위 검토 의견이 변경 사유로 함께 전달됩니다.</p>
+                        {dispReqTo === CONCESSION && <p className="text-[11px] font-semibold text-violet-700">특채 요청입니다 — 특채 유형은 품질보증부가 수락하면서 정합니다. 요청 사유(불량 정도·사용 가능 판단 근거)를 검토 의견에 구체적으로 적어 주십시오.</p>}
                     </>)}
-                    <p className="text-[11px] text-slate-500">폐기 ↔ 불채용(반송)처럼 「물건을 안 쓰는」 처리끼리만 변경할 수 있습니다. 수리·현상태 사용 등은 기존대로 회수 후 특채 트랙으로 진행하세요.</p>
+                    <p className="text-[11px] text-slate-500">부서장이 승인하면 부서 공식 의견으로 품질보증부에 전달됩니다. 품질보증부는 <b>수락 · 거절 · 반송</b> 중 하나로 판단하며, 특채로 수락된 건은 품질부서장 최종승인을 받습니다. 회수·재발행 없이 이 문서에 이력으로 남습니다.</p>
                 </div>
             )}
             <div className="rounded-lg border border-slate-200 bg-white p-3 space-y-2">
@@ -696,16 +778,29 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
                     <div className="text-sm font-semibold text-slate-700">{report.disposition || '—'}&nbsp; → &nbsp;{req.to}</div>
                     <div className="text-sm text-slate-600">&ldquo;{req.note}&rdquo;</div>
                     <div className="flex gap-5 text-sm pt-0.5">
-                        {['수락', '거절'].map(v => (
+                        {['수락', '거절', '반송'].map(v => (
                             <label key={v} className="flex items-center gap-1.5">
                                 <input type="radio" name={`dispdec-${dept}`} checked={dispDecisions[dept] === v}
                                     onChange={() => setDispDecisions(p => ({ ...p, [dept]: v }))} />{v}
                             </label>
                         ))}
                     </div>
-                    {dispDecisions[dept] === '거절' && <p className="text-[11px] text-red-600">거절 사유를 아래 종합검토 의견에 반드시 적어 주세요.</p>}
+                    {dispDecisions[dept] === '거절' && <p className="text-[11px] text-red-600">거절 — 처리방안은 그대로 두고 회람을 계속합니다. 거절 사유를 아래 종합검토 의견에 반드시 적어 주세요.</p>}
+                    {dispDecisions[dept] === '반송' && <p className="text-[11px] text-orange-600">반송 — {dept}로 되돌려 다시 회신받습니다. 문서는 회람중으로 돌아가며 다른 부서 회신은 그대로 유지됩니다.</p>}
                 </div>
             ))}
+            {/* 특채 전환 — 유형 선택 강제 (절차서 5.3.4·5.3.7) */}
+            {dispConcOn && (
+                <div className="rounded-lg border border-violet-300 bg-violet-50 p-3 space-y-1.5">
+                    <div className="text-sm font-bold text-violet-800">특채 전환 — 특채 유형 선택 (필수)</div>
+                    <select value={concPick} onChange={e => setConcPick(e.target.value)} className={inputCls} aria-label="특채 유형">
+                        <option value="">— 선택 —</option>
+                        {(settings?.concession_types || []).map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                    {!report.tech_reply && <p className="text-[11px] font-semibold text-red-600">기술 회신 기록이 없습니다 — 절차서 5.3.6에 따라 수리·현상태 사용은 기술적 근거 서류가 필요합니다. 아래 종합검토 의견에 근거를 반드시 적으십시오.</p>}
+                    <p className="text-[11px] text-violet-700">수락하면 처리방안이 특채로 바뀌고, 문서는 최종승인 대기로 올라가 품질부서장 결재를 받습니다. 회수·재발행은 없으며 이 문서에 이력으로 남습니다. 처리방안 마련자({report.disposition_by || '미지정'})는 그대로 유지됩니다.</p>
+                </div>
+            )}
             <div className="rounded-lg border border-slate-200 bg-white p-3 space-y-2">
                 <div className="text-xs font-bold text-slate-700">★ 1차 · 처리방안 비용 확정</div>
                 <p className="text-[11px] text-slate-500">부서·항목별로 나눠 입력하면 합계가 자동 산출됩니다</p>
@@ -757,7 +852,9 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
                         <div className="col-span-2"><div className="text-xs text-slate-400 mb-0.5">품명</div><div className="font-medium text-slate-700">{report.item_name}{report.item_code ? <span className="ml-1 text-[10px] font-mono text-slate-400">{report.item_code}</span> : null}</div></div>
                         <div><div className="text-xs text-slate-400 mb-0.5">수량 (부적합/전체)</div><div className="font-medium"><span className="text-red-600 font-bold">{report.qty_defect}</span> / {report.qty_unknown ? '파악중' : report.qty_total}</div></div>
                         <div><div className="text-xs text-slate-400 mb-0.5">부적합 코드</div><div className="font-medium text-slate-700">{report.code ? `${report.code} — ${settings?.codes?.[report.code] || ''}` : '—'}</div></div>
-                        <div><div className="text-xs text-slate-400 mb-0.5">처리방안</div><div className="font-medium text-slate-700">{report.disposition || '— 미정 —'}{report.concession_type ? ` (${report.concession_type})` : ''}{report.disposition_prev ? <span className="ml-1 text-[11px] font-normal text-slate-400">({report.disposition_prev}에서 변경)</span> : null}</div></div>
+                        <div><div className="text-xs text-slate-400 mb-0.5">처리방안</div><div className="font-medium text-slate-700">{report.disposition || '— 미정 —'}{report.concession_type ? ` (${report.concession_type})` : ''}{hasDispChange(report) ? <span className="ml-1 text-[11px] font-normal text-slate-400">({dispPrevLabel(report)}에서 변경)</span> : null}</div></div>
+                        {/* 933-07 Recommended by — 회람 부서가 처리방안을 문의할 상대 */}
+                        <div><div className="text-xs text-slate-400 mb-0.5">처리방안 마련자</div><div className="font-medium text-slate-700">{report.disposition_by || '— 미지정 —'}<span className="ml-1 text-[11px] font-normal text-slate-400">(품질보증부)</span></div></div>
                         <div><div className="text-xs text-slate-400 mb-0.5">작성자</div><div className="font-medium text-slate-700">{report.author_name} ({report.author_company})</div></div>
                     </div>
                     <div>
@@ -804,7 +901,7 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
                                                                 </span>
                                                             )}
                                                             {rv.staff_name} · {rv.staff_cmt}
-                                                            {rv.remand_note ? <span className="text-orange-500 ml-1">(재검토 지시: {rv.remand_note})</span> : null}
+                                                            {rv.remand_note ? <span className="text-orange-500 ml-1">({remandLabel(rv.remand_note)}: {remandBody(rv.remand_note)})</span> : null}
                                                             {/* B-21 — 부서가 올린 품질비용을 부서장이 보고 결재할 수 있게 표시 */}
                                                             {Array.isArray(rv.cost_items) && rv.cost_items.length > 0 && (
                                                                 <span className="block mt-1 text-[11px] text-teal-700">
@@ -814,7 +911,7 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
                                                                 </span>
                                                             )}
                                                         </span>)
-                                                            : rv.remand_note ? <span className="text-orange-500">재검토 지시 — {rv.remand_note}</span>
+                                                            : rv.remand_note ? <span className="text-orange-500">{remandLabel(rv.remand_note)} — {remandBody(rv.remand_note)}</span>
                                                                 : <span className="text-slate-400">미회신</span>}
                                                 </td>
                                                 <td className="px-3 py-2">
@@ -964,14 +1061,19 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
                             <div className="flex gap-4 text-sm">{['approve', 'reject'].map(o => (
                                 <label key={o} className="flex items-center gap-1.5"><input type="radio" name="opn2" checked={opinion === o} onChange={() => setOpinion(o)} />{o === 'approve' ? '승인 의견' : '반려 의견'}</label>
                             ))}</div>
-                            {reviews[ro.company]?.remand_note && <div className="text-xs text-orange-600">부서장 재검토 지시: {reviews[ro.company].remand_note}</div>}
+                            {reviews[ro.company]?.remand_note && <div className="text-xs text-orange-600">{remandLabel(reviews[ro.company].remand_note)}: {remandBody(reviews[ro.company].remand_note)}</div>}
                         </Panel> :
                         mode === 'deptHead' ? <Panel {...panelBase} title={`${ro.company} 부서장 결재 — 승인${ro.isDeptDeputy(ro.company) && !ro.isDeptHead(ro.company) ? ' (차석 대결)' : ''}`} onSubmit={doDeptHead} submitLabel="부서 승인 확정" color="bg-blue-700 hover:bg-blue-800">
                             {reviews[ro.company]?.opinion === 'reject' && <div className="text-xs text-red-600">⚠ 담당자가 반려 의견입니다 — 검토 후 결정하세요 (승인 시 의견 기각으로 기록됩니다)</div>}
                         </Panel> :
                         mode === 'deptRemand' ? <Panel {...panelBase} title="담당자 재검토 지시 (부서 내 — 품질 미경유)" onSubmit={doDeptRemand} submitLabel="재검토 지시" color="bg-orange-500 hover:bg-orange-600" needComment /> :
                         mode === 'deptRejQa' ? <Panel {...panelBase} title="품질로 반려 — 문서 자체 문제일 때만" onSubmit={doDeptRejectQa} submitLabel="품질로 반려" color="bg-red-600 hover:bg-red-700" needComment /> :
-                        mode === 'qaSubmit' ? <Panel {...panelBase} title="종합검토 상신 — 품질부서장 최종승인 요청" onSubmit={doQaSubmit} submitLabel="종합검토 상신" color="bg-indigo-600 hover:bg-indigo-700" needComment commentLabel="(부서 회신 요약 + 처리방안 확정 사유 — 필수)">{qaExtra}</Panel> :
+                        mode === 'qaSubmit' ? <Panel {...panelBase}
+                            title={dispRemandOn ? '처분방안 변경 요청 반송 — 요청 부서로 되돌립니다' : '종합검토 상신 — 품질부서장 최종승인 요청'}
+                            onSubmit={doQaSubmit}
+                            submitLabel={dispRemandOn ? '요청 부서로 반송' : '종합검토 상신'}
+                            color={dispRemandOn ? 'bg-orange-500 hover:bg-orange-600' : 'bg-indigo-600 hover:bg-indigo-700'}
+                            needComment commentLabel={dispRemandOn ? '(반송 사유 — 필수)' : '(부서 회신 요약 + 처리방안 확정 사유 — 필수)'}>{qaExtra}</Panel> :
                         mode === 'requery' ? <Panel {...panelBase} title="해당 부서만 재질의 — 그 부서만 회람으로 되돌립니다" onSubmit={doRequery} submitLabel="재질의" color="bg-orange-500 hover:bg-orange-600" needComment>
                             <select value={requeryDept} onChange={e => setRequeryDept(e.target.value)} className={inputCls}>
                                 <option value="">— 재질의 부서 선택 —</option>
@@ -1155,7 +1257,7 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
                                 <button onClick={() => openPanel('issueOk')} className={`${btnP} bg-blue-600 hover:bg-blue-700 flex items-center`}><Stamp className="w-4 h-4 mr-1.5" /> 발행 승인</button>
                             </>)}
                             {newFlow && myTurn && report.status === '기술문의' && ro.isTechStaff && <button onClick={() => openPanel('techStaff')} className={`${btnP} bg-violet-600 hover:bg-violet-700`}>기술 검토 회신</button>}
-                            {newFlow && myTurn && report.status === '기술문의' && ro.isTechApprover && <button onClick={() => openPanel('techHead')} className={`${btnP} bg-violet-700 hover:bg-violet-800`}>회신 확정 ({ro.isTechDeputy && !ro.isTechHead ? '차석 대결' : '기술부서장'})</button>}
+                            {newFlow && myTurn && report.status === '기술문의' && ro.isTechApprover && <button onClick={() => openPanel('techHead')} className={`${btnP} bg-violet-700 hover:bg-violet-800`}>{`회신 확정 (${ro.isTechDeputy && !ro.isTechHead ? '차석 대결' : '기술부서장'})`}</button>}
                             {newFlow && myTurn && report.status === '특채판단' && (<button onClick={() => { openPanel('judge'); setJudgeDepts((settings?.routing?.default_depts || []).filter(d => allDepts.includes(d))); }} className={`${btnP} bg-amber-600 hover:bg-amber-700`}>특채 여부 판단 상신</button>)}
                             {newFlow && myTurn && report.status === '특채승인 대기' && ro.isQaApprover && (<>
                                 <button onClick={() => openPanel('specialNo')} className={`${btnO} text-red-600 border-red-200 hover:bg-red-50`}>반려</button>

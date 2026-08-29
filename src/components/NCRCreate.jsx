@@ -21,7 +21,12 @@ const CODE_GROUPS = [                   // 코드 접두 → optgroup 라벨 (�
     { key: 'A', label: 'A 주물' }, { key: 'B', label: 'B 가공' },
     { key: 'C', label: 'C 조립' }, { key: 'D', label: 'D 기타' }
 ];
+/* 회람 담당자 판정 실측 결함(260829) — 직급 문자열로 걸렀더니 실제 명단에서 뒤집혔다.
+   목록에 '이사'가 없어 최용석·황사빈 부서장이 담당자로 떴고,
+   목록에 '차장'이 있어 정준길·황경빈 실무자가 빠졌다.
+   판정은 role로만 한다(ncrRoles.isNcrRouteStaff — 스테이징과 동일 정본). */
 const ROUTE_EXCLUDE = ['품질보증부', '응용기술팀'];      // 회람 지정 대상에서 제외(주관·선행회람 부서)
+const QA_DEPT = '품질보증부';                             // 처리방안 마련 전속 부서
 const CONCESSION = '특채(Concession)';                   // v9.3 onDispChange 규칙 대상 처리방안
 
 /* 규약의 reviews 항목 1건 — 미선택 부서는 state:'skip'(회람 제외 행으로 인쇄) */
@@ -163,7 +168,9 @@ const blankForm = () => ({
     supplier: '', supplier_code: '', item_name: '', item_code: '', item_cls: '', drawing_no: '',
     qty_total: '', qty_unknown: false, qty_defect: '',
     defect_desc: '', disposition: '', dept: '',
-    code: '', tech_flag: false, routing_depts: [], concession_type: ''
+    code: '', tech_flag: false, routing_depts: [], concession_type: '',
+    /* 933-07 「Recommended by」 — 처리방안 마련자. 발행 시점에 확정해야 회람 부서가 문의처를 안다. */
+    disposition_by: ''
 });
 
 const NCRCreate = ({ user }) => {
@@ -303,6 +310,8 @@ const NCRCreate = ({ user }) => {
     /* v10.1 회람 지정 대상 부서 — users.company 중 품질보증부·응용기술팀 제외 */
     const routeDepts = depts.filter(d => !ROUTE_EXCLUDE.includes(d));
     const staffOf = (dept) => staffAll.filter(u => u.company === dept && isNcrRouteStaff(u));
+    /* 처리방안 마련자는 품질보증부 전속(차장 확정) — 직급 제한 없음. 부서장도 마련자가 될 수 있다. */
+    const qaStaff = staffAll.filter(u => u.company === QA_DEPT);
     const isRouted = (dept) => form.routing_depts.some(x => x.dept === dept);
     const routeOf = (dept) => form.routing_depts.find(x => x.dept === dept);
 
@@ -388,6 +397,7 @@ const NCRCreate = ({ user }) => {
                 qty_unknown: !!r.qty_unknown,
                 qty_defect: r.qty_defect == null ? '' : String(r.qty_defect),
                 defect_desc: r.defect_desc || '', disposition: r.disposition || '', concession_type: r.concession_type || '', dept: r.dept || '',
+                disposition_by: r.disposition_by || '',
                 code: r.code || '',
                 /* A영역 회귀 실측(08-22) — 레거시 특채 문서(tech_flag=false)를 이어쓰기로 열면
                    techLocked는 켜지는데 체크는 꺼진 채라 「꺼진 상태로 잠김」이 됐다.
@@ -456,6 +466,8 @@ const NCRCreate = ({ user }) => {
         if (issuing && !form.defect_desc.trim()) return '발행승인을 요청하려면 부적합 내용을 입력하세요.';
         /* v10.1: 회람 대상 1곳 이상 (기술트랙은 특채판단 단계에서 지정 — 검사 제외) */
         if (issuing && !form.tech_flag && form.routing_depts.length === 0) return '회람 대상 부서를 1곳 이상 선택하세요.';
+        /* 처리방안 마련자는 발행 필수 — 회람 부서가 문의할 상대가 없으면 회신이 겉돈다. */
+        if (issuing && !String(form.disposition_by || '').trim()) return '처리방안 마련자를 지정하세요 (품질보증부).';
         return null;
     };
 
@@ -767,6 +779,18 @@ const NCRCreate = ({ user }) => {
                             <option value="">— 선택 —</option>
                             {depts.map(d => <option key={d} value={d}>{d}</option>)}
                         </select>
+                    </div>
+                </div>
+
+                {/* ── 처리방안 마련자 (933-07 Recommended by) ── */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1.5">처리방안 마련자 <span className="text-red-500">*</span> <span className="text-slate-400 font-normal">(품질보증부 — 발행 필수)</span></label>
+                        <select className={inputCls} value={form.disposition_by} onChange={e => set('disposition_by', e.target.value)}>
+                            <option value="">— 선택 —</option>
+                            {qaStaff.map(u => <option key={u.email} value={u.name}>{u.name} {u.rank}</option>)}
+                        </select>
+                        <p className="mt-1 text-[11px] text-slate-500">회람 부서가 처리방안을 문의할 상대입니다. 처리방안이 특채로 바뀌어도 마련자는 그대로 유지됩니다.</p>
                     </div>
                 </div>
 
