@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Printer, X } from 'lucide-react';
 import { api } from '../lib/api';
 import { isNewFlow, statusLabel } from '../lib/ncrFlow';
+import { attUrl, isImageAtt } from '../lib/attach.jsx';
 
 /* NCR 인쇄 뷰 — FORM 933-07 REV.2 · v10.1 정통 복원
    v9.3 시뮬레이터 §7(인쇄물 구성) 사양 재구현(React + 인라인 인쇄 CSS):
@@ -701,7 +702,7 @@ const NCRPrint = ({ report, history, attachments, onClose }) => {
     const PairCell = ({ att, side }) => (
         <div className={`ncrp-cell ${side}`}>
             <h5>{side === 'good' ? '정 상 (양 품)' : '부 적 합 (불 량)'}</h5>
-            {att ? <img className="ncrp-photo" src={att.dataurl} alt={att.name || ''} /> : <div className="ncrp-empty">사진 없음</div>}
+            {att ? <img className="ncrp-photo" src={attUrl(att)} alt={att.name || ''} /> : <div className="ncrp-empty">사진 없음</div>}
             {att?.name && <div className="ncrp-cap">{att.name}</div>}
         </div>
     );
@@ -711,9 +712,9 @@ const NCRPrint = ({ report, history, attachments, onClose }) => {
             <h4>{title} <small>{count}건</small></h4>
             {items.map((a, i) => (
                 <div key={a.id ?? i} className="ncrp-att">
-                    {(a.dataurl || '').startsWith('data:image') ? (
+                    {isImageAtt(a) ? (
                         <>
-                            <img src={a.dataurl} alt={a.name || ''} />
+                            <img src={attUrl(a)} alt={a.name || ''} />
                             <div className="ncrp-cap">{a.name || `자료 ${i + 1}`}</div>
                         </>
                     ) : (

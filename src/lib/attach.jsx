@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Camera } from 'lucide-react';
+import { supabase } from './api';
 
 /* 첨부 공용 모듈 — v10.2 (H: 캡처 붙여넣기 복원 · 처리확인 증빙 신설)
    작성화면(NCRCreate)과 결재화면(NCRDetail 처리확인 증빙)이 「같은 규칙」으로 파일을 받게 하려고
@@ -52,7 +53,62 @@ export const processAnyFile = (file) => {
     return readAsDataURL(file);
 };
 
-export const isImageAtt = (a) => (a?.dataurl || '').startsWith('data:image');
+/* ── 첨부 실파일 저장소 (v10.2) ──────────────────────────────────────
+   종전에는 사진을 글자로 바꿔(dataURL) ncr_attachments 칸에 통째로 넣었다.
+   08-14 설계초안(`[260814]NCR_v10.0_설계초안_r0.md`)은 「표에는 파일경로, 실파일은 Storage 버킷」이었으므로
+   원설계로 되돌린다. 이미 dataurl 로 저장된 기존 문서는 그대로 읽힌다 — 새로 올리는 것만 버킷에 들어간다.
+   버킷은 비공개이므로 화면에 보여줄 때는 서명 주소를 받아 쓴다. */
+export const ATT_BUCKET = 'qms-files';
+
+const dataUrlBytes = (d) => {
+    const s = String(d || '');
+    const mime = (/^data:([^;,]+)/.exec(s) || [])[1] || 'application/octet-stream';
+    const bin = atob(s.slice(s.indexOf(',') + 1));
+    const u = new Uint8Array(bin.length);
+    for (let k = 0; k < bin.length; k++) u[k] = bin.charCodeAt(k);
+    return { bytes: u, mime };
+};
+
+/* 파일명에 경로·특수문자가 섞이면 저장 경로가 깨진다. 한글은 살리고 나머지는 밑줄로 바꾼다. */
+const safeName = (n) => String(n || 'file').normalize('NFC').replace(/[^\w.\-가-힣]+/g, '_').slice(-60);
+
+/* 첨부 1건을 버킷에 올리고 저장 경로를 돌려준다.
+   실패하면 예외를 던진다 — 호출부는 이 예외를 잡아 저장·상신 자체를 막아야 한다.
+   (첨부만 빠진 채 문서가 다음 단계로 넘어가면 되돌릴 방법이 없다) */
+export const uploadAtt = async (reportId, name, dataurl) => {
+    const { bytes, mime } = dataUrlBytes(dataurl);
+    const key = `ncr/${reportId}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${safeName(name)}`;
+    const { error } = await supabase.storage.from(ATT_BUCKET).upload(key, bytes, { contentType: mime, upsert: false });
+    if (error) throw new Error(`첨부 저장 실패 — ${name}: ${error.message || error}`);
+    return key;
+};
+
+/* 저장 경로 → 화면에서 볼 수 있는 서명 주소(1시간 유효). 실패하면 빈 문자열. */
+export const signAtt = async (p) => {
+    if (!p) return '';
+    try {
+        const { data, error } = await supabase.storage.from(ATT_BUCKET).createSignedUrl(p, 3600);
+        return error ? '' : (data?.signedUrl || '');
+    } catch { return ''; }
+};
+
+/* 조회한 첨부 목록에 화면용 주소를 채운다. path 가 있는 행만 처리하고 레거시 행은 그대로 둔다. */
+export const withAttUrls = async (rows) => {
+    const list = rows || [];
+    const need = list.filter(a => a && a.path && !a.dataurl);
+    if (!need.length) return list;
+    const urls = await Promise.all(need.map(a => signAtt(a.path)));
+    const m = new Map(need.map((a, i) => [a, urls[i]]));
+    return list.map(a => (m.has(a) ? { ...a, url: m.get(a) } : a));
+};
+
+/* 화면에 쓸 주소 — 버킷(url) 우선, 없으면 레거시(dataurl), 아직 안 올린 미리보기도 dataurl 로 보인다. */
+export const attUrl = (a) => a?.url || a?.dataurl || '';
+
+/* 이미지 판정 — 레거시는 dataurl 접두어로, 버킷 방식은 파일명 확장자로 본다. */
+export const isImageAtt = (a) => (a?.dataurl
+    ? a.dataurl.startsWith('data:image')
+    : /\.(png|jpe?g|gif|webp|bmp)$/i.test(a?.name || ''));
 
 /* 클립보드 이미지에는 파일명이 없다(대개 image.png) — 시뮬레이터 v9.3과 같은 규칙으로 시각 이름을 붙인다 */
 export const captureFileName = () => `캡처_${new Date().toTimeString().slice(0, 8).replaceAll(':', '')}.png`;

@@ -5,7 +5,7 @@ import { isLegacyFlow, isNewFlow, statusLabel } from '../lib/ncrFlow';
 import { roleOf, canApprove, techApprovalDecision } from '../lib/ncrRoles';
 /* v10.2 H-③ 처리확인 증빙 첨부 — 작성화면과 「같은 규칙」(1280px 축소 · 비이미지 5MB)을 쓰려고
    lib/attach.jsx의 공용 함수를 그대로 가져다 쓴다(NCRCreate에 있던 것을 lib로 옮긴 것). */
-import { ATT_CAT, processAnyFile, isImageAtt, useCapturePaste, PasteZone } from '../lib/attach.jsx';
+import { ATT_CAT, processAnyFile, isImageAtt, useCapturePaste, PasteZone, attUrl, uploadAtt, withAttUrls } from '../lib/attach.jsx';
 import NCRPrint from './NCRPrint';
 
 /* v10.2 G-⑦ — 흐름 세대 판정은 lib/ncrFlow.js 한 곳에만 있다(중복 정의 금지).
@@ -276,7 +276,10 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
             .then(d => setHistory((d || []).filter(h => h.report_id === report.id).sort((a, b) => (a.at || '').localeCompare(b.at || ''))))
             .catch(() => setHistory([]));
         api.fetch(`/ncr_attachments?report_id=eq.${rid}`).then(r => r.json())
-            .then(d => setAtts((d || []).filter(a => a.report_id === report.id)))
+            /* v10.2 — 버킷에 있는 첨부(path)는 비공개라 서명 주소를 받아야 화면에 걸린다.
+               예전 방식(dataurl)으로 저장된 행은 그대로 쓴다. */
+            .then(d => withAttUrls((d || []).filter(a => a.report_id === report.id)))
+            .then(setAtts)
             .catch(() => setAtts([]));
         api.fetch('/users').then(r => r.json())
             .then(d => setAllDepts([...new Set((d || []).map(u => u.company).filter(c => c && !['품질보증부', '응용기술팀'].includes(c)))].sort()))
@@ -622,9 +625,12 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
         const saveEvid = closedAtts.length === 0 ? null : async () => {
             const at = nowIso();
             for (const a of closedAtts) {
+                /* v10.2 — 실파일은 버킷에 올리고 표에는 경로만 남긴다.
+                   업로드가 실패하면 예외가 올라가 act()의 pre 단계에서 상신이 중단된다. */
+                const p = await uploadAtt(report.id, a.name, a.dataurl);
                 await api.fetch('/ncr_attachments', {
                     method: 'POST',
-                    body: { report_id: report.id, category: ATT_CAT.CLOSED, name: a.name, dataurl: a.dataurl, at, by: user?.name || '' }
+                    body: { report_id: report.id, category: ATT_CAT.CLOSED, name: a.name, path: p, at, by: user?.name || '' }
                 });
             }
         };
@@ -1017,7 +1023,7 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
                                     {['good', 'bad'].map(side => (
                                         <div key={side}>
                                             <div className={`text-center text-[10px] font-bold tracking-widest py-0.5 mb-1 rounded ${side === 'good' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>{side === 'good' ? '정상 (양품)' : '불량 (부적합)'}</div>
-                                            {p[side] ? <a href={p[side].dataurl} target="_blank" rel="noreferrer"><img src={p[side].dataurl} alt="" className="w-full aspect-[4/3] object-cover rounded-lg border border-slate-200" /></a> : <div className="w-full aspect-[4/3] rounded-lg border border-dashed border-slate-200 flex items-center justify-center text-xs text-slate-300">사진 없음</div>}
+                                            {p[side] ? <a href={attUrl(p[side])} target="_blank" rel="noreferrer"><img src={attUrl(p[side])} alt="" className="w-full aspect-[4/3] object-cover rounded-lg border border-slate-200" /></a> : <div className="w-full aspect-[4/3] rounded-lg border border-dashed border-slate-200 flex items-center justify-center text-xs text-slate-300">사진 없음</div>}
                                         </div>
                                     ))}
                                 </div>
@@ -1029,9 +1035,9 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
                         <div key={title}>
                             <div className="text-xs font-bold text-slate-500 mb-2">{title} {list.length}건</div>
                             <div className="grid grid-cols-3 md:grid-cols-4 gap-2">{list.map((a, i) => (
-                                (a.dataurl || '').startsWith('data:image')
-                                    ? <a key={i} href={a.dataurl} target="_blank" rel="noreferrer"><img src={a.dataurl} alt={a.name} className="w-full aspect-[4/3] object-cover rounded-lg border border-slate-200" /></a>
-                                    : <a key={i} href={a.dataurl} download={a.name} className="flex items-center justify-center aspect-[4/3] rounded-lg border border-slate-200 bg-slate-50 text-[10px] text-slate-500 font-mono px-2 text-center break-all">{a.name}</a>
+                                isImageAtt(a)
+                                    ? <a key={i} href={attUrl(a)} target="_blank" rel="noreferrer"><img src={attUrl(a)} alt={a.name} className="w-full aspect-[4/3] object-cover rounded-lg border border-slate-200" /></a>
+                                    : <a key={i} href={attUrl(a)} download={a.name} className="flex items-center justify-center aspect-[4/3] rounded-lg border border-slate-200 bg-slate-50 text-[10px] text-slate-500 font-mono px-2 text-center break-all">{a.name}</a>
                             ))}</div>
                         </div>
                     ))}
@@ -1200,7 +1206,7 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
                                             {closedAtts.map((a, i) => (
                                                 <div key={i} className="relative">
                                                     {isImageAtt(a)
-                                                        ? <img src={a.dataurl} alt={a.name} className="w-full aspect-[4/3] object-cover rounded-lg border border-slate-200 bg-slate-50" />
+                                                        ? <img src={attUrl(a)} alt={a.name} className="w-full aspect-[4/3] object-cover rounded-lg border border-slate-200 bg-slate-50" />
                                                         : <div className="w-full aspect-[4/3] flex flex-col items-center justify-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-1">
                                                             <FileIcon className="w-6 h-6 text-slate-400" />
                                                             <span className="text-[9px] text-slate-500 font-mono truncate max-w-full">{a.name}</span>

@@ -4,7 +4,7 @@ import { api, supabase } from '../lib/api';
 import { isNcrRouteStaff } from '../lib/ncrRoles';
 /* v10.2 H-① 캡처 붙여넣기 복원 — 축소·용량제한·붙여넣기 규칙은 lib/attach.jsx 한 곳에만 둔다(중복 정의 금지).
    결재화면(NCRDetail 처리확인 증빙)이 같은 함수를 쓰므로 이 파일에 다시 정의하지 않는다. */
-import { shrinkImage, processAnyFile, isImageAtt, useCapturePaste, PasteZone } from '../lib/attach.jsx';
+import { shrinkImage, processAnyFile, isImageAtt, useCapturePaste, PasteZone, attUrl, uploadAtt, withAttUrls } from '../lib/attach.jsx';
 
 /* 부적합보고서(NCR) 작성 — v10.1 정통 복원 (v10.0 + Phase 3 첨부 + Phase 4 이어쓰기 전부 보존)
    v9.3 검증 로직 이관: 수량 분리(전체/부적합) + 파악중 + 대소 가드, NCR 번호 자동채번
@@ -62,7 +62,7 @@ const PairSlot = ({ att, kind, onPick, onClear, pasteKey, pz }) => (
         </div>
         {att ? (
             <div className="relative group">
-                <img src={att.dataurl} alt={att.name} className="w-full aspect-[4/3] object-cover rounded-lg border border-slate-200 bg-slate-50" />
+                <img src={attUrl(att)} alt={att.name} className="w-full aspect-[4/3] object-cover rounded-lg border border-slate-200 bg-slate-50" />
                 <button type="button" onClick={onClear}
                     className="absolute top-1.5 right-1.5 p-1 rounded-full bg-white/90 border border-slate-300 text-slate-500 hover:text-red-600 hover:border-red-300">
                     <Trash2 className="w-3.5 h-3.5" />
@@ -89,7 +89,7 @@ const SimpleAttList = ({ list, onAdd, onRemove, pasteKey, pz }) => (
                 {list.map((a, i) => (
                     <div key={i} className="relative">
                         {isImageAtt(a) ? (
-                            <img src={a.dataurl} alt={a.name} className="w-full aspect-[4/3] object-cover rounded-lg border border-slate-200 bg-slate-50" />
+                            <img src={attUrl(a)} alt={a.name} className="w-full aspect-[4/3] object-cover rounded-lg border border-slate-200 bg-slate-50" />
                         ) : (
                             <div className="w-full aspect-[4/3] flex flex-col items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2">
                                 <FileIcon className="w-7 h-7 text-slate-400" />
@@ -408,18 +408,22 @@ const NCRCreate = ({ user }) => {
                 tech_flag: String(r.disposition || '').startsWith('특채') ? true : !!r.tech_flag,
                 routing_depts: routing
             });
-            const res = await api.fetch('/ncr_attachments');
-            const all = ((await res.json()) || []).filter(a => a.report_id === r.id);
+            const res = await api.fetch(`/ncr_attachments?report_id=eq.${encodeURIComponent(r.id)}`);
+            /* v10.2 — 버킷에 있는 첨부는 서명 주소를 받아 화면에 건다.
+               legacy=true 는 「예전 방식(dataurl)으로 이미 저장된 행」이라는 표시다.
+               저장할 때 이 표시가 있으면 다시 올리지 않고 그대로 둔다. */
+            const all = await withAttUrls(((await res.json()) || []).filter(a => a.report_id === r.id));
+            const asForm = (a) => ({ id: a.id, name: a.name, path: a.path || null, url: a.url || '', dataurl: a.dataurl || '', legacy: !!a.dataurl });
             const map = new Map();
             all.filter(a => a.category === 1).forEach(a => {
                 const no = a.pair_no || 1;
                 if (!map.has(no)) map.set(no, { good: null, bad: null });
                 /* G-⑥ — 기존 행의 id를 폼까지 들고 온다. 저장 때 「그대로인 첨부」를 알아보고 손대지 않기 위함. */
-                map.get(no)[a.kind === '정상' ? 'good' : 'bad'] = { id: a.id, name: a.name, dataurl: a.dataurl };
+                map.get(no)[a.kind === '정상' ? 'good' : 'bad'] = asForm(a);
             });
             const loadedPairs = [...map.entries()].sort((x, y) => x[0] - y[0]).map(([, v]) => v);
-            const loadedDrawings = all.filter(a => a.category === 2).map(a => ({ id: a.id, name: a.name, dataurl: a.dataurl }));
-            const loadedRefs = all.filter(a => a.category === 3).map(a => ({ id: a.id, name: a.name, dataurl: a.dataurl }));
+            const loadedDrawings = all.filter(a => a.category === 2).map(asForm);
+            const loadedRefs = all.filter(a => a.category === 3).map(asForm);
             setPairs(loadedPairs); setDrawings(loadedDrawings); setRefDocs(loadedRefs);
             setAttOpen({ 1: loadedPairs.length > 0, 2: loadedDrawings.length > 0, 3: loadedRefs.length > 0 });
             setDraftOpen(false);
@@ -486,6 +490,37 @@ const NCRCreate = ({ user }) => {
         setSaving(true);
         const docNo = editDoc ? editDoc.ncr_no : nextNo;
         try {
+            /* ── 첨부 업로드는 문서 저장보다 먼저 한다 ──────────────────────────
+               실측 결함(예림 050 V-4 · 2026-08-30): 종전 순서는 「문서 저장 → 첨부 업로드」였다.
+               그래서 사진 업로드가 실패해도 문서 상태는 이미 다음 단계(발행승인 대기)로 넘어가 있었다.
+               사진 없이 결재만 끝난 문서는 품질기록으로 성립하지 않는다.
+               → 업로드를 먼저 끝낸다. 하나라도 실패하면 예외가 올라가 문서에는 손도 대지 않는다.
+
+               세 갈래 — ①이미 경로가 있는 것: 그대로 ②예전 방식(legacy): 손대지 않음(재업로드 금지)
+                          ③이번에 새로 고른 것: 지금 올리고 경로를 받는다
+
+               저장 경로 앞자리는 편집이면 문서 id, 신규면 '_draft'다. 신규는 저장 전이라 id가 없다.
+               문서와의 연결은 경로가 아니라 ncr_attachments.report_id 가 담당한다(경로는 사람이 찾아보기 위한 것).
+
+               남는 위험 — 여러 첨부 중 일부만 올라간 뒤 실패하면 버킷에 참조 없는 파일이 남는다.
+               문서·표는 전혀 바뀌지 않으므로 기록은 온전하다. 지우려면 삭제 권한이 필요한데,
+               품질기록 보존을 위해 앱에 삭제 권한을 주지 않기로 했으므로 남겨 둔다. */
+            const now = new Date().toISOString();
+            const attKeyBase = editDoc?.id ?? '_draft';
+            const toAttRow = async (a, extra) => {
+                if (a.path) return { id: a.id, name: a.name, path: a.path, ...extra };
+                if (a.legacy) return { id: a.id, name: a.name, dataurl: a.dataurl, ...extra };
+                return { id: a.id, name: a.name, path: await uploadAtt(attKeyBase, a.name, a.dataurl), ...extra };
+            };
+            const attRows = [
+                ...(await Promise.all(pairs.flatMap((p, i) => [
+                    p.good && toAttRow(p.good, { category: 1, pair_no: i + 1, kind: '정상' }),
+                    p.bad && toAttRow(p.bad, { category: 1, pair_no: i + 1, kind: '불량' })
+                ].filter(Boolean)))),
+                ...(await Promise.all(drawings.map(d => toAttRow(d, { category: 2 })))),
+                ...(await Promise.all(refDocs.map(d => toAttRow(d, { category: 3 }))))
+            ];
+
             /* Phase 4: 편집 모드면 같은 id로 POST(UPSERT→UPDATE) — ncr_no·id 유지 */
             const formCols = { ...form };
             delete formCols.routing_depts; // routing_depts는 UI 전용 상태 — reviews로 환산해 저장
@@ -516,18 +551,9 @@ const NCRCreate = ({ user }) => {
                결재이력(ncr_approvals)은 누적 보존인데 첨부만 계보가 매번 끊겨, 첨부를 참조하는 링크·감사 추적이 무의미해진다.
                → 「변한 것만 반영」으로 바꾼다: 폼에서 빠진 것만 DELETE, 새로 추가된 것만 INSERT,
                  그대로인 것은 아예 손대지 않고(id·at 유지), 자리(pair_no)만 바뀐 것은 같은 id로 갱신한다. */
-            const now = new Date().toISOString();
-            const attRows = [
-                ...pairs.flatMap((p, i) => [
-                    p.good && { id: p.good.id, category: 1, pair_no: i + 1, kind: '정상', name: p.good.name, dataurl: p.good.dataurl },
-                    p.bad && { id: p.bad.id, category: 1, pair_no: i + 1, kind: '불량', name: p.bad.name, dataurl: p.bad.dataurl }
-                ].filter(Boolean)),
-                ...drawings.map(d => ({ id: d.id, category: 2, name: d.name, dataurl: d.dataurl })),
-                ...refDocs.map(d => ({ id: d.id, category: 3, name: d.name, dataurl: d.dataurl }))
-            ];
             const exMap = new Map();
             if (editDoc) {
-                const exRes = await api.fetch('/ncr_attachments');
+                const exRes = await api.fetch(`/ncr_attachments?report_id=eq.${encodeURIComponent(editDoc.id)}`);
                 const exRows = ((await exRes.json()) || []).filter(a => a.report_id === editDoc.id);
                 exRows.forEach(a => exMap.set(String(a.id), a));
                 /* 폼에 남아 있는 id만 살린다 — 사용자가 화면에서 뺀 것만 지워진다 */
@@ -542,6 +568,7 @@ const NCRCreate = ({ user }) => {
                 (prev.pair_no ?? null) === (row.pair_no ?? null) &&
                 (prev.kind ?? null) === (row.kind ?? null) &&
                 (prev.name ?? '') === (row.name ?? '') &&
+                (prev.path ?? '') === (row.path ?? '') &&
                 (prev.dataurl ?? '') === (row.dataurl ?? '') &&
                 String(prev.report_id) === String(reportId);
             for (const row of attRows) {
