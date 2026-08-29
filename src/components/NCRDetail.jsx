@@ -269,10 +269,13 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
 
     useEffect(() => {
         fetchNcrSettings().then(setSettings);
-        api.fetch('/ncr_approvals').then(r => r.json())
+        /* v10.2 (260829) — 조건을 서버로 넘겨 이 문서 것만 받는다. 화면 필터는 그대로 두어
+           (조건을 못 쓰는 환경에서도) 결과가 달라지지 않게 한다. */
+        const rid = encodeURIComponent(report.id);
+        api.fetch(`/ncr_approvals?report_id=eq.${rid}`).then(r => r.json())
             .then(d => setHistory((d || []).filter(h => h.report_id === report.id).sort((a, b) => (a.at || '').localeCompare(b.at || ''))))
             .catch(() => setHistory([]));
-        api.fetch('/ncr_attachments').then(r => r.json())
+        api.fetch(`/ncr_attachments?report_id=eq.${rid}`).then(r => r.json())
             .then(d => setAtts((d || []).filter(a => a.report_id === report.id)))
             .catch(() => setAtts([]));
         api.fetch('/users').then(r => r.json())
@@ -331,17 +334,35 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
     const addSum = sumCosts(costItems);
 
     /* ── v10.1 게이트 핸들러 (v9.3 이식) ── */
+
+    /* v10.2 D-1 — 품질 결재도 「차석이 대결했는가」를 이력에 남긴다.
+       실측 결함(260829 스테이징 044 검증): 대결 표기가 부서승인·기술회신 2곳에만 있고
+       품질 결재에는 없어, 차석이 부서장 대신 결재해도 이력에 그 사실이 남지 않았다.
+       결재 기록은 「누가 어떤 자격으로 처리했는가」가 남아야 하므로 승인·반려 모두에 붙인다.
+       판정 규칙은 deptHeadGate와 같다 — 부서장은 설정과 무관, 차석은 allow_deputy=true일 때만(fail-closed). */
+    const qaGate = () => {
+        if (ro.isQaHead) return { ok: true, deputy: false };
+        if (!settings) return { ok: false, msg: '결재 설정을 불러오는 중입니다 — 잠시 후 다시 시도해 주십시오.' };
+        if (ro.isQaDeputy) return { ok: true, deputy: true };
+        return { ok: false, msg: '품질 결재 권한이 없습니다 — 이 시스템은 차석 대결을 허용하지 않도록 설정돼 있습니다.' };
+    };
+    const dTag = (deputy) => (deputy ? ' (차석 대결)' : '');
+
     const doIssueApprove = () => {
+        const g = qaGate();
+        if (!g.ok) return setErr(g.msg);
         if (report.tech_flag) {
-            if (report.tech_reply) return act('발행승인', { status: '특채판단' }, comment || '(기존 기술 회신 재사용 — 재문의 생략)');
+            if (report.tech_reply) return act('발행승인', { status: '특채판단' }, `${comment || '(기존 기술 회신 재사용 — 재문의 생략)'}${dTag(g.deputy)}`.trim());
             const rv = { ...reviews, '응용기술팀': { state: 'wait', staff_email: null, staff_name: null, opinion: null, staff_cmt: '', staff_at: null, head_name: null, head_cmt: '', head_at: null, deputy: false, remand_note: '' } };
-            return act('발행승인', { status: '기술문의', reviews: rv }, comment);
+            return act('발행승인', { status: '기술문의', reviews: rv }, `${comment}${dTag(g.deputy)}`.trim());
         }
-        act('발행승인', { status: '회람중' }, comment);
+        act('발행승인', { status: '회람중' }, `${comment}${dTag(g.deputy)}`.trim());
     };
     const doIssueReject = () => {
+        const g = qaGate();
+        if (!g.ok) return setErr(g.msg);
         if (!comment.trim()) return setErr('반려 사유는 필수입니다.');
-        act('발행반려', { status: '작성중', reject_note: `[발행반려 · ${user?.name}] ${comment.trim()}` }, comment);
+        act('발행반려', { status: '작성중', reject_note: `[발행반려 · ${user?.name}] ${comment.trim()}` }, `${comment}${dTag(g.deputy)}`);
     };
     const doTechStaff = () => {
         if (!comment.trim()) return setErr('검토 의견은 필수입니다.');
@@ -367,6 +388,8 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
         act('특채판단 상신', { status: '특채승인 대기', judge_plan: { kind: judgeKind, disp: judgeKind === 'special' ? '특채(Concession)' : judgeDisp, conc: judgeKind === 'special' ? judgeConc : '', note: comment.trim(), depts: judgeDepts } }, comment);
     };
     const doSpecialApprove = () => {
+        const g = qaGate();
+        if (!g.ok) return setErr(g.msg);
         const p = report.judge_plan || { depts: [], disp: '특채(Concession)', conc: '' };
         /* v10.2 가드 — 특채는 유형(현상태 사용·수리·재등급 부여·관련부품 수정) 없이 확정될 수 없다 (절차서 5.3.4·5.3.7).
            구 버전에서 상신되어 conc가 없는 문서는 승인 패널에서 보정 선택을 받는다. */
@@ -375,11 +398,14 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
         const rv = { ...reviews };
         allDepts.forEach(d => { if (!p.depts.includes(d)) rv[d] = { ...(rv[d] || {}), state: 'skip' }; });
         p.depts.forEach(d => { rv[d] = { state: 'wait', staff_email: null, staff_name: null, opinion: null, staff_cmt: '', staff_at: null, head_name: null, head_cmt: '', head_at: null, deputy: false, remand_note: '' }; });
-        act('특채승인', { status: '회람중', reviews: rv, disposition: p.disp, concession_type: conc }, comment || `특채 판단 승인 — 본회람 발사 (${p.depts.join('·')})`);
+        const base = comment || `특채 판단 승인 — 본회람 발사 (${p.depts.join('·')})`;
+        act('특채승인', { status: '회람중', reviews: rv, disposition: p.disp, concession_type: conc }, `${base}${dTag(g.deputy)}`);
     };
     const doSpecialReject = () => {
+        const g = qaGate();
+        if (!g.ok) return setErr(g.msg);
         if (!comment.trim()) return setErr('반려 사유는 필수입니다.');
-        act('특채반려', { status: '특채판단' }, comment);
+        act('특채반려', { status: '특채판단' }, `${comment}${dTag(g.deputy)}`);
     };
     const doDeptStaff = () => {
         if (!comment.trim()) return setErr('검토 의견은 필수입니다.');
@@ -523,7 +549,12 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
         const mine = { ...cur, state: 'wait', remand_note: '' };
         act('재질의', { status: '회람중', reviews: { ...reviews, [requeryDept]: mine } }, `[재질의 → ${requeryDept}] ${comment.trim()}`);
     };
-    const doFinalApprove = () => act('최종승인', { status: '처리중' }, comment || '최종 승인 (품질부서장 전결)');
+    const doFinalApprove = () => {
+        const g = qaGate();
+        if (!g.ok) return setErr(g.msg);
+        const base = comment || (g.deputy ? '최종 승인' : '최종 승인 (품질부서장 전결)');
+        act('최종승인', { status: '처리중' }, `${base}${dTag(g.deputy)}`);
+    };
     /* 최종반려 = 「종합검토를 다시 하라」.
        실측 결함(260829): 종합검토 상신 시점에 처분방안 변경이 이미 적용되므로, 부서장이
        「특채 근거 불충분」으로 반려해도 처리방안은 특채인 채로 남고 요청은 수락 처리된 상태라
@@ -531,6 +562,8 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
        그래서 반려 시 ①변경된 처분방안을 원래 값으로 되돌리고 ②판단이 끝난 요청을 다시 미해결로 열어
        담당이 처음부터 다시 판단하게 한다. 폐기↔불채용 변경(B-20)에도 같은 규칙이 적용된다. */
     const doFinalReject = () => {
+        const g = qaGate();
+        if (!g.ok) return setErr(g.msg);
         if (!comment.trim()) return setErr('반려 사유는 필수입니다.');
         const patch = { status: '종합검토', qa_summary: null };
         if (hasDispChange(report)) {
@@ -550,7 +583,7 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
         });
         if (reopened) patch.reviews = rv;
         const tag = patch.disposition ? ` (처리방안 ${report.disposition} → ${patch.disposition} 원복)` : '';
-        act('최종반려', patch, `${comment}${tag}`);
+        act('최종반려', patch, `${comment}${tag}${dTag(g.deputy)}`);
     };
     const doCloseSubmit = () => {
         const items = cleanCosts(costItems);
@@ -599,18 +632,29 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
             `완료확인 · 품질비용 ${fmtWon(total)}${car === '유' ? ' · CAR ' + carNo : ''}${closedAtts.length ? ` · 증빙 ${closedAtts.length}건` : ''}`,
             undefined, saveEvid);
     };
-    const doCloseApprove = () => act('종결승인', { status: '종결' }, comment || '종결 승인');
+    const doCloseApprove = () => {
+        const g = qaGate();
+        if (!g.ok) return setErr(g.msg);
+        act('종결승인', { status: '종결' }, `${comment || '종결 승인'}${dTag(g.deputy)}`);
+    };
     const doCloseReject = () => {
+        const g = qaGate();
+        if (!g.ok) return setErr(g.msg);
         if (!comment.trim()) return setErr('반려 사유는 필수입니다 (예: 품질비용 재산정).');
-        act('종결반려', { status: '처리중', closed: null }, comment);
+        act('종결반려', { status: '처리중', closed: null }, `${comment}${dTag(g.deputy)}`);
     };
     const doVoidApprove = () => {
+        const g = qaGate();
+        if (!g.ok) return setErr(g.msg);
         const q = report.void_req || {};
-        act('무효승인', { status: '무효', void_note: `[${q.kind || '기타'}] ${q.note || ''}`.trim() }, comment || `무효 승인 — ${q.kind || ''}`);
+        const base = comment || `무효 승인 — ${q.kind || ''}`;
+        act('무효승인', { status: '무효', void_note: `[${q.kind || '기타'}] ${q.note || ''}`.trim() }, `${base}${dTag(g.deputy)}`);
     };
     const doVoidReject = () => {
+        const g = qaGate();
+        if (!g.ok) return setErr(g.msg);
         if (!comment.trim()) return setErr('무효 반려 사유는 필수입니다.');
-        act('무효반려', { status: '작성중', void_req: null }, comment);
+        act('무효반려', { status: '작성중', void_req: null }, `${comment}${dTag(g.deputy)}`);
     };
     /* v10.2 D-06 — 회수 시 이전 회차 회람 기록도 초기화(재발행 시 오염 방지) */
     const doWithdraw = () => act('회수', { status: '작성중', tech_reply: null, judge_plan: null, reviews: {} }, comment || '회수');

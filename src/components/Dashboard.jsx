@@ -452,23 +452,25 @@ const Home = ({ setActiveTab }) => {
     const [resources, setResources] = useState([]);
 
     useEffect(() => {
-        const fetchData = async () => {
+        /* v10.2 (260829 실측) — 두 조회를 Promise.all 한 덩어리로 묶으면, 한쪽 표가 없을 때
+           (스테이징에 resources 표 미생성 → PostgREST 404) 나머지 한쪽까지 통째로 사라진다.
+           재현 결과: 자료실 표가 없다는 이유만으로 공지사항 목록도 함께 비었다.
+           두 목록은 서로 관계가 없으므로 표마다 따로 읽고, 실패한 쪽만 빈 채로 둔다. */
+        const load = async (path, set) => {
             try {
-                const [noticeRes, resourceRes] = await Promise.all([
-                    api.fetch('/notices'),
-                    api.fetch('/resources')
-                ]);
-                if (noticeRes.ok) {
-                    const data = await noticeRes.json();
-                    setNotices(data.sort((a, b) => b.id - a.id).slice(0, 5));
-                }
-                if (resourceRes.ok) {
-                    const data = await resourceRes.json();
-                    setResources(data.sort((a, b) => b.id - a.id).slice(0, 5));
-                }
+                const res = await api.fetch(path);
+                if (!res.ok) return;
+                const data = await res.json();
+                set((data || []).sort((a, b) => b.id - a.id).slice(0, 5));
             } catch (error) {
-                console.error('Failed to fetch summary data', error);
+                console.warn(`[홈] ${path} 조회 실패 — 이 목록만 비웁니다.`, error);
             }
+        };
+        const fetchData = async () => {
+            await Promise.allSettled([
+                load('/notices', setNotices),
+                load('/resources', setResources)
+            ]);
         };
         fetchData();
     }, []);

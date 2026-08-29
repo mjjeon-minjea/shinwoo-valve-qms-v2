@@ -178,7 +178,7 @@ const NCRPrint = ({ report, history, attachments, onClose }) => {
     useEffect(() => {
         if (history) return;
         let live = true;
-        api.fetch('/ncr_approvals')
+        api.fetch(`/ncr_approvals?report_id=eq.${encodeURIComponent(report.id)}`)
             .then(r => r.json())
             .then(d => {
                 if (!live) return;
