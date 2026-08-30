@@ -212,10 +212,16 @@ server.post('/api/admin-update-member', async (req, res) => {
             return res.status(401).json({ error: '유효하지 않거나 만료된 세션입니다.' });
         }
 
-        // 3. 요청자가 '차장' 직급인지 DB 교차 검증
+        // 3. 요청자가 시스템 관리자인지 DB 교차 검증
+        /* v10.2 관리자 축 분리(260830) — 종전 「직급 차장 OR role director」 판정은
+   ①실무 차장(예: 정준길)도 통과시키고 ②NCR 도입으로 director가 늘면 부서장 전원이 통과하며
+   ③정작 최고관리자(admin)는 차장도 director도 아니라 차단되는 3중 결함이 있었다.
+   시스템 관리자 축(role=admin 또는 is_admin=true)으로만 판정한다.
+   select('*') 를 쓰는 이유 — is_admin 컬럼이 아직 없는 DB(코드 선배포)에서 42703으로
+   전면 장애가 나지 않게 하기 위함이다. 없으면 undefined→false로 안전하게 떨어진다. */
         const { data: callerData, error: callerError } = await supabaseAdmin
             .from('users')
-            .select('rank, role')
+            .select('*')
             .eq('auth_id', user.id)
             .single();
 
@@ -223,48 +229,125 @@ server.post('/api/admin-update-member', async (req, res) => {
             return res.status(403).json({ error: '권한 검증 실패: 사용자 정보를 찾을 수 없습니다.' });
         }
 
-        if (callerData.rank !== '차장' && callerData.role !== 'director') {
-            return res.status(403).json({ error: '접근 불가: 관리자(차장급) 전용 기능입니다.' });
+        if (callerData.is_admin !== true) { // 차장 확정(260830): is_admin 단독 판정
+            return res.status(403).json({ error: '접근 불가: 시스템 관리자 전용 기능입니다.' });
         }
 
         // 4. 업데이트 대상 데이터 수신
-        const { auth_id, password, name, role, rank, company, status } = req.body;
+        const { auth_id, password, name, role, rank, company, status, is_admin } = req.body;
 
         if (!auth_id) {
             return res.status(400).json({ error: '대상 직원의 auth_id가 누락되었습니다.' });
         }
 
-        // 5. Supabase Auth 비밀번호 강제 갱신 (Service Role 권한 사용)
-        const authUpdates = {};
-        if (password && password.trim()) authUpdates.password = password.trim();
-        if (name) authUpdates.user_metadata = { name };
-
-        if (Object.keys(authUpdates).length > 0) {
-            const { error: authErr } = await supabaseAdmin.auth.admin.updateUserById(auth_id, authUpdates);
-            if (authErr) {
-                console.error('[Admin Update] Auth 갱신 오류:', authErr);
-                return res.status(500).json({ error: `Auth 서버 오류: ${authErr.message}` });
-            }
+        /* r7(260830) 순서 교정 — DB(users) 갱신을 Auth 갱신보다 먼저 한다.
+           종전엔 Auth 비밀번호를 먼저 바꾼 뒤 users 갱신이 방패 트리거 등에서 거부되면
+           「실패했는데 비밀번호만 바뀐」 부분 완료가 남았다. 이제 users가 거부되면 Auth는 건드리지 않고,
+           Auth 쪽이 실패하면 프로필만 반영되고 비밀번호는 그대로임을 응답에 명시한다. */
+        /* r8(260830) 보상 원복 — 예림 조건 6항:
+           ①대상 행 사전조회 1행 ②갱신 영향 1행 ③Auth 확정 실패 시 사전값 보상
+           ④보상 후 read-back 일치 시에만 「원복됨」 ⑤불명확(네트워크 예외)·보상실패는 HOLD 응답
+           ⑥원복 전 「지금 값 = 우리가 쓴 값」 확인(동시 수정 보호) */
+        // 5-0. 대상 행 사전조회 — 정확히 1행이 아니면 아무것도 바꾸지 않고 중단
+        const { data: beforeRows, error: preErr } = await supabaseAdmin
+            .from('users').select('*').eq('auth_id', auth_id);
+        if (preErr || !beforeRows || beforeRows.length !== 1) {
+            return res.status(409).json({ error: '대상 행이 정확히 1행이 아닙니다 — 변경 없이 중단' });
         }
+        const beforeRow = beforeRows[0];
 
-        // 6. public.users 정보 동기화
+        // 5. public.users 정보 동기화 (선행)
         const dbPayload = {};
         if (name !== undefined) dbPayload.name = name;
         if (role !== undefined) dbPayload.role = role;
         if (rank !== undefined) dbPayload.rank = rank;
         if (company !== undefined) dbPayload.company = company;
         if (status !== undefined) dbPayload.status = status;
-        if (password && password.trim()) dbPayload.password = password.trim(); // 레거시 컬럼 동기화
+        if (is_admin !== undefined) dbPayload.is_admin = is_admin === true; // v10.2 관리자 축
+        if (password && password.trim()) dbPayload.password = password.trim(); // 레거시 컬럼 동기화(제거는 별건)
 
-        if (Object.keys(dbPayload).length > 0) {
-            const { error: dbErr } = await supabaseAdmin
-                .from('users')
-                .update(dbPayload)
-                .eq('auth_id', auth_id);
+        /* r9(260830) — 오류 분류: 확정 거부만 원복하고, 결과가 불명확한 오류(네트워크·5xx·재시도류)는
+           원복하지 않고 「부분 상태 불명확—HOLD」로 응답한다 (예림 High ①).
+           DB 오류는 SQLSTATE code 보유 = 확정 거부(변경 없음 확실), code 부재 = 불명확. */
+        // code 가 SQLSTATE(5자리)나 PGRST 코드일 때만 「DB가 요청을 받고 거부한 확정 응답」으로 본다.
+        // (일부 런타임은 네트워크 errno(ECONNREFUSED 등)를 code에 싣는다 — 그건 불확실로 분류해야 한다)
+        const isUncertainDbErr = (e) => !!e && !(typeof e.code === 'string' && /^([0-9A-Z]{5}|PGRST\d+)$/.test(e.code));
+        const isUncertainAuthErr = (e) => !!e && (
+            e.name === 'AuthRetryableFetchError' || typeof e.status !== 'number' || e.status === 0 || e.status >= 500
+        );
 
+        const dbKeys = Object.keys(dbPayload);
+        if (dbKeys.length > 0) {
+            let updRows = null, dbErr = null;
+            try {
+                const r = await supabaseAdmin.from('users').update(dbPayload).eq('auth_id', auth_id).select();
+                updRows = r.data; dbErr = r.error;
+            } catch (netEx) {
+                console.error('[Admin Update] DB 결과 불명확(예외):', netEx);
+                return res.status(500).json({ error: 'DB 결과 불명확(네트워크) — 부분 상태 불명확, HOLD. 수동 확인 필요' });
+            }
             if (dbErr) {
                 console.error('[Admin Update] DB 갱신 오류:', dbErr);
-                return res.status(500).json({ error: `DB 오류: ${dbErr.message}` });
+                if (isUncertainDbErr(dbErr)) {
+                    return res.status(500).json({ error: `DB 결과 불명확 — 부분 상태 불명확, HOLD. 수동 확인 필요 (${dbErr.message})` });
+                }
+                return res.status(500).json({ error: `DB 오류(확정 거부 — 변경 없음): ${dbErr.message}` });
+            }
+            if (!updRows || updRows.length !== 1) {
+                return res.status(500).json({ error: '갱신 영향 행수가 1이 아닙니다 — 부분 상태 불명확, HOLD. 수동 확인 필요' });
+            }
+        }
+
+        // 6. Supabase Auth 비밀번호 강제 갱신 (후행) — 실패 유형별 처리
+        const authUpdates = {};
+        if (password && password.trim()) authUpdates.password = password.trim();
+        if (name) authUpdates.user_metadata = { name };
+
+        if (Object.keys(authUpdates).length > 0) {
+            let authErr = null;
+            try {
+                const r = await supabaseAdmin.auth.admin.updateUserById(auth_id, authUpdates);
+                authErr = r.error;
+            } catch (netEx) {
+                console.error('[Admin Update] Auth 결과 불명확(예외):', netEx);
+                return res.status(500).json({ error: 'Auth 결과 불명확(네트워크) — 부분 상태 불명확, HOLD. 수동 확인 필요' });
+            }
+            if (authErr && isUncertainAuthErr(authErr)) {
+                console.error('[Admin Update] Auth 결과 불명확(재시도류):', authErr);
+                return res.status(500).json({ error: `Auth 결과 불명확 — 부분 상태 불명확, HOLD. 수동 확인 필요 (${authErr.message})` });
+            }
+            if (authErr) {
+                /* Auth 확정 거부(4xx) → 원자적 CAS 원복 (예림 High ②):
+                   「지금 값 = 우리가 쓴 값」인 경우에만 원복되도록 조건을 UPDATE 한 문장에 싣는다.
+                   0행 = 그 사이 다른 수정 개입 → 원복 보류 HOLD. */
+                console.error('[Admin Update] Auth 갱신 확정 실패 → CAS 원복 시도:', authErr);
+                if (dbKeys.length > 0) {
+                    const restore = {};
+                    dbKeys.forEach(k => { restore[k] = beforeRow[k]; });
+                    let cas = supabaseAdmin.from('users').update(restore).eq('auth_id', auth_id);
+                    for (const k of dbKeys) {
+                        cas = (dbPayload[k] === null) ? cas.is(k, null) : cas.eq(k, dbPayload[k]);
+                    }
+                    let resRows = null, resErr = null;
+                    try {
+                        const r = await cas.select();
+                        resRows = r.data; resErr = r.error;
+                    } catch (netEx2) {
+                        return res.status(500).json({ error: `보상 원복 결과 불명확 — 부분 상태 불명확, HOLD. 수동 확인 필요 (${authErr.message})` });
+                    }
+                    if (resErr) {
+                        return res.status(500).json({ error: `보상 원복 실패 — 부분 상태 불명확, HOLD. 수동 확인 필요 (${authErr.message})` });
+                    }
+                    if (!resRows || resRows.length === 0) {
+                        return res.status(500).json({ error: `Auth 실패 후 행이 그 사이 변경됨 — 원복 보류, HOLD. 수동 확인 필요 (${authErr.message})` });
+                    }
+                    const backRow = resRows.length === 1 ? resRows[0] : null;
+                    const restored = backRow && dbKeys.every(k => String(backRow[k]) === String(beforeRow[k]));
+                    if (!restored) {
+                        return res.status(500).json({ error: `보상 원복 read-back 불일치 — 부분 상태 불명확, HOLD. 수동 확인 필요 (${authErr.message})` });
+                    }
+                }
+                return res.status(500).json({ error: `비밀번호 변경 실패 — 프로필 변경도 원복됐습니다(전체 실패): ${authErr.message}` });
             }
         }
 

@@ -624,8 +624,9 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
 
     useEffect(() => {
         // [이중 잠금] 관리자도 아닌데 강제 상태 변조 시 홈으로 튕겨냄
-        if (activeTab === 'post_approval' && !isAdmin) {
-            console.warn("Unauthorized access to post_approval blocked.");
+        // v10.2(260830) — members·settings_home도 같은 잠금. 주소창 #members 직접 진입이 뚫려 있었다.
+        if (['post_approval', 'members', 'settings_home'].includes(activeTab) && !isAdmin) {
+            console.warn(`Unauthorized access to ${activeTab} blocked.`);
             setActiveTab('home');
             return;
         }
@@ -698,8 +699,9 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
             case 'dev_notes': return <DevNotes user={user} />;
             case 'suggestions': return <Suggestions user={user} />;
             case 'post_approval': return isAdmin ? <PostApproval user={user} /> : null;
-            case 'members': return <UserManagement members={members} onDeleteMember={onDeleteMember} onEditMember={onEditMember} onAddMember={onAddMember} onRefresh={onRefresh} />;
-            case 'settings_home': return <HomepageSettings />;
+            // v10.2(260830) — useEffect 잠금은 첫 렌더 뒤에 돌므로 한 프레임 마운트가 샌다. post_approval과 같은 2중 방어.
+            case 'members': return isAdmin ? <UserManagement members={members} onDeleteMember={onDeleteMember} onEditMember={onEditMember} onAddMember={onAddMember} onRefresh={onRefresh} /> : null;
+            case 'settings_home': return isAdmin ? <HomepageSettings /> : null;
             case 'weekly_report': return <WeeklyReport user={user} />;
             case 'weekly_status': return <WeeklyStatus />;
             case 'schedule': return <CalendarView user={user} />;

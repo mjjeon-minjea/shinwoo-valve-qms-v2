@@ -47,6 +47,7 @@ const UserManagement = ({ members, onDeleteMember, onEditMember, onAddMember, on
             email: formData.get('email'),
             password: formData.get('password'),
             status: formData.get('status'),
+            is_admin: formData.get('is_admin') === 'on',
         };
         onEditMember(updatedData);
         setIsEditModalOpen(false);
@@ -199,6 +200,13 @@ const UserManagement = ({ members, onDeleteMember, onEditMember, onAddMember, on
                                     <option value="director">작성+검토+승인</option>
                                     {editingUser.role === 'admin' && <option value="admin">최고 관리자 (통합 승인)</option>}
                                 </select>
+                            </div>
+                            <div>
+                                <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                                    <input type="checkbox" name="is_admin" defaultChecked={editingUser.is_admin === true} className="w-4 h-4 rounded border-slate-300" />
+                                    시스템 관리자 (회원·게시물·홈페이지 관리)
+                                </label>
+                                <p className="text-xs text-slate-500 mt-1">※ 업무 결재 권한과 무관합니다. 결재는 위 「권한」으로만 판정됩니다.</p>
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1">이메일</label>

@@ -184,7 +184,8 @@ const AppContent = () => {
                         role: updatedUser.role,
                         rank: updatedUser.rank,
                         company: updatedUser.company,
-                        status: updatedUser.status
+                        status: updatedUser.status,
+                        is_admin: updatedUser.is_admin === true // v10.2 관리자 축
                     })
                 });
                 

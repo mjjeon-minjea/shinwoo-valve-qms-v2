@@ -50,7 +50,13 @@ export const UserProvider = ({ children }) => {
             const finalUser = {
                 ...profile,
                 id: authUser.id, // 진짜 Auth UUID 부여
-                isAdmin: profile.role === 'manager' || profile.role === 'admin' || profile.role === 'director'
+                /* v10.2 관리자 축 분리(260830) — 업무 등급(role)과 시스템 관리자(is_admin)를 나눈다.
+                   종전에는 manager·director도 관리자로 묶여, NCR 도입으로 타부서 부서장·차석을 등록하는 순간
+                   전원이 회원관리·홈페이지설정에 접근하게 됐다. 결재권은 계속 role만 본다(ncrRoles·WeeklyReport 불변).
+                   is_admin 컬럼이 없는 DB(코드 선배포)에서도 undefined는 false로 떨어져 안전하다.
+                   차장 확정(260830): 시스템 관리자는 is_admin 단독 판정 — role=admin(최고관리자 등급)도
+                   업무 권한(주간보고 통합승인 등)만 가지며, 웹 관리자 화면은 is_admin 보유자만 연다. */
+                isAdmin: profile.is_admin === true
             };
             setUser(finalUser);
         } catch (err) {
