@@ -56,13 +56,18 @@ const AppContent = () => {
         }
 
         try {
-            await login(email, password);
+            const { user: authUser } = await login(email, password);
             setLoginAttempts(0); // Reset on success
-            
-            // 🚨 초기비밀번호('123456') 감지 시 브라우저 메모리에 각인
-            if (password === '123456') {
+
+            /* Staging의 AI/실업무 시험계정만 초기비밀번호 강제변경에서 제외한다.
+               app_metadata는 Auth Admin만 설정할 수 있어 사용자가 스스로 예외 표식을 만들 수 없다. */
+            const isTestAccount = authUser?.app_metadata?.qms_test_account === true;
+            if (password === '123456' && !isTestAccount) {
                 sessionStorage.setItem('force_pw_change', 'true');
                 setForcePasswordChange(true);
+            } else {
+                sessionStorage.removeItem('force_pw_change');
+                setForcePasswordChange(false);
             }
         } catch (err) {
             if (err.code === 'MIGRATION_REQUIRED') {
