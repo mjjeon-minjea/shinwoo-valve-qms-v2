@@ -133,7 +133,7 @@ const fmtDT = (iso) => {
 const won = (n) => `₩${Number(n || 0).toLocaleString()}`;
 
 /* H-④ 첨부 목록 표의 「종류」 칸 — category 숫자를 종이에 그대로 찍으면 알아볼 수 없다 */
-const ATT_KIND = { 1: '사진대지', 2: '도면', 3: '관련자료', 4: '처리확인 증빙' };
+const ATT_KIND = { 1: '사진대지', 2: '도면', 3: '관련자료', 4: '처리확인 증빙', 5: '특채 요청서(933-16)' };   // 09-02: 5 특채 요청서 신설
 
 /* 인쇄 전용 설정 로드 — 호출부 시그니처 변경 없이 NCRPrint가 자체 로드
    (NCRDetail의 fetchNcrSettings를 쓰면 NCRDetail↔NCRPrint 순환 import가 되므로 여기서 별도 구현) */
@@ -164,6 +164,8 @@ const NCRPrint = ({ report, history, attachments, onClose }) => {
     const refs = (attachments || []).filter(a => a.category === 3);
     /* v10.2 H-④ — 처리확인 단계 증빙(category 4). #2·#3과 같은 규칙으로 별지 인쇄한다. */
     const closedAtts = (attachments || []).filter(a => Number(a.category) === 4);
+    /* 09-02 — 특채 요청서(933-16, category 5). #4와 같은 규칙으로 별지 인쇄한다. */
+    const reqDocs = (attachments || []).filter(a => Number(a.category) === 5);
     /* H-④ 첨부 목록 표용 — 분류 순(1→4), 같은 분류 안에서는 쌍번호·등록시각 순 */
     const attList = [...(attachments || [])].sort((x, y) =>
         (Number(x.category) - Number(y.category))
@@ -786,7 +788,8 @@ const NCRPrint = ({ report, history, attachments, onClose }) => {
                         pairs.length ? `#1 사진대지 ${pairs.length}쌍` : null,
                         drawings.length ? `#2 도면 ${drawings.length}건` : null,
                         refs.length ? `#3 관련자료 ${refs.length}건` : null,
-                        closedAtts.length ? `#4 처리확인 증빙 ${closedAtts.length}건` : null
+                        closedAtts.length ? `#4 처리확인 증빙 ${closedAtts.length}건` : null,
+                        reqDocs.length ? `#5 특채 요청서 ${reqDocs.length}건` : null
                     ].filter(Boolean).join(' · ') || '없음'}
                 </div>
 
@@ -847,6 +850,8 @@ const NCRPrint = ({ report, history, attachments, onClose }) => {
                 {refs.length > 0 && <AttSection title="첨부#3 — 관련자료" count={refs.length} items={refs} />}
                 {/* H-④ 처리확인 증빙 별지 — 이미지는 인쇄, 비이미지는 파일명 텍스트만(#2·#3과 동일 규칙) */}
                 {closedAtts.length > 0 && <AttSection title="첨부#4 — 처리확인 증빙" count={closedAtts.length} items={closedAtts} />}
+                {/* 09-02 특채 요청서(933-16) 별지 — #4와 동일 규칙 */}
+                {reqDocs.length > 0 && <AttSection title="첨부#5 — 특채 요청서(933-16)" count={reqDocs.length} items={reqDocs} />}
             </div>
         </div>,
         document.body

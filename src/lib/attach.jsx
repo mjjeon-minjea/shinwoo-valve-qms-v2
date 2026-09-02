@@ -10,8 +10,9 @@ import { supabase } from './api';
 
 /* 첨부 분류(ncr_attachments.category) — 1·2·3은 작성화면, 4는 처리확인 단계 증빙(신설).
    숫자를 코드 곳곳에 흩어 쓰면 4를 추가할 때처럼 빠뜨리는 곳이 생기므로 이름을 붙여 둔다. */
-export const ATT_CAT = { PHOTO: 1, DRAWING: 2, REF: 3, CLOSED: 4 };
-export const ATT_CAT_LABEL = { 1: '사진대지', 2: '도면', 3: '관련자료', 4: '처리확인 증빙' };
+/* 09-02 — 5 특채 요청서(933-16) 분류 신설: 회람 담당이 특채 요청을 올릴 때 서명본을 함께 첨부한다(차장 확정). */
+export const ATT_CAT = { PHOTO: 1, DRAWING: 2, REF: 3, CLOSED: 4, REQUEST: 5 };
+export const ATT_CAT_LABEL = { 1: '사진대지', 2: '도면', 3: '관련자료', 4: '처리확인 증빙', 5: '특채 요청서(933-16)' };
 
 /* 이미지 축소: 최대 1280px · JPEG 0.8 dataURL — 원본 저장 금지(DB 비대 방지) */
 export const shrinkImage = (file) => new Promise((resolve, reject) => {
@@ -36,8 +37,9 @@ export const shrinkImage = (file) => new Promise((resolve, reject) => {
     fr.readAsDataURL(file);
 });
 
-/* Phase 4: 비이미지 파일 — 5MB 이하만 dataURL 그대로 보관 */
-export const NONIMG_MAX = 5 * 1024 * 1024;
+/* Phase 4: 비이미지 파일 — 20MB 이하만 dataURL 그대로 보관
+   09-02 — 5MB → 20MB: 특채 요청서(933-16) 서명본 스캔 PDF가 5MB를 넘는 일이 잦아 차장 확정으로 상향. */
+export const NONIMG_MAX = 20 * 1024 * 1024;
 export const readAsDataURL = (file) => new Promise((resolve, reject) => {
     const fr = new FileReader();
     fr.onerror = () => reject(new Error('파일 읽기 실패'));
@@ -45,11 +47,11 @@ export const readAsDataURL = (file) => new Promise((resolve, reject) => {
     fr.readAsDataURL(file);
 });
 
-/* 파일 1건 → {name, dataurl}. 이미지면 축소, 아니면 5MB 제한.
+/* 파일 1건 → {name, dataurl}. 이미지면 축소, 아니면 20MB 제한.
    붙여넣기·파일선택이 반드시 이 함수를 통과하게 해서 「붙여넣기만 원본으로 새는」 일을 막는다. */
 export const processAnyFile = (file) => {
     if (file.type.startsWith('image/')) return shrinkImage(file);
-    if (file.size > NONIMG_MAX) return Promise.reject(new Error(`'${file.name}' — 이미지가 아닌 파일은 5MB 이하만 첨부할 수 있습니다.`));
+    if (file.size > NONIMG_MAX) return Promise.reject(new Error(`'${file.name}' — 이미지가 아닌 파일은 20MB 이하만 첨부할 수 있습니다.`));
     return readAsDataURL(file);
 };
 

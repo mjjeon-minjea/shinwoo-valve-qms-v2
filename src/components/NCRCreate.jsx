@@ -4,7 +4,7 @@ import { api, supabase } from '../lib/api';
 import { isNcrRouteStaff } from '../lib/ncrRoles';
 /* v10.2 H-① 캡처 붙여넣기 복원 — 축소·용량제한·붙여넣기 규칙은 lib/attach.jsx 한 곳에만 둔다(중복 정의 금지).
    결재화면(NCRDetail 처리확인 증빙)이 같은 함수를 쓰므로 이 파일에 다시 정의하지 않는다. */
-import { shrinkImage, processAnyFile, isImageAtt, useCapturePaste, PasteZone, attUrl, uploadAtt, withAttUrls } from '../lib/attach.jsx';
+import { ATT_CAT, shrinkImage, processAnyFile, isImageAtt, useCapturePaste, PasteZone, attUrl, uploadAtt, withAttUrls } from '../lib/attach.jsx';
 
 /* 부적합보고서(NCR) 작성 — v10.1 정통 복원 (v10.0 + Phase 3 첨부 + Phase 4 이어쓰기 전부 보존)
    v9.3 검증 로직 이관: 수량 분리(전체/부적합) + 파악중 + 대소 가드, NCR 번호 자동채번
@@ -110,7 +110,7 @@ const SimpleAttList = ({ list, onAdd, onRemove, pasteKey, pz }) => (
             <Plus className="w-3.5 h-3.5" /> 파일 추가
             <input type="file" multiple className="hidden" onChange={onAdd} />
         </label>
-        <p className="text-[11px] text-slate-400">이미지는 자동 축소 저장, 이미지 외 파일은 5MB 이하만 첨부됩니다.</p>
+        <p className="text-[11px] text-slate-400">이미지는 자동 축소 저장, 이미지 외 파일은 20MB 이하만 첨부됩니다.</p>
     </div>
 );
 
@@ -559,6 +559,7 @@ const NCRCreate = ({ user }) => {
                 /* 폼에 남아 있는 id만 살린다 — 사용자가 화면에서 뺀 것만 지워진다 */
                 const keep = new Set(attRows.map(r => r.id).filter(v => v != null).map(String));
                 for (const a of exRows) {
+                    if (Number(a.category) >= ATT_CAT.CLOSED) continue; // 09-02: 처리확인 증빙(4)·특채 요청서(5)는 작성 폼에 없으므로 편집 저장이 지우지 않는다
                     if (!keep.has(String(a.id))) await api.fetch(`/ncr_attachments/${a.id}`, { method: 'DELETE' });
                 }
             }

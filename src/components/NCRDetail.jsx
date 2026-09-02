@@ -266,6 +266,9 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
     /* H-③ 처리확인 증빙(첨부#4) — 완료확인 상신 때 함께 올리는 증거 파일. 선택(필수 아님) */
     const [closedAtts, setClosedAtts] = useState([]);                          // [{name, dataurl}] — 아직 저장 전(상신 시 POST)
     const [attErr, setAttErr] = useState(null);                                // 파일 처리 실패 안내(패널 안에서만 표시)
+    /* 09-02 특채 요청서(933-16, 첨부#5) — 회람 담당이 특채 요청을 올릴 때 함께 올리는 서명본. 특채 요청이면 필수 */
+    const [reqAtts, setReqAtts] = useState([]);                                // [{name, dataurl}] — 아직 저장 전(회신 시 POST)
+    const [reqErr, setReqErr] = useState(null);                                // 파일 처리·필수 누락 안내(패널 안에서만 표시)
 
     useEffect(() => {
         fetchNcrSettings().then(setSettings);
@@ -432,7 +435,23 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
             cost_items: items && items.length ? items : null
         };
         const tag = dispReqOn ? `[처분방안 변경 요청 → ${dispReqTo}] ` : '';
-        act('회람회신', { reviews: { ...reviews, [ro.company]: mine } }, `${tag}[${ro.company} 검토·${opinion === 'approve' ? '승인 의견' : '반려 의견'}] ${comment.trim()}`);
+        /* 09-02 특채 요청서(933-16, 첨부#5) — 특채 요청이면 서명본 첨부가 필수다(차장 확정).
+           이미 올라간 #5가 있거나 이번에 담은 것이 있으면 통과. 저장은 H-③ saveEvid와 같은 pre 패턴(버킷 업로드 → 행 INSERT)으로,
+           건별 성공 직후 담아둔 목록에서 빼서 중간 실패 시 재시도해도 같은 파일이 두 번 올라가지 않게 한다. */
+        const concReq = dispReqOn && dispReqTo === CONCESSION;
+        if (concReq && reqDocs.length === 0 && reqAtts.length === 0) { setReqErr('특채 요청에는 특채 요청서(933-16) 첨부가 필요합니다.'); return; }
+        const saveReq = (concReq && reqAtts.length > 0) ? async () => {
+            const at = nowIso();
+            for (const a of reqAtts) {
+                const p = await uploadAtt(report.id, a.name, a.dataurl);
+                await api.fetch('/ncr_attachments', {
+                    method: 'POST',
+                    body: { report_id: report.id, category: ATT_CAT.REQUEST, name: a.name, path: p, at, by: user?.name || '' }
+                });
+                setReqAtts(prev => prev.filter(x => x !== a));
+            }
+        } : undefined;
+        act('회람회신', { reviews: { ...reviews, [ro.company]: mine } }, `${tag}[${ro.company} 검토·${opinion === 'approve' ? '승인 의견' : '반려 의견'}] ${comment.trim()}`, undefined, saveReq);
     };
     /* 부서장 결재 자격 — 쓰기 직전 다시 판정한다.
        B-20 #1의 교훈: 렌더 가드만 두면 화면이 잠깐 잘못 뜨는 순간에 결재가 실제로 완주된다.
@@ -733,6 +752,7 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
     const drawings = atts.filter(a => a.category === 2);
     const refDocs = atts.filter(a => a.category === 3);
     const closedEvid = atts.filter(a => Number(a.category) === ATT_CAT.CLOSED);   // H-③ 첨부#4 처리확인 증빙
+    const reqDocs = atts.filter(a => Number(a.category) === ATT_CAT.REQUEST);     // 09-02 첨부#5 특채 요청서(933-16)
 
     /* ── H-③ 처리확인 증빙 담기 (완료확인 패널 전용) ──
        사진·파일 둘 다 받는다. 작성화면과 같은 processAnyFile을 통과시켜
@@ -747,8 +767,27 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
             setClosedAtts(l => [...l, ...rows]);
         } catch (er) { setAttErr('파일 처리 실패: ' + (er.message || er)); }
     };
-    /* H-① 캡처 붙여넣기 — 대상은 'closed' 한 곳(시뮬레이터 pendClosed와 같은 자리) */
+    /* 09-02 특채 요청서(933-16) 담기 (회람 검토 회신 패널 전용) — addClosedFiles와 같은 규칙(processAnyFile) */
+    const addReqFiles = async (e) => {
+        const files = [...(e.target.files || [])];
+        e.target.value = '';
+        if (!files.length) return;
+        setReqErr(null);
+        try {
+            const rows = await Promise.all(files.map(processAnyFile));
+            setReqAtts(l => [...l, ...rows]);
+        } catch (er) { setReqErr('파일 처리 실패: ' + (er.message || er)); }
+    };
+    /* H-① 캡처 붙여넣기 — 대상은 'closed'(시뮬레이터 pendClosed와 같은 자리) · 09-02 'req'(특채 요청서) 추가 */
     const pz = useCapturePaste(async (target, file) => {
+        if (target === 'req') {
+            setReqErr(null);
+            try {
+                const row = await processAnyFile(file);
+                setReqAtts(l => [...l, row]);
+            } catch (er) { setReqErr('캡처 처리 실패: ' + (er.message || er)); }
+            return;
+        }
         if (target !== 'closed') return;
         setAttErr(null);
         try {
@@ -772,6 +811,8 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
             const openReq = (mineRv.disp_req && !mineRv.disp_req.resolved) ? mineRv.disp_req : null;   // 미해결분만
             setDispReqOn(!!openReq && dispTargets.length > 0);
             setDispReqTo(openReq && dispTargets.includes(openReq.to) ? openReq.to : (dispTargets[0] || ''));
+            /* 09-02: 특채 요청서 담아둔 것도 비운다 — H-③ close 패널과 같은 이유(직전 문서 파일이 남아 잘못 올라가는 것 방지) */
+            setReqAtts([]); setReqErr(null); pz.setHover(null); pz.pin(null);
         }
         if (m === 'qaSubmit') { setDispDecisions({}); setConcPick(''); setStage1Items(seedStage1()); setZeroWhy(report.cost_stage1?.zero_why || ''); }
         /* H-③: 패널을 열 때 증빙 담아둔 것도 비운다 — 직전에 열었다 닫은 문서의 사진이 남아 잘못 올라가는 것 방지 */
@@ -784,7 +825,7 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
     /* 모듈 스코프 Panel에 넘길 공통 props — 렌더마다 값만 바뀌고 컴포넌트 신원은 고정된다(포커스 유지) */
     const panelBase = {
         comment, setComment, saving, inputCls, btnO, btnP,
-        onCancel: () => { setMode(null); setComment(''); setErr(null); }
+        onCancel: () => { setMode(null); setComment(''); setErr(null); setReqAtts([]); setReqErr(null); }   // 09-02: 특채 요청서 담아둔 것도 비운다
     };
 
     /* ── B-20/B-21 · 회람 검토 회신 패널 하단 (검토 의견 입력칸 아래) ── */
@@ -804,6 +845,47 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
                         </select>
                         <p className="text-[11px] text-amber-700">현재 <b>{report.disposition || '미정'}</b> → 변경 요청. 위 검토 의견이 변경 사유로 함께 전달됩니다.</p>
                         {dispReqTo === CONCESSION && <p className="text-[11px] font-semibold text-violet-700">특채 요청입니다 — 특채 유형은 품질보증부가 수락하면서 정합니다. 요청 사유(불량 정도·사용 가능 판단 근거)를 검토 의견에 구체적으로 적어 주십시오.</p>}
+                        {/* ── 09-02 특채 요청서(933-16, 첨부#5) — 특채 요청이면 서명본 첨부 필수(차장 확정).
+                            H-③ 처리확인 증빙(#4) 칸과 같은 UI·같은 저장소(ncr_attachments, category 5). ── */}
+                        {dispReqTo === CONCESSION && (
+                            <div className="rounded-lg border border-slate-200 bg-white p-3 space-y-2" data-req-att>
+                                <div className="text-xs font-bold text-slate-700">특채 요청서(933-16) 첨부 — 필수</div>
+                                <p className="text-[11px] text-slate-400">서명 완료본 스캔/파일. 형식 제한 없음, 파일당 20MB(이미지는 자동 축소)</p>
+                                {reqDocs.length > 0 && (
+                                    <div className="space-y-1">
+                                        <div className="text-[11px] font-semibold text-slate-500">기존 첨부 {reqDocs.length}건</div>
+                                        {reqDocs.map((a, i) => (
+                                            <a key={a.id ?? i} href={attUrl(a)} target="_blank" rel="noreferrer" className="block text-[11px] text-blue-600 hover:underline font-mono truncate">{a.name}</a>
+                                        ))}
+                                    </div>
+                                )}
+                                {reqAtts.length > 0 && (
+                                    <div className="grid grid-cols-3 md:grid-cols-4 gap-2">
+                                        {reqAtts.map((a, i) => (
+                                            <div key={i} className="relative">
+                                                {isImageAtt(a)
+                                                    ? <img src={attUrl(a)} alt={a.name} className="w-full aspect-[4/3] object-cover rounded-lg border border-slate-200 bg-slate-50" />
+                                                    : <div className="w-full aspect-[4/3] flex flex-col items-center justify-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-1">
+                                                        <FileIcon className="w-6 h-6 text-slate-400" />
+                                                        <span className="text-[9px] text-slate-500 font-mono truncate max-w-full">{a.name}</span>
+                                                    </div>}
+                                                <button type="button" onClick={() => setReqAtts(l => l.filter((_, j) => j !== i))}
+                                                    className="absolute top-1 right-1 p-1 rounded-full bg-white/90 border border-slate-300 text-slate-500 hover:text-red-600 hover:border-red-300">
+                                                    <Trash2 className="w-3 h-3" />
+                                                </button>
+                                                <div className="text-[10px] text-slate-400 font-mono truncate mt-0.5">{a.name}</div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                                <PasteZone {...pz} target="req" />
+                                <label className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 cursor-pointer">
+                                    <Plus className="w-3.5 h-3.5" /> 파일 추가
+                                    <input type="file" multiple className="hidden" onChange={addReqFiles} />
+                                </label>
+                                {reqErr && <div className="text-[11px] text-red-600">{reqErr}</div>}
+                            </div>
+                        )}
                     </>)}
                     <p className="text-[11px] text-slate-500">부서장이 승인하면 부서 공식 의견으로 품질보증부에 전달됩니다. 품질보증부는 <b>수락 · 거절 · 반송</b> 중 하나로 판단하며, 특채로 수락된 건은 품질부서장 최종승인을 받습니다. 회수·재발행 없이 이 문서에 이력으로 남습니다.</p>
                 </div>
@@ -859,6 +941,18 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
                     <input className={inputCls} placeholder="0원 사유 (예: 반송 — 당사 비용 발생 없음) — 필수" value={zeroWhy} onChange={e => setZeroWhy(e.target.value)} />
                 )}
             </div>
+            {/* 09-02 특채 요청서(933-16, 첨부#5) — 종합검토가 요청서를 바로 열어볼 수 있게 목록만 보인다(차단 없음).
+                시공 전에 올라온 특채 요청은 요청서가 없으므로 회색 안내만 남긴다. */}
+            {(reqDocs.length > 0 || pendingDispReqs.some(({ req }) => req.to === CONCESSION)) && (
+                <div className="rounded-lg border border-slate-200 bg-white p-3 space-y-1">
+                    <div className="text-xs font-bold text-slate-700">특채 요청서(933-16) {reqDocs.length > 0 && <span className="font-normal text-slate-400">{reqDocs.length}건</span>}</div>
+                    {reqDocs.length === 0
+                        ? <p className="text-[11px] text-slate-400">특채 요청서 없음(시공 전 요청)</p>
+                        : reqDocs.map((a, i) => (
+                            <a key={a.id ?? i} href={attUrl(a)} target="_blank" rel="noreferrer" className="block text-[11px] text-blue-600 hover:underline font-mono truncate">{a.name}</a>
+                        ))}
+                </div>
+            )}
         </div>
     );
 
@@ -1031,7 +1125,7 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
                         </div>
                     )}
                     {/* H-③: 처리확인 증빙(#4)도 같은 방식으로 카드에 보여준다 — 올라간 증거를 상세에서 바로 확인 */}
-                    {[[drawings, '첨부#2 — 해당 도면'], [refDocs, '첨부#3 — 관련자료'], [closedEvid, '첨부#4 — 처리확인 증빙']].map(([list, title]) => list.length > 0 && (
+                    {[[drawings, '첨부#2 — 해당 도면'], [refDocs, '첨부#3 — 관련자료'], [closedEvid, '첨부#4 — 처리확인 증빙'], [reqDocs, '첨부#5 — 특채 요청서(933-16)']].map(([list, title]) => list.length > 0 && (
                         <div key={title}>
                             <div className="text-xs font-bold text-slate-500 mb-2">{title} {list.length}건</div>
                             <div className="grid grid-cols-3 md:grid-cols-4 gap-2">{list.map((a, i) => (
@@ -1225,7 +1319,7 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
                                         <Plus className="w-3.5 h-3.5" /> 파일 추가
                                         <input type="file" multiple className="hidden" onChange={addClosedFiles} />
                                     </label>
-                                    <p className="text-[11px] text-slate-400">사상 처리 사진 · 재검사 성적서 · 반송 인수증 등 — 이미지는 자동 축소, 이미지 외 파일은 5MB 이하.</p>
+                                    <p className="text-[11px] text-slate-400">사상 처리 사진 · 재검사 성적서 · 반송 인수증 등 — 이미지는 자동 축소, 이미지 외 파일은 20MB 이하.</p>
                                     {attErr && <div className="text-[11px] text-red-600">{attErr}</div>}
                                 </div>
                             </div>
