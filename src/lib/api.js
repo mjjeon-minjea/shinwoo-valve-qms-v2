@@ -12,6 +12,13 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
 });
 
 export const api = {
+    /* 09-03 058-B — PostgREST RPC. 서버 함수가 한 트랜잭션으로 처리해야 하는 것(reviews 부서 칸 병합 + 타열)에 쓴다 */
+    rpc: async (fn, args) => {
+        console.log(`[Supabase API] RPC ${fn}`);
+        const { data, error } = await supabase.rpc(fn, args);
+        if (error) throw error;
+        return data;
+    },
     fetch: async (url, options = {}) => {
         // URL 파싱: '/table_name' 또는 '/table_name/id' 형식
         /* v10.2 (260829) — 물음표 뒤의 조건을 버리지 않고 서버로 넘긴다.

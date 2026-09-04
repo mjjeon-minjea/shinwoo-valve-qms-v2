@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { X, CheckCircle2, XCircle, Printer, Undo2, Stamp, FlaskConical, Users, ClipboardCheck, Ban, Coins, Plus, Trash2, File as FileIcon } from 'lucide-react';
 import { api } from '../lib/api';
 import { isLegacyFlow, isNewFlow, statusLabel } from '../lib/ncrFlow';
@@ -299,11 +299,29 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
     /* extra: 같은 처리에서 별도 이력 1건을 더 남겨야 할 때(B-20 '처분방안 변경') — [{action, comment}]
        pre : 본 처리 직전에 끝내야 하는 부수 작업(H-③ 처리확인 증빙 첨부 저장) — 실패하면 상신 자체를 하지 않는다.
              (첨부만 빠진 채 상태가 넘어가면 되돌릴 방법이 없다) */
+    /* 09-03 057 E-10 — 빠른 2회 클릭이면 두 번째 호출이 첫 렌더보다 먼저 들어와 이력이 2행 생겼다(스테이징 재현).
+       saving(state)은 다음 렌더에야 버튼을 잠그므로, 렌더와 무관한 동기 ref로 진입 자체를 먼저 막는다.
+       성공하면 onClose로 창이 닫히므로 잠금을 풀지 않고, 실패했을 때만 풀어 재시도를 허용한다. */
+    const actLock = useRef(false);
     const act = async (action, patch, cmt, extra, pre) => {
+        if (actLock.current) return;
+        actLock.current = true;
         setSaving(true); setErr(null);
         try {
             if (pre) await pre();
-            await api.fetch(`/ncr_reports/${report.id}`, { method: 'PATCH', body: patch });
+            /* 09-03 058-B — reviews는 부서별 칸(jsonb 최상위 키)이다. 창을 연 시점의 전체 객체를 PATCH하면
+               그 사이 다른 부서가 저장한 칸을 덮어쓴다(057 B-01 실측). 그래서 「내가 바꾼 칸」만 골라
+               나머지 열과 함께 DB 함수(ncr_patch_report) 한 번으로 원자 갱신한다.
+               칸을 없애는 처리(회수의 reviews:{})는 병합으로 표현이 안 되므로 종전 PATCH 그대로. */
+            const { statusIfAllDone, ...patch0 } = patch || {};
+            if (patch0.reviews && Object.keys(patch0.reviews).length && Object.keys(reviews).every(k => k in patch0.reviews)) {
+                const changed = Object.fromEntries(Object.entries(patch0.reviews)
+                    .filter(([k, v]) => JSON.stringify(v) !== JSON.stringify(reviews[k])));
+                const { reviews: _omit, ...cols } = patch0;
+                await api.rpc('ncr_patch_report', { p_id: report.id, p_reviews: changed, p_cols: Object.keys(cols).length ? cols : null, p_status_if_all_done: statusIfAllDone || null });
+            } else if (Object.keys(patch0).length) {
+                await api.fetch(`/ncr_reports/${report.id}`, { method: 'PATCH', body: patch0 });
+            }
             for (const x of (extra || [])) {
                 await api.fetch('/ncr_approvals', {
                     method: 'POST',
@@ -315,7 +333,7 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
                 body: { report_id: report.id, action, actor_name: user?.name || '', actor_company: user?.company || '', comment: cmt || '', at: nowIso() }
             });
             onChanged?.(); onClose?.();
-        } catch (e) { setErr('처리 실패: ' + (e.message || e)); setSaving(false); }
+        } catch (e) { setErr('처리 실패: ' + (e.message || e)); setSaving(false); actLock.current = false; }
     };
 
     /* ── B-20/B-21 파생값 ── */
@@ -469,9 +487,8 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
         /* B-20: 담당이 올린 처분방안 변경 요청은 그대로 보존한다 — 부서 공식 의견으로 확정되는 지점 */
         const mine = { ...(reviews[ro.company] || {}), state: 'done', head_name: user?.name, head_cmt: comment.trim() || '승인.', head_at: nowIso(), deputy };
         const rv = { ...reviews, [ro.company]: mine };
-        const allDone = Object.values(rv).every(v => ['done', 'skip'].includes(v.state));
         const dispTag = (mine.disp_req && !mine.disp_req.resolved) ? ' (처분방안 변경 요청 포함)' : '';
-        act('부서승인', { reviews: rv, ...(allDone ? { status: '종합검토' } : {}) }, `${comment.trim() || '승인.'}${deputy ? ' (차석 대결)' : ''}${dispTag}`);
+        act('부서승인', { reviews: rv, statusIfAllDone: '종합검토' /* 09-03 058-B — 전 부서 완료 판정은 DB 병합 결과로(ncr_patch_report) */ }, `${comment.trim() || '승인.'}${deputy ? ' (차석 대결)' : ''}${dispTag}`);
     };
     const doDeptRemand = () => {
         const g = deptHeadGate();
