@@ -1063,6 +1063,13 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
                                                             )}
                                                             {rv.staff_name} · {rv.staff_cmt}
                                                             {rv.remand_note ? <span className="text-orange-500 ml-1">({remandLabel(rv.remand_note)}: {remandBody(rv.remand_note)})</span> : null}
+                                                            {/* 09-04 059 B-12 — 이전 처분방안 변경 요청(disp_req_prev)도 보이게 한다. 08-22부터 데이터는 보존돼 있었고 표시만 없었다(057 B-12) */}
+                                                            {Array.isArray(rv.disp_req_prev) && rv.disp_req_prev.length > 0 && (
+                                                                <span className="block mt-1 text-[11px] text-slate-500">
+                                                                    <span className="inline-block px-1.5 py-0.5 rounded bg-slate-50 border border-slate-200 font-bold mr-1">이전 요청 {rv.disp_req_prev.length}건</span>
+                                                                    {rv.disp_req_prev.map((q, i) => <span key={i} className="mr-2">→ {q.to || ''} ({q.resolved || '미판정'}{q.resolved_by ? ` · ${q.resolved_by}` : ''}{q.resolved_at ? ` · ${String(q.resolved_at).replace('T', ' ').slice(0, 16)}` : ''})</span>)}
+                                                                </span>
+                                                            )}
                                                             {/* B-21 — 부서가 올린 품질비용을 부서장이 보고 결재할 수 있게 표시 */}
                                                             {Array.isArray(rv.cost_items) && rv.cost_items.length > 0 && (
                                                                 <span className="block mt-1 text-[11px] text-teal-700">

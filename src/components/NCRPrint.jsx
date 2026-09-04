@@ -507,6 +507,12 @@ const NCRPrint = ({ report, history, attachments, onClose }) => {
                                                     [처분방안 변경 요청 → {r.disp_req.to}]{r.disp_req.resolved ? ` (${r.disp_req.resolved})` : ''}
                                                 </div>
                                             )}
+                                            {/* 09-04 059 B-12 — 이전 처분방안 변경 요청(disp_req_prev)도 종이에 남긴다 */}
+                                            {Array.isArray(r.disp_req_prev) && r.disp_req_prev.map((q, i) => (
+                                                <div className="ncrp-note" key={i}>
+                                                    [이전 변경 요청 → {q.to}]{q.resolved ? ` (${q.resolved}${q.resolved_by ? ' · ' + q.resolved_by : ''}${q.resolved_at ? ' · ' + fmtDT(q.resolved_at) : ''})` : ' (미판정)'}
+                                                </div>
+                                            ))}
                                             {Array.isArray(r.cost_items) && r.cost_items.length > 0 && (
                                                 <div className="ncrp-note">
                                                     [품질비용] {r.cost_items.map((c, i) => `${c.label || `항목 ${i + 1}`} ${won(c.amount)}`).join(' · ')}
