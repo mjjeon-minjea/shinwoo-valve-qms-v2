@@ -22,6 +22,7 @@ import DevNotes from './DevNotes';
 import Suggestions from './Suggestions';
 import PostApproval from './PostApproval';
 import ResourceRoom from './ResourceRoom';
+import { listCurrentResources } from '../lib/resourceFiles';
 import WeeklyReport from './WeeklyReport';
 import WeeklyStatus from './WeeklyStatus';
 import CalendarView from './CalendarView';
@@ -450,6 +451,7 @@ const Popup = ({ onClose }) => {
 const Home = ({ setActiveTab }) => {
     const [notices, setNotices] = useState([]);
     const [resources, setResources] = useState([]);
+    const [resourceError, setResourceError] = useState('');
 
     useEffect(() => {
         /* v10.2 (260829 실측) — 두 조회를 Promise.all 한 덩어리로 묶으면, 한쪽 표가 없을 때
@@ -466,10 +468,20 @@ const Home = ({ setActiveTab }) => {
                 console.warn(`[홈] ${path} 조회 실패 — 이 목록만 비웁니다.`, error);
             }
         };
+        const loadResources = async () => {
+            try {
+                setResources(await listCurrentResources());
+                setResourceError('');
+            } catch (error) {
+                console.warn('[홈] 자료실 조회 실패', error);
+                setResources([]);
+                setResourceError('자료실을 불러오지 못했습니다 · 다시 시도');
+            }
+        };
         const fetchData = async () => {
             await Promise.allSettled([
                 load('/notices', setNotices),
-                load('/resources', setResources)
+                loadResources()
             ]);
         };
         fetchData();
@@ -554,20 +566,22 @@ const Home = ({ setActiveTab }) => {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
-                                {resources.length === 0 ? (
+                                {resourceError ? (
+                                    <tr><td colSpan="5" className="py-10 text-center text-red-600 text-xs"><button type="button" onClick={() => setActiveTab('resources')} className="underline">{resourceError}</button></td></tr>
+                                ) : resources.length === 0 ? (
                                     <tr><td colSpan="5" className="py-10 text-center text-slate-400 text-xs">등록된 자료가 없습니다.</td></tr>
                                 ) : (
                                     resources.map((resource) => (
                                         <tr key={resource.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => setActiveTab('resources')}>
                                             <td className="px-4 py-3 text-xs text-slate-500 text-center">{resource.id}</td>
                                             <td className="px-4 py-3 text-center whitespace-nowrap">
-                                                <span className={`px-2 py-0.5 text-[10px] rounded-full font-medium ${resource.type === '매뉴얼' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'}`}>
-                                                    {resource.type}
+                                                <span className="px-2 py-0.5 text-[10px] rounded-full font-medium bg-green-100 text-green-700">
+                                                    {resource.module_label} · {resource.category_label}
                                                 </span>
                                             </td>
                                             <td className="px-4 py-3 text-sm text-slate-800 line-clamp-1">{resource.title}</td>
-                                            <td className="px-4 py-3 text-xs text-slate-500 text-center">{resource.author}</td>
-                                            <td className="px-4 py-3 text-xs text-slate-400 text-center whitespace-nowrap">{resource.date}</td>
+                                            <td className="px-4 py-3 text-xs text-slate-500 text-center">{resource.registered_by_name}</td>
+                                            <td className="px-4 py-3 text-xs text-slate-400 text-center whitespace-nowrap">{resource.created_at ? new Date(resource.created_at).toLocaleDateString('ko-KR') : '-'}</td>
                                         </tr>
                                     ))
                                 )}
@@ -680,7 +694,7 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
         switch (activeTab) {
             case 'home': return <Home setActiveTab={setActiveTab} />;
             case 'notices': return <NoticeBoard />;
-            case 'resources': return <ResourceRoom />;
+            case 'resources': return <ResourceRoom user={user} isAdmin={isAdmin} />;
             case 'inbound_analysis': return <InboundAnalysis />;
             case 'inspection_analysis': return <InspectionAnalysisDashboard />;
             case 'inbound_status': return <NonConformanceStatus />;

@@ -1,402 +1,231 @@
-import { useState, useEffect } from 'react';
-import { Search, Plus, Edit, Trash2, X, ChevronLeft, ChevronRight, Download, FileText } from 'lucide-react';
-import { api } from '../lib/api';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ChevronLeft, ChevronRight, Download, FileText, History, Plus, RefreshCw, Trash2, X } from 'lucide-react';
+import {
+    createResourceDownload,
+    listCurrentResources,
+    listResourceHistory,
+    publishResourceRevision,
+    softDeleteResource
+} from '../lib/resourceFiles';
 
-const ResourceRoom = () => {
+const EMPTY_FORM = {
+    module: '', moduleLabel: '', category: '', categoryLabel: '', docKey: '',
+    title: '', description: '', sourceRef: '', revisionNote: '', file: null
+};
+const ITEMS_PER_PAGE = 10;
+
+const formatDate = (value) => value ? new Date(value).toLocaleDateString('ko-KR') : '-';
+const revisionLabel = (resource) => `r${resource.revision}${resource.is_current ? ' · 최신' : ''}${resource.is_deleted ? ' · 삭제됨' : ''}`;
+
+const ResourceRoom = ({ user, isAdmin = false }) => {
     const [resources, setResources] = useState([]);
+    const [history, setHistory] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    const [historyError, setHistoryError] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
+    const [moduleFilter, setModuleFilter] = useState('');
+    const [categoryFilter, setCategoryFilter] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [isDetailOpen, setIsDetailOpen] = useState(false);
-    const [currentResource, setCurrentResource] = useState(null);
-    const [formData, setFormData] = useState({ title: '', type: '자료', author: '', content: '', attachment: '' });
+    const [detail, setDetail] = useState(null);
+    const [form, setForm] = useState(EMPTY_FORM);
+    const [modalOpen, setModalOpen] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [actionError, setActionError] = useState('');
+    const [publishReceipt, setPublishReceipt] = useState(null);
+    const publishLock = useRef(false);
 
-    const itemsPerPage = 10;
-
-    useEffect(() => {
-        fetchResources();
-    }, []);
-
-    const fetchResources = async () => {
+    const loadResources = useCallback(async () => {
+        setLoading(true);
+        setError('');
         try {
-            const res = await api.fetch('/resources');
-            if (res.ok) {
-                const data = await res.json();
-                setResources(data.sort((a, b) => b.id - a.id));
-            }
-        } catch (error) {
-            console.error('Failed to fetch resources:', error);
+            const current = await listCurrentResources();
+            setResources(current);
+        } catch (loadError) {
+            console.error('Resource list failed:', loadError);
+            setResources([]);
+            setError('자료실을 불러오지 못했습니다 · 다시 시도');
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
 
-    const handleSave = async (e) => {
-        e.preventDefault();
-        const date = new Date().toISOString().split('T')[0];
-
-        let uploadedFilename = currentResource?.attachment || '';
-        let originalFilename = currentResource?.originalFilename || '';
-
-        // Handle File Upload
-        if (formData.file) {
-            const uploadData = new FormData();
-            uploadData.append('file', formData.file);
-
-            try {
-                const uploadRes = await api.fetch('/upload', {
-                    method: 'POST',
-                    body: uploadData
-                });
-
-                if (uploadRes.ok) {
-                    const result = await uploadRes.json();
-                    uploadedFilename = result.filename;
-                    originalFilename = result.originalName;
-                } else {
-                    alert('파일 업로드 실패');
-                    return;
-                }
-            } catch (error) {
-                console.error('File upload error:', error);
-                alert('파일 업로드 중 오류가 발생했습니다.');
-                return;
-            }
-        } else if (formData.attachment && formData.attachment !== uploadedFilename) {
-            // Case where user might have manually edited the text field (legacy support or if we keep the text input)
-            // But with new design we should rely on file input. 
-            // If user cleared it, we might want to respect that.
-            // For now, let's assume if no new file is selected, we keep the old one unless explicitly cleared?
-            // Since we are changing the UI to file input, let's stick to the file object.
+    const loadHistory = useCallback(async () => {
+        if (!isAdmin) {
+            setHistory([]);
+            setHistoryError('');
+            return;
         }
-
-        const payload = {
-            ...formData,
-            attachment: uploadedFilename,
-            originalFilename: originalFilename,
-            date,
-            views: currentResource?.views || 0
-        };
-        // Remove the 'file' object from payload as we don't store it in DB
-        delete payload.file;
-
         try {
-            if (currentResource?.id) {
-                await api.fetch(`/resources/${currentResource.id}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ ...currentResource, ...payload })
-                });
-            } else {
-                await api.fetch('/resources', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ ...payload, views: 0 })
-                });
-            }
-            setIsModalOpen(false);
-            setCurrentResource(null);
-            setFormData({ title: '', type: '자료', author: '', content: '', attachment: '', file: null });
-            fetchResources();
-        } catch (error) {
-            console.error('Error saving resource:', error);
-            alert('저장 중 오류가 발생했습니다.');
+            setHistory(await listResourceHistory({ isAdmin }));
+            setHistoryError('');
+        } catch (loadError) {
+            console.error('Resource history failed:', loadError);
+            setHistory([]);
+            setHistoryError('개정 이력을 불러오지 못했습니다.');
         }
+    }, [isAdmin]);
+
+    const refresh = useCallback(async () => {
+        await Promise.all([loadResources(), loadHistory()]);
+    }, [loadHistory, loadResources]);
+
+    useEffect(() => { refresh(); }, [refresh]);
+
+    const moduleOptions = useMemo(() => [...new Map(resources.map(item => [item.module, item.module_label])).entries()], [resources]);
+    const categoryOptions = useMemo(() => [...new Map(resources
+        .filter(item => !moduleFilter || item.module === moduleFilter)
+        .map(item => [item.category, item.category_label])).entries()], [moduleFilter, resources]);
+    const filteredResources = useMemo(() => resources.filter((resource) => {
+        const needle = searchTerm.trim().toLowerCase();
+        const searchable = [resource.title, resource.module, resource.module_label, resource.category, resource.category_label, resource.doc_key, resource.registered_by_name]
+            .join(' ').toLowerCase();
+        return (!needle || searchable.includes(needle))
+            && (!moduleFilter || resource.module === moduleFilter)
+            && (!categoryFilter || resource.category === categoryFilter);
+    }), [categoryFilter, moduleFilter, resources, searchTerm]);
+    const totalPages = Math.max(1, Math.ceil(filteredResources.length / ITEMS_PER_PAGE));
+    const currentItems = filteredResources.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+
+    useEffect(() => { setCurrentPage(1); }, [searchTerm, moduleFilter, categoryFilter]);
+    useEffect(() => { if (currentPage > totalPages) setCurrentPage(totalPages); }, [currentPage, totalPages]);
+
+    const openNew = () => {
+        if (!isAdmin) return;
+        if (publishReceipt) { setModalOpen(true); return; }
+        setForm(EMPTY_FORM);
+        setPublishReceipt(null);
+        setActionError('');
+        setModalOpen(true);
     };
 
-    const handleDelete = async (id) => {
-        if (window.confirm('정말 삭제하시겠습니까?')) {
-            try {
-                await api.fetch(`/resources/${id}`, { method: 'DELETE' });
-                fetchResources();
-                if (isDetailOpen) setIsDetailOpen(false);
-            } catch (error) {
-                console.error('Error deleting resource:', error);
-            }
-        }
+    const openRevision = (resource) => {
+        if (!isAdmin) return;
+        if (publishReceipt) { setModalOpen(true); return; }
+        setForm({
+            module: resource.module, moduleLabel: resource.module_label, category: resource.category,
+            categoryLabel: resource.category_label, docKey: resource.doc_key, title: resource.title,
+            description: resource.description || '', sourceRef: resource.source_ref || '', revisionNote: '', file: null
+        });
+        setPublishReceipt(null);
+        setActionError('');
+        setModalOpen(true);
     };
 
-    const openModal = (resource = null) => {
-        if (resource) {
-            setCurrentResource(resource);
-            setFormData({
-                title: resource.title,
-                type: resource.type,
-                author: resource.author,
-                content: resource.content,
-                attachment: resource.attachment || '',
-                originalFilename: resource.originalFilename || '',
-                file: null
-            });
-        } else {
-            setCurrentResource(null);
-            setFormData({ title: '', type: '자료', author: '', content: '', attachment: '', file: null });
-        }
-        setIsModalOpen(true);
+    const updateForm = (key, value) => {
+        setActionError('');
+        setForm(previous => ({ ...previous, [key]: value }));
     };
 
-    const openDetail = async (resource) => {
-        setCurrentResource(resource);
-        setIsDetailOpen(true);
-        // Increment view count
+    const handlePublish = async (event) => {
+        event.preventDefault();
+        if (!isAdmin || publishLock.current) return;
+        publishLock.current = true;
+        setSaving(true);
+        setActionError('');
         try {
-            await api.fetch(`/resources/${resource.id}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ views: (resource.views || 0) + 1 })
-            });
-            fetchResources();
-        } catch (err) {
-            console.error('Failed to update views', err);
+            await publishResourceRevision({ draft: form, file: form.file, receipt: publishReceipt, isAdmin });
+            setModalOpen(false);
+            setPublishReceipt(null);
+            setForm(EMPTY_FORM);
+            await refresh();
+        } catch (publishError) {
+            console.error('Resource publish failed:', publishError);
+            setPublishReceipt(publishError.receipt || publishReceipt);
+            setActionError(publishError.message || '자료 등록에 실패했습니다.');
+        } finally {
+            publishLock.current = false;
+            setSaving(false);
         }
     };
 
-    // Filter & Pagination
-    const filteredResources = resources.filter(r =>
-        r.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        r.author.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const handleDelete = async (resource) => {
+        if (!isAdmin || !window.confirm(`“${resource.title}” 자료를 논리삭제하시겠습니까?`)) return;
+        setActionError('');
+        try {
+            await softDeleteResource({ id: resource.id, isAdmin });
+            if (detail?.id === resource.id) setDetail(null);
+            await refresh();
+        } catch (deleteError) {
+            console.error('Resource delete failed:', deleteError);
+            setActionError(deleteError.message || '자료 삭제에 실패했습니다.');
+        }
+    };
 
-    const indexOfLastItem = currentPage * itemsPerPage;
-    const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-    const currentItems = filteredResources.slice(indexOfFirstItem, indexOfLastItem);
-    const totalPages = Math.ceil(filteredResources.length / itemsPerPage);
-
-    if (isDetailOpen && currentResource) {
-        return (
-            <div className="space-y-6 animate-fade-in">
-                <button onClick={() => setIsDetailOpen(false)} className="flex items-center text-slate-500 hover:text-primary-600 mb-4 transition-colors">
-                    <ChevronLeft className="w-4 h-4 mr-1" /> 목록으로 돌아가기
-                </button>
-
-                <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                    <div className="p-6 border-b border-slate-100 bg-slate-50 flex justify-between items-start">
-                        <div>
-                            <div className="flex items-center gap-2 mb-2">
-                                <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${currentResource.type === '매뉴얼' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'}`}>
-                                    {currentResource.type}
-                                </span>
-                                <h1 className="text-2xl font-bold text-slate-800">{currentResource.title}</h1>
-                            </div>
-                            <div className="flex gap-4 text-sm text-slate-500">
-                                <span>작성자: {currentResource.author}</span>
-                                <span>작성일: {currentResource.date}</span>
-                                <span>조회수: {currentResource.views || 0}</span>
-                            </div>
-                        </div>
-                        <div className="flex gap-2">
-                            <button onClick={() => { setIsDetailOpen(false); openModal(currentResource); }} className="p-2 text-slate-400 hover:text-primary-600 bg-white border border-slate-200 rounded-lg shadow-sm"><Edit className="w-4 h-4" /></button>
-                            <button onClick={() => handleDelete(currentResource.id)} className="p-2 text-slate-400 hover:text-red-600 bg-white border border-slate-200 rounded-lg shadow-sm"><Trash2 className="w-4 h-4" /></button>
-                        </div>
-                    </div>
-
-                    <div className="p-8 min-h-[300px] border-b border-slate-100">
-                        <div className="whitespace-pre-wrap text-slate-700 leading-relaxed max-w-4xl">
-                            {currentResource.content}
-                        </div>
-                    </div>
-
-                    {/* Attachment Section */}
-                    {currentResource.attachment && (
-                        <div className="p-6 bg-slate-50 flex items-center gap-4">
-                            <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
-                                <FileText className="w-8 h-8 text-primary-500" />
-                            </div>
-                            <div className="flex-1">
-                                <h3 className="text-sm font-medium text-slate-900">{currentResource.originalFilename || currentResource.attachment}</h3>
-                                <p className="text-xs text-slate-500">첨부파일</p>
-                            </div>
-                            <a
-                                href={`/uploads/${currentResource.attachment}`}
-                                download
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 transition-colors shadow-sm"
-                            >
-                                <Download className="w-4 h-4 mr-2" />
-                                다운로드
-                            </a>
-                        </div>
-                    )}
-                </div>
-            </div>
-        );
-    }
+    const handleDownload = async (resource) => {
+        setActionError('');
+        try {
+            const signedUrl = await createResourceDownload({ id: resource.id, isAdmin });
+            window.location.assign(signedUrl);
+        } catch (downloadError) {
+            console.error('Resource download failed:', downloadError);
+            setActionError(downloadError.message || '다운로드에 실패했습니다.');
+        }
+    };
 
     return (
-        <div className="space-y-6 animate-fade-in">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div className="space-y-4 sm:space-y-6 animate-fade-in" data-testid="resource-room">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-                        <FileText className="w-6 h-6 text-green-600" />
-                        자료실
-                    </h1>
-                    <p className="text-slate-500">업무 관련 서식 및 매뉴얼</p>
+                    <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-900"><FileText className="h-6 w-6 text-green-600" />자료실</h1>
+                    <p className="text-sm text-slate-500">최신 개정본을 안전하게 내려받습니다{user?.name ? ` · ${user.name}` : ''}</p>
                 </div>
-                <button onClick={() => openModal()} className="flex items-center px-4 py-2 bg-primary-600 text-white rounded-xl hover:bg-primary-700 transition-colors shadow-sm">
-                    <Plus className="w-4 h-4 mr-2" />
-                    자료 등록
-                </button>
+                <div className="flex flex-wrap gap-2">
+                    <button type="button" onClick={refresh} className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 hover:bg-slate-50" aria-label="자료실 다시 시도">
+                        <RefreshCw className="mr-1.5 h-4 w-4" />새로고침
+                    </button>
+                    {isAdmin && <button type="button" onClick={openNew} className="inline-flex items-center rounded-lg bg-primary-600 px-3 py-2 text-sm font-medium text-white hover:bg-primary-700" data-testid="resource-upload-open">
+                        <Plus className="mr-1.5 h-4 w-4" />자료 등록
+                    </button>}
+                </div>
             </div>
 
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                    <div className="relative max-w-xs w-full">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                        <input
-                            type="text"
-                            placeholder="제목 또는 자료명 검색..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-100 focus:border-primary-400 transition-all"
-                        />
-                    </div>
-                    <span className="text-xs text-slate-500">총 {filteredResources.length}건</span>
+            {actionError && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{actionError}</div>}
+            {error && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>}
+
+            <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                <div className="grid gap-2 border-b border-slate-100 bg-slate-50/60 p-3 sm:grid-cols-3 sm:p-4">
+                    <label className="sr-only" htmlFor="resource-search">자료 검색</label>
+                    <input id="resource-search" data-testid="resource-search" value={searchTerm} onChange={event => setSearchTerm(event.target.value)} placeholder="자료명, 모듈, 문서키 검색" className="min-w-0 rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+                    <label className="sr-only" htmlFor="resource-module-filter">모듈 필터</label>
+                    <select id="resource-module-filter" value={moduleFilter} onChange={event => { setModuleFilter(event.target.value); setCategoryFilter(''); }} className="min-w-0 rounded-lg border border-slate-200 px-3 py-2 text-sm">
+                        <option value="">모든 모듈</option>
+                        {moduleOptions.map(([key, label]) => <option key={key} value={key}>{label} ({key})</option>)}
+                    </select>
+                    <label className="sr-only" htmlFor="resource-category-filter">구분 필터</label>
+                    <select id="resource-category-filter" value={categoryFilter} onChange={event => setCategoryFilter(event.target.value)} className="min-w-0 rounded-lg border border-slate-200 px-3 py-2 text-sm">
+                        <option value="">모든 구분</option>
+                        {categoryOptions.map(([key, label]) => <option key={key} value={key}>{label} ({key})</option>)}
+                    </select>
                 </div>
 
                 <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-slate-200">
-                        <thead className="bg-slate-50">
-                            <tr>
-                                <th className="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase w-16">No</th>
-                                <th className="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase w-24">구분</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">자료명</th>
-                                <th className="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase w-32">작성자</th>
-                                <th className="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase w-32">날짜</th>
-                                <th className="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase w-24">첨부</th>
-                            </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-slate-100">
-                            {loading ? (
-                                <tr><td colSpan="6" className="py-10 text-center text-slate-500">로딩 중...</td></tr>
-                            ) : currentItems.length === 0 ? (
-                                <tr><td colSpan="6" className="py-10 text-center text-slate-500">등록된 자료가 없습니다.</td></tr>
-                            ) : (
-                                currentItems.map((resource) => (
-                                    <tr key={resource.id} className="hover:bg-slate-50 cursor-pointer transition-colors" onClick={() => openDetail(resource)}>
-                                        <td className="px-6 py-4 text-center text-xs text-slate-400">{resource.id}</td>
-                                        <td className="px-6 py-4 text-center whitespace-nowrap">
-                                            <span className={`px-2 py-1 text-xs rounded-full font-medium ${resource.type === '매뉴얼' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'}`}>
-                                                {resource.type}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 text-sm font-medium text-slate-900">{resource.title}</td>
-                                        <td className="px-6 py-4 text-center text-sm text-slate-600">{resource.author}</td>
-                                        <td className="px-6 py-4 text-center text-xs text-slate-400">{resource.date}</td>
-                                        <td className="px-6 py-4 text-center">
-                                            {resource.attachment && <Download className="w-4 h-4 text-slate-400 mx-auto" />}
-                                        </td>
-                                    </tr>
-                                ))
-                            )}
+                    <table className="min-w-[720px] w-full divide-y divide-slate-200 text-sm">
+                        <thead className="bg-slate-50 text-left text-xs text-slate-500"><tr>
+                            <th className="px-3 py-3">모듈 / 구분</th><th className="px-3 py-3">자료명</th><th className="px-3 py-3">문서키 / 개정</th><th className="px-3 py-3">등록자</th><th className="px-3 py-3">등록일</th><th className="px-3 py-3 text-right">다운로드</th>
+                        </tr></thead>
+                        <tbody className="divide-y divide-slate-100">
+                            {loading ? <tr><td colSpan="6" className="px-3 py-10 text-center text-slate-500">자료실을 불러오는 중입니다…</td></tr>
+                                : !error && currentItems.length === 0 ? <tr><td colSpan="6" className="px-3 py-10 text-center text-slate-500">등록된 자료가 없습니다.</td></tr>
+                                    : currentItems.map(resource => <tr key={resource.id} className="hover:bg-slate-50">
+                                        <td className="px-3 py-3"><div className="font-medium text-slate-800">{resource.module_label}</div><div className="text-xs text-slate-500">{resource.module} / {resource.category_label} ({resource.category})</div></td>
+                                        <td className="px-3 py-3"><button type="button" onClick={() => setDetail(resource)} className="text-left font-medium text-primary-700 hover:underline">{resource.title}</button><div className="max-w-xs truncate text-xs text-slate-500">{resource.original_name}</div></td>
+                                        <td className="px-3 py-3 text-xs text-slate-600">{resource.doc_key}<br />{revisionLabel(resource)}</td>
+                                        <td className="px-3 py-3 text-slate-600">{resource.registered_by_name}</td><td className="px-3 py-3 text-xs text-slate-500">{formatDate(resource.created_at)}</td>
+                                        <td className="px-3 py-3 text-right"><button type="button" onClick={() => handleDownload(resource)} className="inline-flex items-center rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-700 hover:bg-slate-100" aria-label={`${resource.original_name} 다운로드`}><Download className="mr-1 h-3.5 w-3.5" />다운로드</button></td>
+                                    </tr>)}
                         </tbody>
                     </table>
                 </div>
+                {totalPages > 1 && <div className="flex items-center justify-center gap-3 border-t border-slate-100 p-3"><button type="button" disabled={currentPage === 1} onClick={() => setCurrentPage(page => page - 1)} className="rounded p-1 disabled:opacity-40" aria-label="이전 페이지"><ChevronLeft className="h-5 w-5" /></button><span className="text-sm text-slate-600">{currentPage} / {totalPages}</span><button type="button" disabled={currentPage === totalPages} onClick={() => setCurrentPage(page => page + 1)} className="rounded p-1 disabled:opacity-40" aria-label="다음 페이지"><ChevronRight className="h-5 w-5" /></button></div>}
+            </section>
 
-                {/* Pagination */}
-                {totalPages > 1 && (
-                    <div className="flex justify-center items-center p-4 border-t border-slate-100 gap-2">
-                        <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="p-1 rounded hover:bg-slate-100 disabled:opacity-50"><ChevronLeft className="w-5 h-5 text-slate-500" /></button>
-                        <span className="text-sm text-slate-600">{currentPage} / {totalPages}</span>
-                        <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="p-1 rounded hover:bg-slate-100 disabled:opacity-50"><ChevronRight className="w-5 h-5 text-slate-500" /></button>
-                    </div>
-                )}
-            </div>
+            {isAdmin && <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"><div className="flex items-center gap-2 border-b border-slate-100 p-4"><History className="h-4 w-4 text-slate-500" /><h2 className="font-bold text-slate-800">관리자 개정 이력</h2></div>
+                {historyError ? <p role="alert" className="p-4 text-sm text-red-700">{historyError}</p> : <div className="overflow-x-auto"><table className="min-w-[720px] w-full divide-y divide-slate-100 text-sm"><thead className="bg-slate-50 text-left text-xs text-slate-500"><tr><th className="px-3 py-3">자료</th><th className="px-3 py-3">모듈 / 구분 / 문서키</th><th className="px-3 py-3">개정 상태</th><th className="px-3 py-3">파일</th><th className="px-3 py-3 text-right">관리</th></tr></thead><tbody className="divide-y divide-slate-100">{history.length === 0 ? <tr><td colSpan="5" className="p-5 text-center text-slate-500">개정 이력이 없습니다.</td></tr> : history.map(resource => <tr key={resource.id}><td className="px-3 py-3">{resource.title}</td><td className="px-3 py-3 text-xs text-slate-600">{resource.module} / {resource.category} / {resource.doc_key}</td><td className="px-3 py-3 text-xs">{revisionLabel(resource)}</td><td className="px-3 py-3 text-xs">{resource.original_name}</td><td className="space-x-1 whitespace-nowrap px-3 py-3 text-right">{!resource.is_deleted && <button type="button" onClick={() => handleDownload(resource)} className="rounded border border-slate-200 px-2 py-1 text-xs hover:bg-slate-50">다운로드</button>}{!resource.is_deleted && <button type="button" onClick={() => handleDelete(resource)} className="rounded border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50">논리삭제</button>}</td></tr>)}</tbody></table></div>}</section>}
 
-            {/* Write/Edit Modal */}
-            {isModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl p-6 animate-scale-in">
-                        <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-xl font-bold text-slate-900">{currentResource ? '자료 수정' : '새 자료 등록'}</h2>
-                            <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600"><X className="w-6 h-6" /></button>
-                        </div>
-                        <form onSubmit={handleSave} className="space-y-4">
-                            <div className="grid grid-cols-4 gap-4">
-                                <div className="col-span-1">
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">구분</label>
-                                    <select
-                                        value={formData.type}
-                                        onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
-                                    >
-                                        <option value="자료">자료</option>
-                                        <option value="매뉴얼">매뉴얼</option>
-                                        <option value="양식">양식</option>
-                                        <option value="규격">규격</option>
-                                    </select>
-                                </div>
-                                <div className="col-span-3">
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">작성자</label>
-                                    <input
-                                        type="text"
-                                        required
-                                        value={formData.author}
-                                        onChange={(e) => setFormData({ ...formData, author: e.target.value })}
-                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
-                                        placeholder="이름"
-                                    />
-                                </div>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">제목</label>
-                                <input
-                                    type="text"
-                                    required
-                                    value={formData.title}
-                                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
-                                    placeholder="자료 제목을 입력하세요"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">내용</label>
-                                <textarea
-                                    required
-                                    rows="10"
-                                    value={formData.content}
-                                    onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none resize-none"
-                                    placeholder="자료에 대한 설명을 입력하세요..."
-                                ></textarea>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">첨부파일</label>
-                                <div
-                                    className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-slate-300 border-dashed rounded-lg hover:border-primary-500 transition-colors cursor-pointer relative"
-                                    onDragOver={(e) => { e.preventDefault(); }}
-                                    onDrop={(e) => {
-                                        e.preventDefault();
-                                        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-                                            setFormData({ ...formData, file: e.dataTransfer.files[0] });
-                                        }
-                                    }}
-                                    onClick={() => document.getElementById('file-upload').click()}
-                                >
-                                    <div className="space-y-1 text-center">
-                                        <FileText className="mx-auto h-12 w-12 text-slate-400" />
-                                        <div className="flex text-sm text-slate-600 justify-center">
-                                            <label htmlFor="file-upload" className="relative cursor-pointer bg-white rounded-md font-medium text-primary-600 hover:text-primary-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-primary-500" onClick={(e) => e.stopPropagation()}>
-                                                <span>파일 선택</span>
-                                                <input id="file-upload" name="file-upload" type="file" className="sr-only" onChange={(e) => setFormData({ ...formData, file: e.target.files[0] })} />
-                                            </label>
-                                            <p className="pl-1">또는 드래그 앤 드롭</p>
-                                        </div>
-                                        <p className="text-xs text-slate-500">
-                                            {formData.file ? formData.file.name : (formData.originalFilename || '파일을 선택하세요')}
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="flex justify-end gap-3 pt-4">
-                                <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">취소</button>
-                                <button type="submit" className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors shadow-sm">저장하기</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
+            {detail && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-3"><section role="dialog" aria-modal="true" aria-labelledby="resource-detail-title" className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-5 shadow-xl"><div className="flex items-start justify-between gap-3"><div><h2 id="resource-detail-title" className="text-xl font-bold text-slate-900">{detail.title}</h2><p className="mt-1 text-xs text-slate-500">{detail.module_label} / {detail.category_label} · {detail.doc_key} · {revisionLabel(detail)}</p></div><button type="button" onClick={() => setDetail(null)} className="rounded p-1 text-slate-500 hover:bg-slate-100" aria-label="상세 닫기"><X className="h-5 w-5" /></button></div><p className="mt-5 whitespace-pre-wrap text-sm leading-6 text-slate-700">{detail.description || '설명 없음'}</p><div className="mt-5 rounded-lg bg-slate-50 p-3 text-sm"><div className="font-medium text-slate-800">{detail.original_name}</div><div className="mt-1 text-xs text-slate-500">{detail.mime_type} · {detail.file_size?.toLocaleString()} bytes</div></div><div className="mt-5 flex flex-wrap justify-end gap-2"><button type="button" onClick={() => handleDownload(detail)} className="rounded-lg bg-slate-800 px-3 py-2 text-sm text-white hover:bg-slate-900"><Download className="mr-1 inline h-4 w-4" />다운로드</button>{isAdmin && !detail.is_deleted && <><button type="button" onClick={() => openRevision(detail)} className="rounded-lg border border-primary-200 px-3 py-2 text-sm text-primary-700 hover:bg-primary-50">새 개정 등록</button><button type="button" onClick={() => handleDelete(detail)} className="rounded-lg border border-red-200 px-3 py-2 text-sm text-red-700 hover:bg-red-50"><Trash2 className="mr-1 inline h-4 w-4" />논리삭제</button></>}</div></section></div>}
+
+            {modalOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-3"><section role="dialog" aria-modal="true" aria-labelledby="resource-form-title" className="max-h-[94vh] w-full max-w-3xl overflow-y-auto rounded-xl bg-white p-5 shadow-xl"><div className="mb-4 flex items-center justify-between"><h2 id="resource-form-title" className="text-xl font-bold text-slate-900">{publishReceipt ? '자료 발행 재시도' : '자료 등록 / 새 개정'}</h2><button type="button" onClick={() => { if (!saving) setModalOpen(false); }} className="rounded p-1 text-slate-500 hover:bg-slate-100" aria-label="등록 닫기"><X className="h-5 w-5" /></button></div>{publishReceipt && <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">{publishReceipt.uploaded ? '파일은 이미 저장되었습니다. 파일과 입력값을 바꾸지 말고 발행을 재시도하세요.' : '파일 저장이 확인되지 않았습니다. 같은 파일과 입력값으로 저장을 재시도하세요.'}</p>}<form onSubmit={handlePublish} className="space-y-4"><div className="grid gap-3 sm:grid-cols-2"><label className="text-sm font-medium text-slate-700">모듈 key<input disabled={saving || !!publishReceipt} required value={form.module} onChange={event => updateForm('module', event.target.value)} placeholder="예: weekly-report" pattern="[a-z0-9][a-z0-9_-]{0,63}" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 font-normal" /></label><label className="text-sm font-medium text-slate-700">모듈 표시명<input disabled={saving || !!publishReceipt} required value={form.moduleLabel} onChange={event => updateForm('moduleLabel', event.target.value)} placeholder="예: 주간보고" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 font-normal" /></label><label className="text-sm font-medium text-slate-700">구분 key<input disabled={saving || !!publishReceipt} required value={form.category} onChange={event => updateForm('category', event.target.value)} placeholder="예: attachment" pattern="[a-z0-9][a-z0-9_-]{0,63}" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 font-normal" /></label><label className="text-sm font-medium text-slate-700">구분 표시명<input disabled={saving || !!publishReceipt} required value={form.categoryLabel} onChange={event => updateForm('categoryLabel', event.target.value)} placeholder="예: 첨부" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 font-normal" /></label><label className="text-sm font-medium text-slate-700">문서 key<input disabled={saving || !!publishReceipt} required value={form.docKey} onChange={event => updateForm('docKey', event.target.value)} pattern="[a-z0-9][a-z0-9._-]{0,127}" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 font-normal" /></label><label className="text-sm font-medium text-slate-700">자료명<input disabled={saving || !!publishReceipt} required value={form.title} onChange={event => updateForm('title', event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 font-normal" /></label></div><label className="block text-sm font-medium text-slate-700">원본 파일<input disabled={saving || !!publishReceipt} required={!publishReceipt} type="file" onChange={event => updateForm('file', event.target.files?.[0] || null)} className="mt-1 block w-full text-sm font-normal" aria-label="원본 파일 선택" /></label><p className="text-xs text-slate-500">PDF, 이미지, Office, CSV/TXT, ZIP, HWP/HWPX · 최대 20 MiB. 원본 파일명은 그대로 보존됩니다.</p><label className="block text-sm font-medium text-slate-700">설명<textarea disabled={saving || !!publishReceipt} value={form.description} onChange={event => updateForm('description', event.target.value)} rows="3" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 font-normal" /></label><div className="grid gap-3 sm:grid-cols-2"><label className="text-sm font-medium text-slate-700">원본 참조<input disabled={saving || !!publishReceipt} value={form.sourceRef} onChange={event => updateForm('sourceRef', event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 font-normal" /></label><label className="text-sm font-medium text-slate-700">개정 사유<input disabled={saving || !!publishReceipt} value={form.revisionNote} onChange={event => updateForm('revisionNote', event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 font-normal" /></label></div><div className="flex justify-end gap-2"><button type="button" onClick={() => { if (!saving) setModalOpen(false); }} className="rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-100">취소</button><button type="submit" disabled={saving} className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">{saving ? '처리 중…' : publishReceipt ? '같은 발행 재시도' : '자료 발행'}</button></div></form></section></div>}
         </div>
     );
 };
