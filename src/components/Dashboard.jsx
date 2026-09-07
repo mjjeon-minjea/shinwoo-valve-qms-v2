@@ -1042,7 +1042,7 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
             </aside>
 
             {/* Main Content Area */}
-            <main className="flex-1 lg:ml-64 p-8 relative">
+            <main className="flex-1 min-w-0 lg:ml-64 p-8 relative">
                 {renderContent()}
                 <Chatbot />
             </main>

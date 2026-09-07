@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { FileText, Save, Send, AlertTriangle, ChevronDown, ChevronRight, Plus, Trash2, ImagePlus, File as FileIcon, FilePlus2, RotateCcw, Info, Users } from 'lucide-react';
 import { api, supabase } from '../lib/api';
 import { isNcrRouteStaff } from '../lib/ncrRoles';
+import { isNcrAttachmentRestoreReady } from '../lib/ncrAttachmentRestore';
 /* v10.2 H-① 캡처 붙여넣기 복원 — 축소·용량제한·붙여넣기 규칙은 lib/attach.jsx 한 곳에만 둔다(중복 정의 금지).
    결재화면(NCRDetail 처리확인 증빙)이 같은 함수를 쓰므로 이 파일에 다시 정의하지 않는다. */
 import { ATT_CAT, shrinkImage, processAnyFile, isImageAtt, useCapturePaste, PasteZone, attUrl, uploadAtt, withAttUrls } from '../lib/attach.jsx';
@@ -200,6 +201,10 @@ const NCRCreate = ({ user }) => {
     const [drafts, setDrafts] = useState([]);
     const [draftOpen, setDraftOpen] = useState(false);
     const [editDoc, setEditDoc] = useState(null); // {id, ncr_no, status} — null이면 새 문서
+    /* 이어쓰기 첨부는 기존 행의 keep-set을 만드는 기준이다. 복원이 끝나기 전에는
+       빈 keep-set으로 기존 첨부를 삭제하지 않도록 ref로도 즉시 차단한다. */
+    const [attachmentRestore, setAttachmentRestore] = useState({ status: 'idle', docId: null, draft: null, token: 0 });
+    const attachmentRestoreRef = useRef({ status: 'idle', docId: null, draft: null, token: 0 });
     /* v10.2 G-⑤ — 이어쓰기로 연 시점의 처리방안 원본값.
        설정 목록에 없는 구용어(예: '특채(그대로 사용)')를 다른 값으로 한 번 바꾸면
        선택지에서 사라져 되돌릴 수 없었다(F #34 실측 — 영구 소실).
@@ -361,6 +366,9 @@ const NCRCreate = ({ user }) => {
 
     /* Phase 4: 편집 이탈 → 새 문서 모드 */
     const resetToNew = () => {
+        const restore = { status: 'idle', docId: null, draft: null, token: attachmentRestoreRef.current.token + 1 };
+        attachmentRestoreRef.current = restore; // 진행 중인 이전 문서 복원 결과는 무효화
+        setAttachmentRestore(restore);
         setEditDoc(null);
         setForm(emptyForm());
         setOrigDisp('');
@@ -372,8 +380,13 @@ const NCRCreate = ({ user }) => {
 
     /* Phase 4: 이어쓰기 — 문서 + 첨부를 폼에 로드 (ncr_no·id 유지) */
     const loadDraft = async (r) => {
+        const restore = { status: 'loading', docId: r.id, draft: r, token: attachmentRestoreRef.current.token + 1 };
+        attachmentRestoreRef.current = restore;
+        setAttachmentRestore(restore);
         try {
             setEditDoc({ id: r.id, ncr_no: r.ncr_no, status: r.status, reject_note: r.reject_note || '' });
+            /* 다른 문서의 기존 화면값을 keep-set으로 오인하지 않도록 복원 전에는 비운다. */
+            setPairs([]); setDrawings([]); setRefDocs([]); setAttOpen({ 1: false, 2: false, 3: false });
             setOrigDisp(r.disposition || '');   // G-⑤ 목록 밖 값 보존용 원본 기억
             routeSeeded.current = true; // 복원값 보호 — 기본 회람부서 주입 금지
             /* v10.1: reviews에서 회람 지정 복원. 레거시(reviews 비어있음 — v10.0 발행·반려 문서)는
@@ -424,11 +437,20 @@ const NCRCreate = ({ user }) => {
             const loadedPairs = [...map.entries()].sort((x, y) => x[0] - y[0]).map(([, v]) => v);
             const loadedDrawings = all.filter(a => a.category === 2).map(asForm);
             const loadedRefs = all.filter(a => a.category === 3).map(asForm);
+            /* 빠른 재선택·새 문서 전환 뒤 늦게 끝난 이전 요청은 현재 문서를 승인하지 못한다. */
+            if (attachmentRestoreRef.current.token !== restore.token || String(attachmentRestoreRef.current.docId) !== String(r.id)) return;
             setPairs(loadedPairs); setDrawings(loadedDrawings); setRefDocs(loadedRefs);
             setAttOpen({ 1: loadedPairs.length > 0, 2: loadedDrawings.length > 0, 3: loadedRefs.length > 0 });
+            const ready = { ...restore, status: 'ready' };
+            attachmentRestoreRef.current = ready;
+            setAttachmentRestore(ready);
             setDraftOpen(false);
             setMsg(null);
         } catch (e) {
+            if (attachmentRestoreRef.current.token !== restore.token || String(attachmentRestoreRef.current.docId) !== String(r.id)) return;
+            const failed = { ...restore, status: 'failed' };
+            attachmentRestoreRef.current = failed;
+            setAttachmentRestore(failed);
             setMsg({ t: 'err', s: '문서 불러오기 실패: ' + (e.message || e) });
         }
     };
@@ -477,6 +499,11 @@ const NCRCreate = ({ user }) => {
 
     /* H-② 발행/재발행 버튼 → ①검증 먼저 ②통과했을 때만 확인창. 임시저장은 되돌릴 수 있으므로 확인창 없음. */
     const askIssue = () => {
+        if (!isNcrAttachmentRestoreReady(editDoc, attachmentRestoreRef.current)) {
+            setMsg({ t: 'err', s: '첨부 파일을 모두 불러온 뒤에 저장 또는 승인요청할 수 있습니다. 첨부 다시 불러오기를 시도하세요.' });
+            setConfirmOn(false);
+            return;
+        }
         const e = validationError(ISSUE_STATUS);
         if (e) { setMsg({ t: 'err', s: e }); setConfirmOn(false); return; }
         setMsg(null);
@@ -484,6 +511,11 @@ const NCRCreate = ({ user }) => {
     };
 
     const submit = async (status) => {
+        if (!isNcrAttachmentRestoreReady(editDoc, attachmentRestoreRef.current)) {
+            setMsg({ t: 'err', s: '첨부 파일을 모두 불러온 뒤에 저장 또는 승인요청할 수 있습니다. 첨부 다시 불러오기를 시도하세요.' });
+            setConfirmOn(false);
+            return;
+        }
         const vErr = validationError(status);
         if (vErr) { setMsg({ t: 'err', s: vErr }); return; }
         const issuing = status !== '작성중';
@@ -612,6 +644,9 @@ const NCRCreate = ({ user }) => {
                 ? (editDoc ? '수정 저장' : '임시저장')
                 : (redo ? '재발행 승인 요청' : '발행승인 요청');
             setMsg({ t: 'ok', s: `${docNo} ${doneLabel} 완료` });
+            const restore = { status: 'idle', docId: null, draft: null, token: attachmentRestoreRef.current.token + 1 };
+            attachmentRestoreRef.current = restore;
+            setAttachmentRestore(restore);
             setConfirmOn(false);           // H-② 저장이 끝났으면 확인창은 닫는다(실패 시엔 열어둔 채 오류만 표시)
             setEditDoc(null);
             setForm(emptyForm());
@@ -641,6 +676,7 @@ const NCRCreate = ({ user }) => {
     const outOfListDisps = [...new Set([origDisp, form.disposition].filter(d => d && !dispList.includes(d)))];
     /* H-② 확인창 제목용 — 반려 문서를 이어쓰는 중이면 「재발행승인 요청」으로 부른다(버튼 분기와 같은 판정) */
     const isRedoDoc = ['반려', '발행반려'].includes(editDoc?.status) || !!editDoc?.reject_note;
+    const attachmentRestoreBlocked = !isNcrAttachmentRestoreReady(editDoc, attachmentRestore);
 
     return (
         <div className="max-w-4xl">
@@ -923,29 +959,35 @@ const NCRCreate = ({ user }) => {
                 {msg && (
                     <div className={`text-sm px-4 py-2.5 rounded-lg ${msg.t === 'ok' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>{msg.s}</div>
                 )}
+                {attachmentRestore.status === 'failed' && attachmentRestore.draft && (
+                    <button type="button" onClick={() => loadDraft(attachmentRestore.draft)}
+                        className="inline-flex items-center px-3 py-2 text-xs font-semibold rounded-lg border border-red-300 text-red-700 hover:bg-red-50">
+                        첨부 다시 불러오기
+                    </button>
+                )}
 
                 <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
                     {(['반려', '발행반려'].includes(editDoc?.status) || !!editDoc?.reject_note) ? (
                         /* Phase 4: 반려 문서 편집 — 수정 저장(작성중 유지) / 재발행 (v10.1: 발행승인 대기로 재진입) */
                         <>
-                            <button onClick={() => submit('작성중')} disabled={saving}
+                            <button onClick={() => submit('작성중')} disabled={saving || attachmentRestoreBlocked}
                                 className="px-4 py-2.5 text-sm font-semibold rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 flex items-center disabled:opacity-50">
                                 <Save className="w-4 h-4 mr-1.5" /> 수정 저장 (작성중 유지)
                             </button>
                             {/* H-②: 바로 보내지 않고 검증 통과 후 확인창을 띄운다 */}
-                            <button onClick={askIssue} disabled={saving}
+                            <button onClick={askIssue} disabled={saving || attachmentRestoreBlocked}
                                 className="px-5 py-2.5 text-sm font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700 flex items-center disabled:opacity-50">
                                 <RotateCcw className="w-4 h-4 mr-1.5" /> 재발행승인 요청 (품질부서장)
                             </button>
                         </>
                     ) : (
                         <>
-                            <button onClick={() => submit('작성중')} disabled={saving}
+                            <button onClick={() => submit('작성중')} disabled={saving || attachmentRestoreBlocked}
                                 className="px-4 py-2.5 text-sm font-semibold rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 flex items-center disabled:opacity-50">
                                 <Save className="w-4 h-4 mr-1.5" /> {editDoc ? '수정 저장' : '임시저장'}
                             </button>
                             {/* H-②: 바로 보내지 않고 검증 통과 후 확인창을 띄운다 */}
-                            <button onClick={askIssue} disabled={saving}
+                            <button onClick={askIssue} disabled={saving || attachmentRestoreBlocked}
                                 className="px-5 py-2.5 text-sm font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700 flex items-center disabled:opacity-50">
                                 <Send className="w-4 h-4 mr-1.5" /> 발행승인 요청 (품질부서장)
                             </button>
@@ -997,7 +1039,7 @@ const NCRCreate = ({ user }) => {
                                 <div className="flex justify-end gap-2">
                                     <button onClick={() => setConfirmOn(false)} disabled={saving}
                                         className="px-4 py-2 text-sm font-semibold rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-100 disabled:opacity-50">취소</button>
-                                    <button onClick={() => submit(ISSUE_STATUS)} disabled={saving}
+                                    <button onClick={() => submit(ISSUE_STATUS)} disabled={saving || attachmentRestoreBlocked}
                                         className="px-4 py-2 text-sm font-semibold rounded-lg text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50">
                                         {saving ? '전송 중…' : '승인요청'}
                                     </button>
