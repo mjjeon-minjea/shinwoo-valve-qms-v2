@@ -27,16 +27,16 @@ import WeeklyReport from './WeeklyReport';
 import WeeklyStatus from './WeeklyStatus';
 import CalendarView from './CalendarView';
 import { api } from '../lib/api';
-import NonConformanceStatus from './NonConformanceStatus';
-import InspectionAnalysisDashboard from './InspectionAnalysisDashboard';
 import ProcessInspectionDashboard from './ProcessInspectionDashboard';
 import ProcessHistory from './ProcessHistory';
 import ProcessAnalysis from './ProcessAnalysis';
 import WorkplaceAnalysis from './WorkplaceAnalysis';
 import EquipmentAnalysis from './EquipmentAnalysis';
 import ModelCategoryAnalysis from './ModelCategoryAnalysis';
-import InboundAnalysis from './InboundAnalysis';
-import InboundHistory from './InboundHistory';
+import InboundOverview from './InboundOverview';
+import InboundSuppliers from './InboundSuppliers';
+import InboundItems from './InboundItems';
+import InboundRecords from './InboundRecords';
 import NCRCreate from './NCRCreate';
 import NCRInbox from './NCRInbox';
 import NCRLedger from './NCRLedger';
@@ -695,10 +695,12 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
             case 'home': return <Home setActiveTab={setActiveTab} />;
             case 'notices': return <NoticeBoard />;
             case 'resources': return <ResourceRoom user={user} isAdmin={isAdmin} />;
-            case 'inbound_analysis': return <InboundAnalysis />;
-            case 'inspection_analysis': return <InspectionAnalysisDashboard />;
-            case 'inbound_status': return <NonConformanceStatus />;
-            case 'inbound_history': return <InboundHistory />;
+            case 'inbound_overview': return <InboundOverview setActiveTab={setActiveTab} />;
+            case 'inbound_suppliers': return <InboundSuppliers />;
+            case 'inbound_items': return <InboundItems />;
+            case 'inbound_records': return <InboundRecords />;
+            /* 구 URL(#inbound_status) 호환 — 「부적합 현황 조회」는 품목·부적합 관리의 「부적합 관리」 탭으로 간다 */
+            case 'inbound_status': return <InboundItems initialTab="ncr" />;
             case 'process':
             case 'process_dashboard': return <ProcessInspectionDashboard user={user} isAdmin={isAdmin} />;
             case 'process_by_process': return <ProcessAnalysis />;
@@ -719,7 +721,7 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
             case 'weekly_report': return <WeeklyReport user={user} />;
             case 'weekly_status': return <WeeklyStatus />;
             case 'schedule': return <CalendarView user={user} />;
-            default: return <InboundAnalysis />;
+            default: return <InboundOverview setActiveTab={setActiveTab} />;
         }
     };
 
@@ -788,40 +790,40 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
                         <div>
                             <button
                                 onClick={() => setInboundExpanded(!inboundExpanded)}
-                                className={`w-full flex items-center justify-between px-3 py-2.5 text-sm font-semibold rounded-lg transition-all ${activeTab.includes('inbound') || activeTab === 'inspection_analysis' ? 'bg-slate-800 text-white border-l-4 border-blue-500' : 'text-slate-300 hover:bg-slate-800/60'}`}
+                                className={`w-full flex items-center justify-between px-3 py-2.5 text-sm font-semibold rounded-lg transition-all ${activeTab.startsWith('inbound') ? 'bg-slate-800 text-white border-l-4 border-blue-500' : 'text-slate-300 hover:bg-slate-800/60'}`}
                             >
                                 <div className="flex items-center">
-                                    <ClipboardCheck className={`mr-3 h-5 w-5 ${activeTab.includes('inbound') || activeTab === 'inspection_analysis' ? 'text-blue-400' : 'text-slate-400'}`} />
+                                    <ClipboardCheck className={`mr-3 h-5 w-5 ${activeTab.startsWith('inbound') ? 'text-blue-400' : 'text-slate-400'}`} />
                                     인수검사
                                 </div>
-                                <ChevronDown className={`w-4 h-4 transition-transform ${inboundExpanded ? 'transform rotate-180' : ''} ${activeTab.includes('inbound') ? 'text-white' : 'text-slate-400'}`} />
+                                <ChevronDown className={`w-4 h-4 transition-transform ${inboundExpanded ? 'transform rotate-180' : ''} ${activeTab.startsWith('inbound') ? 'text-white' : 'text-slate-400'}`} />
                             </button>
 
                             {inboundExpanded && (
                                 <div className="mt-1.5 space-y-1.5 pl-6 border-l border-slate-700/50 ml-5">
                                     <button
-                                        onClick={() => setActiveTab('inbound_analysis')}
-                                        className={`w-full flex items-center px-3 py-2 text-xs font-medium rounded-md transition-all ${activeTab === 'inbound_analysis' ? 'text-blue-400 font-bold bg-slate-800/40' : 'text-slate-400 hover:text-white'}`}
+                                        onClick={() => setActiveTab('inbound_overview')}
+                                        className={`w-full flex items-center px-3 py-2 text-xs font-medium rounded-md transition-all ${activeTab === 'inbound_overview' ? 'text-blue-400 font-bold bg-slate-800/40' : 'text-slate-400 hover:text-white'}`}
                                     >
                                         대시보드
                                     </button>
                                     <button
-                                        onClick={() => setActiveTab('inspection_analysis')}
-                                        className={`w-full flex items-center px-3 py-2 text-xs font-medium rounded-md transition-all ${activeTab === 'inspection_analysis' ? 'text-blue-400 font-bold bg-slate-800/40' : 'text-slate-400 hover:text-white'}`}
+                                        onClick={() => setActiveTab('inbound_suppliers')}
+                                        className={`w-full flex items-center px-3 py-2 text-xs font-medium rounded-md transition-all ${activeTab === 'inbound_suppliers' ? 'text-blue-400 font-bold bg-slate-800/40' : 'text-slate-400 hover:text-white'}`}
                                     >
-                                        종합분석현황
+                                        협력업체
                                     </button>
                                     <button
-                                        onClick={() => setActiveTab('inbound_status')}
-                                        className={`w-full flex items-center px-3 py-2 text-xs font-medium rounded-md transition-all ${activeTab === 'inbound_status' ? 'text-blue-400 font-bold bg-slate-800/40' : 'text-slate-400 hover:text-white'}`}
+                                        onClick={() => setActiveTab('inbound_items')}
+                                        className={`w-full flex items-center px-3 py-2 text-xs font-medium rounded-md transition-all ${(activeTab === 'inbound_items' || activeTab === 'inbound_status') ? 'text-blue-400 font-bold bg-slate-800/40' : 'text-slate-400 hover:text-white'}`}
                                     >
-                                        부적합 현황 조회
+                                        품목·부적합 관리
                                     </button>
                                     <button
-                                        onClick={() => setActiveTab('inbound_history')}
-                                        className={`w-full flex items-center px-3 py-2 text-xs font-medium rounded-md transition-all ${activeTab === 'inbound_history' ? 'text-blue-400 font-bold bg-slate-800/40' : 'text-slate-400 hover:text-white'}`}
+                                        onClick={() => setActiveTab('inbound_records')}
+                                        className={`w-full flex items-center px-3 py-2 text-xs font-medium rounded-md transition-all ${activeTab === 'inbound_records' ? 'text-blue-400 font-bold bg-slate-800/40' : 'text-slate-400 hover:text-white'}`}
                                     >
-                                        이력 조회 및 등록
+                                        기록·기준
                                     </button>
                                 </div>
                             )}

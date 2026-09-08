@@ -5,8 +5,7 @@ import Dashboard from './components/Dashboard';
 import Chatbot from './components/Chatbot';
 import { supabase } from './lib/api';
 
-import { Routes, Route, useNavigate } from 'react-router-dom';
-import InspectionAnalysisDashboard from './components/InspectionAnalysisDashboard';
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import QualificationExam from './components/QualificationExam';
 import PasswordChangeModal from './components/PasswordChangeModal';
 
@@ -257,14 +256,9 @@ const AppContent = () => {
                         </footer>
                     </>
                 } />
-                <Route path="/inspection-analysis" element={
-                     <>
-                        <Header isLoggedIn={!!user} onLogout={handleLogout} currentUser={user} onUpdateProfile={handleUpdateProfile} />
-                        <div className="p-8 bg-slate-50 min-h-screen">
-                            <InspectionAnalysisDashboard />
-                        </div>
-                     </>
-                } />
+                {/* 042 P8 — 구 「종합분석현황」 주소는 새 대시보드로 넘긴다.
+                    히스토리에 남기지 않는다(replace) — 뒤로가기로 없어진 화면에 다시 들어가면 안 된다. */}
+                <Route path="/inspection-analysis" element={<Navigate to="/#inbound_overview" replace />} />
             </Routes>
         </div>
     );

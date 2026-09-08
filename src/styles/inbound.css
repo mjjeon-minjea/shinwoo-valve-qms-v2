@@ -1,0 +1,879 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   inbound.css — 인수검사 4화면 전용 토큰·표면·모션   (플랜 042 / P4 r4)
+
+   왜 CSS 파일을 따로 두나
+     · index.css / tailwind.config.js 는 **건드리지 않는다**(전사 공용이라 위험하다).
+       인수검사 화면만 쓰는 색·크기를 여기 CSS 변수로 두고, 화면 뿌리에 붙는
+       .inbound-screen 아래에서만 살아 있게 한다.
+     · TV 현황판(다크)은 클래스 하나(.inbound-tv)로 같은 변수를 덮어쓴다.
+       컴포넌트는 한 벌이고 값만 바뀐다 — 다크용 컴포넌트를 또 만들지 않는다.
+
+   쓰는 곳: InboundOverview / InboundSuppliers / InboundItems / InboundRecords
+   (각 화면이 이 파일을 import 한다. 화면을 안 열면 이 스타일도 안 붙는다.)
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.inbound-screen {
+    /* 먹·바탕 */
+    --ib-bg: #eef2f9;
+    --ib-ink: #0f172a;
+    --ib-ink2: #475569;
+    --ib-ink3: #64748b;
+    --ib-ink4: #94a3b8;
+    /* 표면(글래스-라이트) */
+    --ib-card: rgba(255, 255, 255, .75);
+    --ib-cardline: rgba(255, 255, 255, .66);
+    --ib-ring: rgba(15, 23, 42, .07);
+    --ib-shadow: 0 1px 2px rgba(15, 23, 42, .06), 0 8px 24px rgba(15, 23, 42, .06);
+    --ib-blur: blur(16px) saturate(1.25);
+    /* 계통색 — 브랜드(sky) */
+    --ib-pri: #0369a1;
+    --ib-pri2: #0ea5e9;
+    --ib-pri3: #7dd3fc;
+    /* 의미 고정색 — 정상 emerald / 주의 amber / 이상 rose (ISA-101) */
+    --ib-ok: #047857;
+    --ib-ok2: #10b981;
+    --ib-warn: #b45309;
+    --ib-warn2: #f59e0b;
+    --ib-bad: #be123c;
+    --ib-bad2: #f43f5e;
+    /* 보조 */
+    --ib-grid: rgba(15, 23, 42, .09);
+    --ib-track: rgba(15, 23, 42, .09);
+    --ib-chip: rgba(15, 23, 42, .05);
+    /* 3단 크기 눈금 */
+    --ib-hero: 64px;
+    --ib-kpi: 30px;
+    --ib-num: 22px;
+    --ib-lbl: 11.5px;
+    --ib-ttl: 14px;
+    --ib-body: 12.5px;
+    --ib-r: 20px;
+    --ib-pad: 24px;
+    /* 랭킹 막대 (P9 r9) — r8 의 14px 은 안에 앉은 「164건」을 위아래로 잘랐다.
+       두 배로 키우고, 값은 여기 한 곳에서만 정한다. */
+    --ib-rankbar: 28px;
+    --ib-rankpad: 8px;
+
+    position: relative;
+    color: var(--ib-ink);
+    font-size: var(--ib-body);
+}
+
+/* ── TV 현황판(다크) ── 화면을 통째로 덮는다. 사이드바까지 가려야 4 m 밖에서 읽힌다. */
+.inbound-tv {
+    --ib-bg: #020617;
+    --ib-ink: #eaf2fb;
+    --ib-ink2: #b6c6da;
+    --ib-ink3: #94a3b8;
+    --ib-ink4: #64748b;
+    --ib-card: #0a1120;
+    --ib-cardline: rgba(56, 189, 248, .22);
+    --ib-ring: transparent;
+    --ib-shadow: 0 18px 44px rgba(0, 0, 0, .55);
+    --ib-blur: none;
+    --ib-pri: #38bdf8;
+    --ib-pri2: #38bdf8;
+    --ib-pri3: #0ea5e9;
+    --ib-ok: #34d399;
+    --ib-ok2: #34d399;
+    --ib-warn: #fbbf24;
+    --ib-warn2: #fbbf24;
+    --ib-bad: #fb7185;
+    --ib-bad2: #fb7185;
+    --ib-grid: rgba(148, 163, 184, .16);
+    --ib-track: rgba(148, 163, 184, .18);
+    --ib-chip: rgba(148, 163, 184, .12);
+    /* ── 눈금은 **화면 높이를 따라간다** (P7 r7) ────────────────────────────
+       r6 까지는 1080px 짜리 TV 하나만 보고 px 로 못 박아 두었다. 그런데 실제로
+       이 화면이 뜨는 곳은 1920×911(크롬 창), 1600×860, 1366×768 짜리도 있다.
+       못 박은 눈금은 화면이 낮아져도 그대로라 글자가 칸을 넘고 아래 조각을 덮었다.
+       그래서 전부 clamp(바닥, N vh, 1080p 값) 으로 바꾼다.
+         · 위 끝 = 예전 값 그대로 → 1080p TV 는 보이던 그대로다.
+         · vh 계수 = 예전 값 ÷ 1080 → 1080p 에서 정확히 같은 크기가 나온다.
+         · 아래 끝 = 4 m 밖에서 그래도 읽히는 최소치. */
+    --ib-hero: clamp(56px, 10.37vh, 112px);
+    --ib-kpi: clamp(30px, 5.19vh, 56px);
+    --ib-num: clamp(22px, 3.70vh, 40px);
+    --ib-lbl: clamp(14px, 2.22vh, 24px);
+    --ib-ttl: clamp(16px, 2.41vh, 26px);
+    --ib-body: clamp(13px, 2.04vh, 22px);
+    --ib-r: 22px;
+    --ib-pad: 26px;
+    /* P9 r9 — TV 의 랭킹 막대도 두 배(1080p 에서 40px). 화면이 낮아지면 같이 준다. */
+    --ib-rankbar: clamp(22px, 3.70vh, 40px);
+    --ib-rankpad: clamp(3px, 0.74vh, 8px);
+
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    overflow: auto;
+    background: var(--ib-bg);
+}
+
+/* ── 오로라 배경 ── 저채도 sky·indigo·teal 방사형 3겹. 클릭을 먹지 않는다. */
+.ib-aurora {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    border-radius: var(--ib-r);
+    background:
+        radial-gradient(1100px 620px at 8% -12%, rgba(56, 189, 248, .28), transparent 62%),
+        radial-gradient(900px 560px at 96% 4%, rgba(129, 140, 248, .20), transparent 60%),
+        radial-gradient(1000px 680px at 46% 108%, rgba(45, 212, 191, .14), transparent 62%);
+}
+
+.inbound-tv .ib-aurora {
+    position: fixed;
+    border-radius: 0;
+    background:
+        radial-gradient(1200px 700px at 6% -14%, rgba(14, 165, 233, .20), transparent 60%),
+        radial-gradient(1000px 620px at 98% 2%, rgba(99, 102, 241, .16), transparent 58%),
+        radial-gradient(1100px 700px at 50% 112%, rgba(16, 185, 129, .10), transparent 60%);
+}
+
+/* ── 카드 ── */
+.ib-card {
+    position: relative;
+    background: var(--ib-card);
+    border: 1px solid var(--ib-cardline);
+    border-radius: var(--ib-r);
+    box-shadow: var(--ib-shadow), 0 0 0 1px var(--ib-ring);
+    -webkit-backdrop-filter: var(--ib-blur);
+    backdrop-filter: var(--ib-blur);
+    overflow: hidden;
+    transition: box-shadow .3s, transform .18s;
+}
+
+.ib-card::after {
+    /* 윗변 1px 하이라이트 — 표면이 떠 보이게 하는 값싼 장치 */
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .85), transparent);
+    opacity: .7;
+    pointer-events: none;
+}
+
+.inbound-tv .ib-card::after {
+    background: linear-gradient(90deg, transparent, rgba(125, 211, 252, .45), transparent);
+    opacity: .55;
+}
+
+.inbound-screen:not(.inbound-tv) .ib-card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 1px 2px rgba(15, 23, 42, .07), 0 14px 34px rgba(15, 23, 42, .10), 0 0 0 1px var(--ib-ring);
+}
+
+/* ── 살아있음 표시 점 ── */
+.ib-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--ib-ok2);
+    position: relative;
+    flex: none;
+}
+
+.ib-dot::after {
+    content: "";
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    border: 2px solid var(--ib-ok2);
+    opacity: .5;
+    animation: ib-pulse 2.4s ease-out infinite;
+}
+
+@keyframes ib-pulse {
+    0% { transform: scale(.6); opacity: .7 }
+    100% { transform: scale(1.5); opacity: 0 }
+}
+
+/* ── 등장 모션 ── 순차 지연은 인라인 style 로 준다 */
+.ib-fade {
+    opacity: 0;
+    transform: translateY(14px);
+    animation: ib-fu .55s cubic-bezier(.22, 1, .36, 1) forwards;
+}
+
+@keyframes ib-fu { to { opacity: 1; transform: none } }
+
+/* ── 표 ── 머리 고정 · 얼룩 · 숫자 자리맞춤 */
+.ib-table { width: 100%; border-collapse: separate; border-spacing: 0; }
+.ib-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--ib-card);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--ib-grid);
+    font-weight: 700;
+    color: var(--ib-ink3);
+    white-space: nowrap;
+}
+.ib-table tbody tr { border-bottom: 1px solid var(--ib-grid); }
+.ib-table tbody tr:nth-child(even) { background: rgba(15, 23, 42, .022); }
+.ib-table tbody tr:hover { background: rgba(14, 165, 233, .07); }
+.inbound-tv .ib-table tbody tr:nth-child(even) { background: rgba(148, 163, 184, .06); }
+
+/* Recharts 축 글자 — 화면 토큰을 따르게 한다 */
+.inbound-screen .recharts-cartesian-axis-tick text { fill: var(--ib-ink4); }
+.inbound-screen .recharts-text { font-variant-numeric: tabular-nums; }
+
+/* ═════════════════════════════════════════════════════════════════════════════
+   P5 r5 — 「대시보드」 4영역 · 한 화면 채우기 (16:9 무스크롤)
+
+   높이 셈 (개발웹 실물 기준, 눈으로 잰 게 아니라 클래스에서 뽑은 값이다)
+     · Header.jsx        : `fixed` + 안쪽 `h-16`      → 64px
+     · Dashboard.jsx 감싸개: `pt-16`                   → 64px (헤더 자리)
+     · Dashboard.jsx `<main class="flex-1 lg:ml-64 p-8">` → 위·아래 32px + 32px = 64px
+     ⟹ 화면이 쓸 수 있는 높이 = 100vh − (64 + 64) = 100vh − 128px  = var(--ib-shell)
+
+   이 값을 넘기면 감싸개(min-h-[calc(100vh-64px)]) 가 100vh 를 넘어 **페이지가 스크롤된다**.
+   그래서 영역 본문은 `flex:1; min-height:0; overflow:auto` 로 두고, 모자라면
+   페이지가 아니라 **본문이 안에서** 구른다(세로 짧은 노트북 대비).
+
+   ※ .ib-fill 은 「대시보드」만 붙인다. 협력업체·품목·기록 3화면은 예전처럼
+     자연 높이로 자란다(그 화면들은 표가 길어 한 장에 안 들어간다).
+   ═════════════════════════════════════════════════════════════════════════════ */
+
+.inbound-screen {
+    --ib-shell: 128px;
+    /* P9 r9 — 470px 은 1920×911 짜리 창에서 영역이 화면보다 커지는 값이었다.
+       카드가 읽을 수 있는 최소치까지만 낮춘다(그 아래로는 화면 쪽이 구른다). */
+    --ib-area-min: 400px;
+    --ib-gap: 12px;
+}
+
+.inbound-screen.ib-fill {
+    height: calc(100vh - var(--ib-shell));
+    display: flex;
+    flex-direction: column;
+}
+
+.inbound-screen.ib-fill > .ib-fillbody {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.inbound-tv.ib-fill {
+    height: 100vh;
+    overflow: hidden;
+}
+
+/* 영역 본문 — 남은 높이를 전부 먹는다 */
+.ib-area {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    padding-bottom: 2px;
+}
+
+.ib-area-grid {
+    /* Card 는 padding 을 var(--ib-pad) 로 인라인 지정한다 — 격자 안에서만 값을 줄인다.
+       (인라인 style 을 클래스로 이길 수 없으니 '변수'를 갈아 끼우는 쪽이 맞다) */
+    --ib-pad: 13px 16px;
+    display: grid;
+    gap: var(--ib-gap);
+    height: 100%;
+    min-height: var(--ib-area-min);
+}
+
+/* P7 r7 — 카드 안쪽 여백도 화면 높이를 따라간다(1080p 는 예전 16px/20px 그대로).
+   min-height 를 620px 로 못 박아 두면 768px 짜리 TV 에서 격자가 화면보다 커진다. */
+.inbound-tv .ib-area-grid {
+    --ib-pad: clamp(9px, 1.48vh, 16px) clamp(13px, 1.85vh, 20px);
+    min-height: min(560px, 100%);
+}
+
+/* 4영역 격자 — 승인 구성안 r0 의 .g1~.g4 그대로 */
+.ib-g1 { grid-template-columns: 4fr 3fr 3fr 3fr; grid-template-rows: 1fr 1fr; }
+.ib-g2 { grid-template-columns: 1fr 1fr 1fr; grid-template-rows: 1.5fr 1fr; }
+.ib-g3 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+.ib-g4 { grid-template-columns: 1fr 2fr 1fr; grid-template-rows: 1fr 1fr; }
+/* TV 는 글자가 두 배라 오른쪽 칸(업체 목록)이 1fr 로는 좁다 */
+.inbound-tv .ib-g4 { grid-template-columns: 1fr 1.7fr 1.2fr; }
+
+/* 격자 칸 안의 카드 — 넘치면 카드가 커지는 게 아니라 카드 **안이** 구른다.
+   space-between 은 KPI 타일처럼 '자라지 않는 조각'만 든 카드에서 각주를 바닥에 붙인다
+   (본문이 flex:1 인 카드에서는 남는 자리가 없으므로 아무 일도 하지 않는다). */
+.ib-area-grid > .ib-card {
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+/* 카드 본문 — 제목 아래 남은 자리를 채운다 */
+.ib-cardbody {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    margin-top: 8px;
+}
+
+/* ── P9 r9 : 「대시보드」 안에는 스크롤 막대가 없다 ───────────────────────────
+   차장 피드백 09-02 : "대시보드에 스크롤이 생기면 안 된다(데스크톱·TV 둘 다)."
+   벽걸이 TV 는 아무도 굴려 주지 않고, 데스크톱에서도 카드 안에 막대가 생기면
+   "여기 뭔가 더 있다"는 신호만 주고 끝난다. 그래서 **카드 안에서 구르지 않는다** —
+   대신 화면이 **줄 수를 정해 놓고 남는 건 「외 N건」으로 적는다**(A3 최근 불합격 7줄,
+   A0 최근 검사 7줄, A4 하위 5개사). 자리에 안 들어가면 줄을 지우는 게 아니라
+   글자·여백 눈금을 줄인다(아래 .ib-a0roll · .ib-faillist 규칙).
+   ※ 이 클래스는 대시보드 다섯 영역에서만 쓴다. 협력업체·품목·부적합 관리 화면의
+     긴 표는 **페이지가** 구른다(그쪽은 원래 한 장에 안 들어가는 화면이다). */
+.ib-scroll { flex: 1; min-height: 0; overflow: hidden; }
+
+/* KPI 타일의 스파크라인 칸 — 평소엔 38px 고정, 「대시보드」 격자 안에서는 조금 자란다.
+   (svg 가 height:100% 라서 부모 높이가 '정해져' 있어야 한다. auto 로 두면 0 이 된다)
+   max-height 를 두는 이유: 스파크라인은 preserveAspectRatio="none" 이라 세로로 늘리면
+   선 끝 점이 타원으로 찌그러지고, '형태만 보는 그림'이 큰 차트처럼 읽힌다. */
+.ib-kpispark { height: 38px; }
+.inbound-tv .ib-kpispark { height: 54px; }
+.ib-area-grid .ib-kpispark { flex: 1; height: auto; min-height: 30px; max-height: 72px; }
+.inbound-tv .ib-area-grid .ib-kpispark { max-height: 120px; }
+
+/* ── P8 r8 : 스파크라인 감싸개 (묶음 라벨 · 시작/끝날 · 최고점) ──────────────
+   축을 그리지 않는 그림이라 "언제부터 언제까지인가"를 글자로 적어 준다.
+   세 줄 전부 flex:none 이다 — 그림이 아무리 커도 이 줄들의 자리를 뺏지 못한다
+   (r7 에서 큰 숫자가 칩을 덮었던 것과 같은 종류의 사고를 막는다). */
+.ib-sparkcap {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+    flex: none;
+    margin-top: 6px;
+    font-size: calc(var(--ib-lbl) * .88);
+    font-weight: 700;
+    color: var(--ib-ink4);
+    line-height: 1.25;
+}
+.ib-sparkcap b { color: var(--ib-ink3); font-weight: 800; }
+
+.ib-spark { display: flex; flex-direction: column; min-height: 0; }
+.ib-spark-svg { flex: 1; min-height: 0; }
+.ib-sparkfoot {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 6px;
+    flex: none;
+    margin-top: 1px;
+    font-size: calc(var(--ib-lbl) * .82);
+    font-weight: 600;
+    color: var(--ib-ink4);
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+}
+.ib-sparkfoot b { font-weight: 800; overflow: hidden; text-overflow: ellipsis; }
+
+/* ── P8 r8 : 월별 PPM 미니 막대 (히어로 카드의 빈자리) ───────────────────────
+   축은 선형이다. 목표 100 PPM 은 지금 자료에서 바닥에 거의 붙는다 — 그게 사실이다.
+   선이 축과 겹쳐 사라지지만 않게 바닥에서 2px 만 띄운다(그리기 사정이지 값이 아니다). */
+.ib-ppmbars { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+.ib-ppmvals,
+.ib-ppmkeys {
+    display: flex;
+    flex: none;
+    gap: 6px;
+    font-size: calc(var(--ib-lbl) * .82);
+    line-height: 1.25;
+}
+.ib-ppmvals > span,
+.ib-ppmkeys > span { flex: 1; text-align: center; min-width: 0; }
+.ib-ppmvals > span { font-weight: 800; }
+.ib-ppmkeys > span { font-weight: 600; color: var(--ib-ink4); margin-top: 2px; }
+
+.ib-ppmplot {
+    position: relative;
+    display: flex;
+    align-items: flex-end;
+    gap: 6px;
+    flex: 1;
+    min-height: 26px;
+    padding-top: 2px;
+    border-bottom: 1px solid var(--ib-grid);
+}
+.ib-ppmplot > i { flex: 1; min-width: 0; min-height: 3px; border-radius: 4px 4px 0 0; display: block; }
+.ib-ppmtarget {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 0;
+    border-top: 1.5px dashed currentColor;
+    opacity: .9;
+    pointer-events: none;
+}
+.ib-ppmtarget > em {
+    position: absolute;
+    right: 0;
+    bottom: 1px;
+    font-style: normal;
+    font-weight: 800;
+    font-size: calc(var(--ib-lbl) * .8);
+    white-space: nowrap;
+    background: var(--ib-card);
+    padding: 0 3px;
+    border-radius: 4px;
+}
+
+/* ── 랭킹 막대 (P9 r9) ────────────────────────────────────────────────────────
+   차장 피드백 09-02 : "막대가 너무 얇아 안의 글자가 잘린다(164건)."
+   막대 높이를 두 배(--ib-rankbar)로 키우고, 막대 안 숫자는 **막대보다 커질 수 없게**
+   font-size 를 막대 높이에도 묶었다. 이 규칙 하나가 대시보드·품목·부적합 관리의
+   모든 랭킹 막대(Top5 업체 · 부적합 유형 · 품번 Top10 …)에 그대로 적용된다. */
+.ib-rankrow { padding: var(--ib-rankpad) 0; border-bottom: 1px solid var(--ib-grid); }
+
+.ib-rankbar {
+    height: var(--ib-rankbar);
+    background: var(--ib-track);
+    flex: 1 1 0%;
+}
+
+.ib-rankval {
+    font-size: min(calc(var(--ib-lbl) * .95), calc(var(--ib-rankbar) * .62));
+    font-weight: 800;
+    color: var(--ib-ink);
+    line-height: 1;
+}
+
+/* 격자 안에서는 줄들이 카드 높이를 고르게 나눠 갖는다 */
+.ib-area-grid .ib-rank { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.ib-area-grid .ib-rank > * { flex: 1; min-height: calc(var(--ib-rankbar) + var(--ib-rankpad) * 2); }
+/* 「대시보드」 격자 안은 세로가 빠듯하다 — 막대는 그대로 두고 줄 사이 여백만 줄인다 */
+.inbound-screen:not(.inbound-tv) .ib-area-grid { --ib-rankpad: 5px; }
+
+/* ── 영역 세그먼트 바 ─────────────────────────────────────────────────────── */
+.ib-areabar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+}
+
+.ib-areabar button {
+    padding: 6px 15px;
+    border-radius: 10px;
+    font-size: var(--ib-lbl);
+    font-weight: 700;
+    color: var(--ib-ink2);
+    border: 1px solid transparent;
+    background: var(--ib-chip);
+    transition: background .18s, color .18s;
+}
+
+.ib-areabar button[aria-selected="true"] {
+    background: var(--ib-ink);
+    color: #fff;
+}
+
+.inbound-tv .ib-areabar button { padding: 8px 20px; }
+.inbound-tv .ib-areabar button[aria-selected="true"] { background: var(--ib-pri2); color: #04121f; }
+
+/* ── TV 현황판 조작부 ─────────────────────────────────────────────────────── */
+.ib-tvarrow {
+    position: fixed;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 70;
+    width: 36px;
+    height: 84px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 14px;
+    border: 1px solid rgba(148, 163, 184, .28);
+    background: rgba(15, 23, 42, .55);
+    color: #e2e8f0;
+    font-size: 26px;
+    line-height: 1;
+    opacity: .55;
+    transition: opacity .18s, background .18s;
+}
+
+.ib-tvarrow:hover, .ib-tvarrow:focus-visible { opacity: 1; background: rgba(15, 23, 42, .8); }
+.ib-tvarrow.l { left: 3px; }
+.ib-tvarrow.r { right: 3px; }
+
+.ib-dots { display: flex; align-items: center; gap: 9px; }
+.ib-dots i {
+    display: block;
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    background: var(--ib-track);
+    border: 1px solid var(--ib-ink4);
+}
+.ib-dots i.on { background: var(--ib-pri2); border-color: var(--ib-pri2); }
+
+.ib-progress {
+    height: 3px;
+    border-radius: 999px;
+    background: var(--ib-track);
+    overflow: hidden;
+    margin-bottom: 8px;
+    flex: none;
+}
+.ib-progress > i {
+    display: block;
+    height: 100%;
+    background: var(--ib-pri2);
+    border-radius: 999px;
+}
+
+/* ── 자동 순환 간격 팝오버 ────────────────────────────────────────────────── */
+.ib-modalwrap {
+    position: fixed;
+    inset: 0;
+    z-index: 80;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(15, 23, 42, .38);
+}
+
+.ib-modal {
+    width: 320px;
+    max-width: calc(100vw - 32px);
+    border-radius: 16px;
+    background: #fff;
+    border: 1px solid rgba(15, 23, 42, .1);
+    box-shadow: 0 24px 60px rgba(15, 23, 42, .28);
+    padding: 18px 20px;
+    color: #0f172a;
+}
+
+/* ═════════════════════════════════════════════════════════════════════════════
+   P6 r6 — 영역 0 「오늘 현황」 (운영 화면)
+
+   앞의 4영역은 '분석'이다. 이 영역은 **운영**이다 — 벽걸이 TV 앞을 지나가는 사람이
+   1초 안에 색으로, 3초 안에 큰 숫자로, 10초 안에 목록으로 읽어야 한다(1-3-10).
+   그래서 여기만 규칙이 둘 다르다.
+     · 숫자 눈금이 하나 더 크다 (--ib-big). TV 1080p 에서 108px — 4 m 밖에서 읽힌다.
+     · 카드 테두리에 **신호등**을 켠다(.ib-lamp-*). 글로우는 이 상태 표시에만 쓴다.
+       (다른 카드까지 빛나면 무엇이 경고인지 알 수 없게 된다.)
+   ═════════════════════════════════════════════════════════════════════════════ */
+
+.inbound-screen { --ib-big: 64px; }
+/* P7 r7 — TV 의 큰 숫자도 화면 높이를 따라간다. 108px 은 1080p 에서만 나오는 값이다.
+   (9.5vh → 1080:102.6px · 911:86.5px · 860:81.7px · 768:73.0px) */
+.inbound-tv { --ib-big: clamp(40px, 9.5vh, 108px); }
+
+/* 영역 0 은 머리줄(기준일·동기화) + 격자 두 층이다 */
+.ib-a0wrap {
+    height: 100%;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.ib-a0wrap > .ib-area-grid {
+    flex: 1;
+    height: auto;
+    min-height: 340px;
+}
+
+.inbound-tv .ib-a0wrap > .ib-area-grid { min-height: min(470px, 100%); }
+
+/* 위 4칸(큰 숫자) : 아래 3칸(누계 · 오늘 불합격 · 최근 검사) = 대략 4 : 5 */
+.ib-g0 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-rows: minmax(0, 4fr) minmax(0, 5fr);
+}
+
+/* TV 는 큰 숫자 칸에 여유가 남고 아래 목록 칸이 모자란다 — 위에서 조금 떼어 아래로 준다.
+   (숫자는 108px 그대로다. 줄어드는 건 숫자 위아래의 빈자리뿐이다.) */
+.inbound-tv .ib-g0 { grid-template-rows: minmax(0, 3.6fr) minmax(0, 5.4fr); }
+
+.ib-g0 > .ib-a0roll { grid-column: span 1; }
+.ib-g0 > .ib-a0fails { grid-column: span 2; }
+.ib-g0 > .ib-a0tick { grid-column: span 1; }
+
+/* ── 큰 숫자 타일 ─────────────────────────────────────────────────────────────
+   P7 r7 — 타일은 **4단 세로 flex** 다. 라벨 / 숫자칸 / 칩 / 각주.
+     · 라벨·칩·각주는 flex:none — 제 높이만 갖는다(눌리지도 늘어나지도 않는다).
+     · 숫자칸만 flex:1 로 남은 자리를 먹는다. 남은 자리가 없으면 0 이 된다.
+   r6 의 버그는 여기서 났다. 숫자가 108px 로 못 박혀 있어 남은 자리(50~82px)보다
+   커도 그대로 그려졌고, flex 자식은 밖으로 삐져나오므로 아래 「vs 어제」 칩을 덮었다.
+   고친 방법은 둘이다.
+     ① 눈금을 vh 로 묶어 화면이 낮아지면 숫자도 같이 준다(--ib-big).
+     ② 그래도 모자랄 수 있으니 숫자칸을 **컨테이너**로 만들어 그 높이(cqh)로 한 번 더
+        덮어씌운다. 이러면 어떤 높이에서도 숫자가 제 칸을 못 넘는다. cqh 를 모르는
+        브라우저에서는 이 줄이 통째로 무효가 되고 앞줄(vh clamp)이 남는다 — 안전하다. */
+.ib-a0tile { overflow: hidden; }
+
+.ib-a0lbl {
+    flex: none;
+    font-size: var(--ib-lbl);
+    font-weight: 700;
+    color: var(--ib-ink3);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* 숫자 칸 — 라벨과 칩 사이의 남은 자리를 먹고 그 안에서 가운데 선다 */
+.ib-a0numwrap {
+    flex: 1 1 0%;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+    container-type: size;
+    container-name: ib-a0num;
+}
+
+/* P9 r9 : margin-top 4px 이 그대로 칸 밖 4px 이 됐다(감싸개가 이미 가운데 세운다). 뺐다. */
+.ib-a0num {
+    font-size: var(--ib-big);
+    font-weight: 800;
+    letter-spacing: -.045em;
+    line-height: 1.02;
+    color: var(--ib-ink);
+    white-space: nowrap;
+    max-width: 100%;
+}
+
+/* 칸 높이로 한 번 더 잠근다 (앞줄을 덮어쓴다) */
+.ib-a0num { font-size: min(var(--ib-big), 90cqh); }
+
+.inbound-tv .ib-a0num { line-height: 1; }
+
+/* 단위(건 · EA) — 숫자와 **같은 기준선**에 앉고 절대 줄바꿈하지 않는다 */
+.ib-a0num small {
+    display: inline-block;
+    vertical-align: baseline;
+    font-size: .3em;
+    line-height: 1;
+    font-weight: 700;
+    color: var(--ib-ink3);
+    margin-left: .18em;
+    letter-spacing: 0;
+    white-space: nowrap;
+}
+
+/* 「vs 어제」 칩 — 자라지도 눌리지도 않는다 */
+.ib-a0delta { flex: none; margin-top: 6px; }
+
+/* TV 에서는 각주 자리를 **두 줄로 미리 잡아 둔다**. 각주가 한 줄인 타일과 두 줄인 타일이
+   섞이면 숫자칸 높이가 서로 달라지고, 그러면 네 타일의 숫자 크기가 제각각이 된다.
+   벽에 걸린 화면에서 큰 숫자 넷의 크기가 다른 건 자료가 다른 것처럼 읽힌다. */
+/* P8 r8 : 각주가 최대 세 줄이 됐다 — (입고/불량률) · 이번 주 일평균 · 전월 일평균.
+   min-height 를 세 줄로 잡아 타일 넷의 각주 시작선이 서로 어긋나지 않게 한다. */
+.inbound-tv .ib-a0sub { min-height: calc(var(--ib-lbl) * .9 * 1.35 * 3); }
+
+/* 각주 — 세 줄까지. 넘치면 잘라 … 를 붙인다(칸을 밀어내지 않는다) */
+.ib-a0sub {
+    flex: none;
+    margin-top: 6px;
+    font-size: calc(var(--ib-lbl) * .9);
+    color: var(--ib-ink3);
+    line-height: 1.35;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    overflow: hidden;
+}
+
+/* 각주 한 줄. -webkit-box 안의 블록이라 줄 단위로 잘린다. */
+.ib-a0avg {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ── 신호등 ── 테두리 + 글로우. 데스크톱은 hover 규칙(4 클래스)을 이겨야 하므로
+   같은 무게의 선택자를 뒤에 둔다. !important 는 쓰지 않는다(고칠 때 더 헷갈린다). */
+.inbound-screen .ib-card.ib-lamp-ok,
+.inbound-screen .ib-card.ib-lamp-ok:hover {
+    border-color: rgba(16, 185, 129, .5);
+    box-shadow: 0 0 0 1px rgba(16, 185, 129, .3), 0 8px 26px rgba(16, 185, 129, .16);
+}
+
+.inbound-screen .ib-card.ib-lamp-warn,
+.inbound-screen .ib-card.ib-lamp-warn:hover {
+    border-color: rgba(245, 158, 11, .55);
+    box-shadow: 0 0 0 1px rgba(245, 158, 11, .34), 0 8px 26px rgba(245, 158, 11, .20);
+}
+
+.inbound-screen .ib-card.ib-lamp-bad,
+.inbound-screen .ib-card.ib-lamp-bad:hover {
+    border-color: rgba(244, 63, 94, .55);
+    box-shadow: 0 0 0 1px rgba(244, 63, 94, .36), 0 8px 30px rgba(244, 63, 94, .24);
+}
+
+.inbound-tv .ib-card.ib-lamp-ok { box-shadow: 0 0 0 2px rgba(52, 211, 153, .48), 0 0 52px rgba(52, 211, 153, .20); }
+.inbound-tv .ib-card.ib-lamp-warn { box-shadow: 0 0 0 2px rgba(251, 191, 36, .52), 0 0 52px rgba(251, 191, 36, .24); }
+.inbound-tv .ib-card.ib-lamp-bad { box-shadow: 0 0 0 2px rgba(251, 113, 133, .55), 0 0 60px rgba(251, 113, 133, .28); }
+
+/* ── 기준일 머리줄 ────────────────────────────────────────────────────────── */
+.ib-a0bar {
+    flex: none;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px 14px;
+    padding: 8px 14px;
+    border-radius: 12px;
+    background: var(--ib-card);
+    border: 1px solid var(--ib-cardline);
+    box-shadow: var(--ib-shadow), 0 0 0 1px var(--ib-ring);
+    -webkit-backdrop-filter: var(--ib-blur);
+    backdrop-filter: var(--ib-blur);
+    font-size: var(--ib-lbl);
+    color: var(--ib-ink3);
+    font-weight: 600;
+}
+
+.ib-a0bar input[type="date"] {
+    padding: 4px 8px;
+    border-radius: 8px;
+    border: 1px solid rgba(15, 23, 42, .16);
+    background: rgba(255, 255, 255, .7);
+    font-size: var(--ib-lbl);
+    font-weight: 700;
+    font-family: inherit;
+    color: var(--ib-ink);
+}
+
+/* ── 누계 카드 한 줄 ──────────────────────────────────────────────────────── */
+.ib-a0row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 3px 0;
+    border-bottom: 1px solid var(--ib-grid);
+    white-space: nowrap;
+}
+
+.ib-a0row > .k { flex: none; width: 4.6em; color: var(--ib-ink3); font-weight: 700; }
+/* P9 r9 : 값이 길어도(「1.45% · 14,482 PPM」) 오른쪽 칩을 덮지 않는다.
+   덮이면 두 숫자가 겹쳐 둘 다 못 읽는 글자가 된다. */
+.ib-a0row > .v {
+    flex: 1;
+    min-width: 0;
+    text-align: right;
+    font-weight: 800;
+    color: var(--ib-ink);
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ib-a0blk { margin-bottom: 8px; }
+
+/* TV 는 글자가 두 배라 「이번 주 + 이번 달」 12줄이 카드를 넘친다. 벽에 걸린 화면은
+   아무도 굴려 주지 않는다 — 넘치면 안 보이는 것이다. 그래서 이 카드 안에서만
+   눈금을 한 단계 줄이고 각주를 감춰 둘 다 한 화면에 들어가게 한다. */
+/* P7 r7 — 이 눈금도 화면 높이를 따라간다. 1080p 에서 17px(예전 값) 그대로,
+   768p 짜리 TV 에서는 12px 로 줄어 12줄이 그래도 한 화면에 들어간다. */
+.inbound-tv .ib-a0roll { --ib-lbl: clamp(9px, 1.30vh, 17px); font-size: var(--ib-lbl); }
+.inbound-tv .ib-a0roll .ib-cardbody { margin-top: 3px; }
+.inbound-tv .ib-a0roll .ib-a0row { padding: 0; }
+.inbound-tv .ib-a0roll .ib-a0blk { margin-bottom: 2px; }
+.inbound-tv .ib-a0roll .ib-a0foot { display: none; }
+
+/* P9 r9 — 데스크톱 누계 카드도 스크롤 없이 12줄이 들어가야 한다(1920×911 기준).
+   줄을 지우지 않는다 — 눈금과 여백만 줄인다. 1920×1080 에서는 예전과 거의 같다. */
+.inbound-screen:not(.inbound-tv) .ib-area-grid .ib-a0roll { --ib-lbl: clamp(9.5px, 1.20vh, 12px); font-size: var(--ib-lbl); }
+.inbound-screen:not(.inbound-tv) .ib-area-grid .ib-a0roll .ib-cardbody { margin-top: 4px; }
+.inbound-screen:not(.inbound-tv) .ib-area-grid .ib-a0roll .ib-a0row { padding: 1px 0; }
+.inbound-screen:not(.inbound-tv) .ib-area-grid .ib-a0roll .ib-a0blk { margin-bottom: 5px; }
+
+/* ── 최근 검사 티커 ───────────────────────────────────────────────────────────
+   TV 에서만 천천히 흐른다. 두 벌을 이어 붙이고 정확히 -50% 만큼 민다 —
+   그래야 이음매가 안 보인다. 마우스를 올리면 멈춘다(사람이 읽는 중이다).
+   OS 에서 모션을 껐으면 흐르지 않는다. 그때는 카드 안에서 굴리면 된다. */
+.ib-tk {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    position: relative;
+}
+
+/* P9 r9 — 데스크톱 티커도 구르지 않는다. 화면이 **7줄만** 넘겨 주고(A0Today),
+   그 7줄이 카드 높이를 고르게 나눠 갖는다. 넘칠 일이 없으니 막대도 안 생긴다. */
+.inbound-screen:not(.inbound-tv) .ib-tk { overflow: hidden; }
+.inbound-screen:not(.inbound-tv) .ib-tk-track,
+.inbound-screen:not(.inbound-tv) .ib-tk-set {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+}
+.inbound-screen:not(.inbound-tv) .ib-tkrow { flex: 1 1 0%; min-height: 0; }
+
+.ib-tk-track { display: block; }
+.ib-tk-track.run { animation: ib-tkroll 44s linear infinite; }
+.ib-tk:hover .ib-tk-track.run { animation-play-state: paused; }
+
+@keyframes ib-tkroll {
+    from { transform: translateY(0) }
+    to { transform: translateY(-50%) }
+}
+
+.ib-tkrow {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 5px 0;
+    border-bottom: 1px solid var(--ib-grid);
+    white-space: nowrap;
+}
+
+.ib-tkrow > .d { flex: none; color: var(--ib-ink4); font-weight: 700; font-size: calc(var(--ib-lbl) * .92); }
+.ib-tkrow > .s { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--ib-ink); font-weight: 700; }
+.ib-tkrow > .r { flex: none; font-weight: 800; font-size: calc(var(--ib-lbl) * .92); }
+
+/* ── 오늘 불합격 0건 ── 큰 체크 하나. 목록 자리를 빈칸으로 두지 않는다. */
+.ib-a0zero {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    color: var(--ib-ok);
+}
+
+/* ═════════════════════════════════════════════════════════════════════════════
+   P9 r9 — 「줄 수를 정해 놓은 목록」 (스크롤 대신 「외 N건」)
+
+   대시보드의 목록 카드는 구르지 않는다. 그래서 **몇 줄을 보여 줄지 화면이 정하고**,
+   남은 건 카드 맨 아래 한 줄에 「외 N건」으로 적는다. 목록이 잘린 걸 감추지 않는다 —
+   감추면 "이게 전부"로 읽히고, 그건 거짓말이다.
+   ═════════════════════════════════════════════════════════════════════════════ */
+.ib-listfoot {
+    flex: none;
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid var(--ib-grid);
+    font-size: calc(var(--ib-lbl) * .92);
+    font-weight: 700;
+    color: var(--ib-ink4);
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+/* 최근 불합격 목록 — 줄 여백은 A3Nonconformance.jsx 가 인라인으로 준다
+   (인라인 style 을 클래스로 이길 수 없으므로 TV/데스크톱 값을 그쪽에서 나눈다). */
+
+/* ── 접근성 ── 사용자가 모션을 꺼 두었으면 전부 정지한다 */
+@media (prefers-reduced-motion: reduce) {
+    .ib-fade { animation: none; opacity: 1; transform: none }
+    .ib-dot::after { animation: none }
+    .inbound-screen * { transition: none !important }
+    .ib-progress > i { transition: none !important }
+    .ib-tk-track.run { animation: none }
+}

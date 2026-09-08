@@ -6,15 +6,14 @@ import { createClient } from '@supabase/supabase-js';
 dotenv.config({ path: './.env.local' });
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const SUPABASE_KEY = SUPABASE_SERVICE_ROLE_KEY;
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
-const GEMINI_MODEL = process.env.VITE_GEMINI_MODEL || 'gemini-2.5-flash';
-const GEMINI_RUN_LIMIT = Number(process.env.GEMINI_RUN_LIMIT || 50);
-const GEMINI_DAILY_LIMIT = Number(process.env.GEMINI_DAILY_LIMIT || 200);
-const SYNC_LOCK_WINDOW_MINUTES = Number(process.env.SYNC_LOCK_WINDOW_MINUTES || 15);
-const GEMINI_INPUT_KRW_PER_1K_TOKENS = process.env.GEMINI_INPUT_KRW_PER_1K_TOKENS;
-const GEMINI_OUTPUT_KRW_PER_1K_TOKENS = process.env.GEMINI_OUTPUT_KRW_PER_1K_TOKENS;
+const CRON_SECRET = process.env.CRON_SECRET;
+/* 042 P8 — 잠금 창을 15분에서 **5분**으로 줄였다.
+   크론이 10분마다 도는데 잠금이 15분이면, 앞 실행이 running 으로 남은 순간
+   그 다음 두 판이 통째로 막힌다. 창은 주기보다 짧아야 한다. */
+const SYNC_LOCK_WINDOW_MINUTES = Number(process.env.SYNC_LOCK_WINDOW_MINUTES || 5);
 
 const STANDARD_CATEGORIES = new Set([
   '외관부적합',
@@ -38,29 +37,78 @@ ITEM-SW-V04,스트레이너 65A,2026-05-29,삼영금속,200,200,3,SR-20260529-00
 ITEM-SW-V05,감압밸브 40A,2026-05-29,신우정밀,50,50,1,SR-20260529-005,외주가공,나사산 가공 오류
 ITEM-SW-V06,버터플라이밸브 150A,2026-05-29,동양금속,90,90,4,SR-20260529-006,외주가공,조립 뻑뻑함`;
 
+/* ── 042 P8 : 호출 인증 ────────────────────────────────────────────────────────
+   이 함수는 그전까지 **아무나 부를 수 있었다**. 인증 코드가 한 줄도 없었고,
+   서비스롤 키로 inspections 를 통째로 덮어쓴다. 크론(vercel.json)을 붙이는 김에
+   문을 닫는다. 통과 조건은 둘 중 하나다 — 둘 다 아니면 401.
+
+     ① 크론 :  Authorization: Bearer <CRON_SECRET>
+               Vercel Cron 이 붙여 보내는 헤더다. CRON_SECRET 이 비어 있으면
+               이 경로는 **열리지 않는다**(빈 문자열끼리 맞아떨어지는 사고 방지).
+     ② 사람 :  Authorization: Bearer <로그인 사용자의 Supabase access_token>
+               화면의 「지금 동기화」 버튼이 이 토큰을 실어 보낸다.
+               검증 방식은 api/admin-update-member.js 와 **같다**(anon 클라이언트로
+               auth.getUser(token)). 새 방식을 만들지 않았다.
+
+   ②를 is_admin=true 로 더 좁힐지는 열어 둔다 — 지금 「지금 동기화」 버튼은
+   로그인한 사람 모두에게 보이므로, 좁히면 그 버튼이 일반 사용자에게서 401 이 된다.
+   좁히기로 하면 이 함수의 주석 아래 한 곳만 고치면 된다. (README_P8 §3 참조)          */
+async function authorize(req) {
+  const header = req.headers?.authorization || '';
+
+  // ① 크론 비밀키
+  if (CRON_SECRET && header === `Bearer ${CRON_SECRET}`) {
+    return { ok: true, via: 'cron' };
+  }
+
+  // ② 로그인 사용자 토큰
+  if (header.startsWith('Bearer ')) {
+    const token = header.slice('Bearer '.length).trim();
+    if (token && SUPABASE_URL && SUPABASE_ANON_KEY) {
+      try {
+        const authClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+          auth: { autoRefreshToken: false, persistSession: false }
+        });
+        const { data, error } = await authClient.auth.getUser(token);
+        if (!error && data?.user) {
+          // ↓ 관리자만 허용하려면 여기서 users.is_admin 을 한 번 더 확인하면 된다.
+          return { ok: true, via: 'user', userId: data.user.id };
+        }
+      } catch (e) {
+        // 검증 실패는 곧 미인증이다. 이유는 서버 로그에만 남긴다.
+        console.error('[Sync Engine] token verify failed:', e.message);
+      }
+    }
+  }
+
+  return { ok: false, via: null };
+}
+
 // Vercel Serverless Function 핸들러
 export default async function handler(req, res) {
   // CORS 헤더 설정
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  // 042 P8 — Authorization 헤더를 받기 위해 허용 목록에 추가
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
 
-  console.log('[Sync Engine] Starting Google Sheets Synchronization...');
+  // 042 P8 — 인증 게이트. 통과하지 못하면 시트도 읽지 않고 즉시 끝낸다.
+  const auth = await authorize(req);
+  if (!auth.ok) {
+    console.warn('[Sync Engine] unauthorized sync attempt blocked.');
+    return res.status(401).json({
+      success: false,
+      message: '인증되지 않은 동기화 요청입니다. (크론 비밀키 또는 로그인 토큰 필요)'
+    });
+  }
+
+  console.log(`[Sync Engine] Starting Google Sheets Synchronization... (via ${auth.via})`);
   const logs = [];
   let syncLogId = null;
-  let geminiCalls = 0;
-  let promptTokens = 0;
-  let outputTokens = 0;
-  let totalTokens = 0;
-  let dailyCallsBefore = 0;
-  let dailyCallsAfter = 0;
-  let estimatedCostKrw = 0;
-  let costBasis = 'usageMetadata token-based estimate';
-  let fallbackCount = 0;
 
   const log = (msg) => {
     console.log(`[Sync Engine] ${msg}`);
@@ -107,8 +155,7 @@ export default async function handler(req, res) {
       processed_rows: rows.length,
       nonempty_defect_rows: nonemptyDefectRows,
       unique_raw_terms: rawTerms.length,
-      unique_normalized_terms: termMap.size,
-      model: GEMINI_MODEL
+      unique_normalized_terms: termMap.size
     }, log);
 
     await enforceNoRecentRunningSync(log, syncLogId);
@@ -121,29 +168,20 @@ export default async function handler(req, res) {
     Object.assign(cachedMap, seededMap);
     missingTerms = [...termMap.keys()].filter(key => !cachedMap[key]);
 
-    dailyCallsBefore = await getDailyGeminiCalls();
-    enforceGeminiGuards(missingTerms.length, dailyCallsBefore);
-
-    const classificationResult = await classifyMissingTerms(missingTerms, termMap, log);
-    geminiCalls = classificationResult.geminiCalls;
-    promptTokens = classificationResult.promptTokens;
-    outputTokens = classificationResult.outputTokens;
-    totalTokens = classificationResult.totalTokens;
-    fallbackCount = classificationResult.fallbackCount;
-
-    await saveNewCategories(classificationResult.categories, log);
-
-    dailyCallsAfter = dailyCallsBefore + geminiCalls;
-    const costResult = estimateGeminiCostKrw(promptTokens, outputTokens);
-    estimatedCostKrw = costResult.estimatedCostKrw;
-    costBasis = costResult.costBasis;
+    /* 042 P8 — 캐시에도 없고 기존 inspections 에도 없는 말은 **규칙표**로 분류한다.
+       이 규칙표는 예전에도 있었다(외부 분류가 실패했을 때의 되돌림 자리).
+       이제는 그것이 유일한 분류기다. 규칙은 결정적이라 같은 말은 늘 같은 값이 되고,
+       계산이 공짜라 **캐시에 적어 두지 않는다** — 규칙이 틀렸을 때 그 오답이
+       표에 굳어 버리는 편이 훨씬 나쁘다. defect_category_map 에는 예전처럼
+       '기존 inspections 에서 되찾은 값'만 쌓인다. */
+    const ruleResult = classifyMissingTermsByRule(missingTerms, termMap, log);
 
     const defectCategoryMap = {
       '': '합격',
-      ...expandToOriginalMap(termMap, cachedMap, classificationResult.categories)
+      ...expandToOriginalMap(termMap, cachedMap, ruleResult.categories)
     };
 
-    log(`Defect category cache: total=${termMap.size}, cacheHit=${Object.keys(cachedMap).length}, newGeminiTerms=${missingTerms.length}, geminiCalls=${geminiCalls}`);
+    log(`Defect category resolve: total=${termMap.size}, cacheHit=${Object.keys(cachedMap).length}, ruleClassified=${missingTerms.length}`);
 
     // 2단계: 데이터 가공 및 Supabase Upsert 리스트 생성
     const inspectionsToUpsert = rows.map((row, index) => {
@@ -162,7 +200,7 @@ export default async function handler(req, res) {
       const hashPart = Buffer.from(rawId).toString('base64').replace(/[^a-zA-Z0-9]/g, '').substring(0, 20);
       const safeId = `${hashPart}_${index}`;
 
-      // 분류 캐시 맵에서 카테고리 획득
+      // 분류 맵에서 카테고리 획득
       const defectCategory = defectCategoryMap[originalDefectType] || '합격';
 
       return {
@@ -218,20 +256,11 @@ export default async function handler(req, res) {
       log('Supabase batch Upsert successfully completed.');
     }
 
-    const finalStatus = fallbackCount > 0 ? 'partial_success' : 'success';
     await finalizeSyncLog(syncLogId, {
-      status: finalStatus,
+      status: 'success',
       finished_at: new Date().toISOString(),
       cache_hits: Object.keys(cachedMap).length,
       new_terms: missingTerms.length,
-      gemini_calls: geminiCalls,
-      prompt_tokens: promptTokens,
-      output_tokens: outputTokens,
-      total_tokens: totalTokens,
-      daily_calls_before: dailyCallsBefore,
-      daily_calls_after: dailyCallsAfter,
-      estimated_cost_krw: estimatedCostKrw,
-      cost_basis: costBasis,
       upsert_count: inspectionsToUpsert.length
     }, log);
 
@@ -239,19 +268,10 @@ export default async function handler(req, res) {
       success: true,
       message: '구글 스프레드시트 동기화 완수 완료',
       processedCount: inspectionsToUpsert.length,
-      geminiUsage: {
+      classification: {
+        totalTerms: termMap.size,
         cacheHits: Object.keys(cachedMap).length,
-        newTerms: missingTerms.length,
-        geminiCalls,
-        runLimit: GEMINI_RUN_LIMIT,
-        dailyCallsBefore,
-        dailyCallsAfter,
-        dailyLimit: GEMINI_DAILY_LIMIT,
-        promptTokens,
-        outputTokens,
-        totalTokens,
-        estimatedCostKrw,
-        costBasis
+        ruleClassified: missingTerms.length
       },
       logs
     });
@@ -260,20 +280,12 @@ export default async function handler(req, res) {
     console.error('[Sync Engine Error]', error);
     log(`[ERROR] Sync aborted: ${error.message}`);
 
-    const blocked = error.code === 'RUN_LIMIT_EXCEEDED' || error.code === 'DAILY_LIMIT_EXCEEDED' || error.code === 'SYNC_ALREADY_RUNNING';
+    const blocked = error.code === 'SYNC_ALREADY_RUNNING';
     await finalizeSyncLog(syncLogId, {
       status: blocked ? 'blocked' : 'failed',
       finished_at: new Date().toISOString(),
       blocked_reason: blocked ? error.code : null,
       error_message: error.message,
-      gemini_calls: geminiCalls,
-      prompt_tokens: promptTokens,
-      output_tokens: outputTokens,
-      total_tokens: totalTokens,
-      daily_calls_before: dailyCallsBefore,
-      daily_calls_after: blocked ? dailyCallsBefore : dailyCallsAfter,
-      estimated_cost_krw: estimatedCostKrw,
-      cost_basis: costBasis,
       upsert_count: 0
     }, log);
 
@@ -283,10 +295,6 @@ export default async function handler(req, res) {
         blocked: true,
         reason: error.code,
         message: error.message,
-        runLimit: GEMINI_RUN_LIMIT,
-        dailyLimit: GEMINI_DAILY_LIMIT,
-        dailyCallsBefore,
-        plannedCalls: error.plannedCalls || 0,
         logs
       });
     }
@@ -415,7 +423,7 @@ async function seedCachedCategoriesFromExistingInspections(missingTerms, termMap
     from += pageSize;
   }
 
-  log(`Existing inspection seed reused ${Object.keys(seeded).length} categories without Gemini calls.`);
+  log(`Existing inspection seed reused ${Object.keys(seeded).length} categories from the inspections table.`);
   return seeded;
 }
 
@@ -440,103 +448,38 @@ async function enforceNoRecentRunningSync(log, currentSyncLogId = null) {
   if (data && data.length > 0) {
     const lockError = new Error(`최근 ${SYNC_LOCK_WINDOW_MINUTES}분 내 sync 실행이 아직 running 상태입니다. 중복 실행 방지를 위해 이번 요청을 중단합니다.`);
     lockError.code = 'SYNC_ALREADY_RUNNING';
-    lockError.plannedCalls = 0;
     throw lockError;
   }
   log(`Sync lock clear: no running sync in last ${SYNC_LOCK_WINDOW_MINUTES} minutes.`);
 }
 
-async function getDailyGeminiCalls() {
-  const today = new Date();
-  today.setUTCHours(0, 0, 0, 0);
-  const { data, error } = await supabase
-    .from('sync_logs')
-    .select('gemini_calls')
-    .gte('started_at', today.toISOString())
-    .in('status', ['success', 'partial_success', 'blocked', 'failed']);
-
-  if (error) {
-    throw new Error(`sync_logs daily usage read failed: ${error.message}`);
-  }
-
-  return (data || []).reduce((sum, row) => sum + Number(row.gemini_calls || 0), 0);
+/* 042 P8 — 규칙표 분류기. 외부 호출이 하나도 없다(네트워크·키·요금 없음).
+   말 안에 든 낱말로만 정한다. 어디에도 맞지 않으면 '기타'다 — 지어내지 않는다. */
+function classifyDefectTypeByRule(defectType) {
+  const text = String(defectType || '').toLowerCase();
+  if (text.includes('외관') || text.includes('도장') || text.includes('흠집') || text.includes('사출')) return '외관부적합';
+  if (text.includes('가공') || text.includes('나사') || text.includes('리머') || text.includes('홀')) return '가공부적합';
+  if (text.includes('치수') || text.includes('공차') || text.includes('금형') || text.includes('주물')) return '주물치수부적합';
+  if (text.includes('조립') || text.includes('뻑뻑') || text.includes('유격')) return '조립부적합';
+  if (text.includes('재질') || text.includes('성적') || text.includes('강도')) return '재질부적합';
+  return '기타';
 }
 
-function enforceGeminiGuards(plannedCalls, dailyCallsBefore) {
-  if (plannedCalls > GEMINI_RUN_LIMIT) {
-    const error = new Error(`Gemini 신규 분류 ${plannedCalls}건이 1회 실행 상한 ${GEMINI_RUN_LIMIT}콜을 초과했습니다. 캐시 선적재 또는 수동 분류 후 다시 실행해 주세요.`);
-    error.code = 'RUN_LIMIT_EXCEEDED';
-    error.plannedCalls = plannedCalls;
-    throw error;
-  }
-
-  if (dailyCallsBefore + plannedCalls > GEMINI_DAILY_LIMIT) {
-    const error = new Error(`Gemini 일일 예상 호출 ${dailyCallsBefore + plannedCalls}건이 1일 상한 ${GEMINI_DAILY_LIMIT}콜을 초과합니다. 내일 다시 실행하거나 차장님 승인 후 상한을 조정해 주세요.`);
-    error.code = 'DAILY_LIMIT_EXCEEDED';
-    error.plannedCalls = plannedCalls;
-    throw error;
-  }
-}
-
-async function classifyMissingTerms(missingTerms, termMap, log) {
+function classifyMissingTermsByRule(missingTerms, termMap, log) {
   const categories = {};
-  let geminiCalls = 0;
-  let promptTokens = 0;
-  let outputTokens = 0;
-  let totalTokens = 0;
-  let fallbackCount = 0;
 
   if (missingTerms.length > 0) {
-    log(`Invoking Gemini content generation for ${missingTerms.length} new normalized defect terms...`);
+    log(`Classifying ${missingTerms.length} new normalized defect terms by rule table...`);
   }
 
   for (const normalizedTerm of missingTerms) {
     const original = termMap.get(normalizedTerm)?.representativeOriginal || normalizedTerm;
-    const result = await classifyDefectTypeWithGemini(original, log);
-    categories[normalizedTerm] = {
-      standardCategory: normalizeStandardCategory(result.standardCategory),
-      originalTerm: original,
-      source: result.source,
-      model: GEMINI_MODEL
-    };
-    geminiCalls += result.geminiCalls;
-    promptTokens += result.promptTokens;
-    outputTokens += result.outputTokens;
-    totalTokens += result.totalTokens;
-    if (result.source === 'rule_fallback') fallbackCount += 1;
-    log(`Mapping resolved: "${original}" ➔ "${categories[normalizedTerm].standardCategory}"`);
+    const standardCategory = normalizeStandardCategory(classifyDefectTypeByRule(original));
+    categories[normalizedTerm] = { standardCategory, originalTerm: original, source: 'rule' };
+    log(`Mapping resolved: "${original}" ➔ "${standardCategory}" (rule)`);
   }
 
-  return { categories, geminiCalls, promptTokens, outputTokens, totalTokens, fallbackCount };
-}
-
-async function saveNewCategories(classifications, log) {
-  const rows = Object.entries(classifications)
-    // rule_fallback is execution-local only: do not persist transient Gemini/API failures as a trusted cache.
-    .filter(([, item]) => item.source !== 'rule_fallback')
-    .map(([normalizedTerm, item]) => ({
-    original_term: item.originalTerm,
-    normalized_term: normalizedTerm,
-    standard_category: normalizeStandardCategory(item.standardCategory),
-    source: item.source,
-    model: item.model,
-    first_classified_at: new Date().toISOString(),
-    last_used_at: new Date().toISOString(),
-    use_count: 1,
-    updated_at: new Date().toISOString()
-  }));
-
-  if (rows.length === 0) return;
-
-  const { error } = await supabase
-    .from('defect_category_map')
-    .upsert(rows, { onConflict: 'normalized_term' });
-
-  if (error) {
-    throw new Error(`defect_category_map cache save failed: ${error.message}`);
-  }
-
-  log(`Saved ${rows.length} new defect category cache rows.`);
+  return { categories };
 }
 
 function expandToOriginalMap(termMap, cachedMap, newClassifications) {
@@ -585,21 +528,31 @@ function extractGid(sheetUrl) {
   }
 }
 
-function estimateGeminiCostKrw(promptTokens, outputTokens) {
-  const inputRate = Number(GEMINI_INPUT_KRW_PER_1K_TOKENS);
-  const outputRate = Number(GEMINI_OUTPUT_KRW_PER_1K_TOKENS);
+/* ── 042 P8r2 : 헤더 별칭 정규화 (09-04) ──────────────────────────────────────
+   정본 시트(2026 탭)와 옛 시트는 같은 뜻의 열을 다른 이름으로 부른다.
+   아래 표는 **열 이름만** 표준명으로 바꾼다. 행 변환·id 계산식은 손대지 않았다.
+     · 정본의 첫 열 머리글은 공백 한 칸이라 trim 하면 빈 문자열이 된다 → 품목번호
+     · 정본에는 '업태'가 두 번 나온다(10열 세분류 · 11열 대분류). 이 표는 이름만
+       바꾸므로 「뒤 열이 앞 열을 덮어쓴다」는 기존 동작이 그대로 남는다
+       = 대분류(외주가공/원자재(주물)/중국공장/가공 구매품)가 채택된다. 의도대로다.
+     · 표에 없는 열 이름은 건드리지 않는다('부적합 유형'·'부적합 발행' 등 그대로). */
+const HEADER_ALIASES = {
+  '': '품목번호',
+  '품목번호': '품목번호',
+  '입고수량': '입고',
+  '입고': '입고',
+  '검사수량': '검사(함수)',
+  '검사(함수)': '검사(함수)',
+  '부적합수량': '부적합',
+  '부적합': '부적합',
+  '업태': '업태(함수)',
+  '업태(함수)': '업태(함수)'
+};
 
-  if (!Number.isFinite(inputRate) || !Number.isFinite(outputRate)) {
-    return {
-      estimatedCostKrw: 0,
-      costBasis: 'TOKEN_PRICE_UNSET: prompt/output token counts recorded, KRW estimate not finalized'
-    };
-  }
-
-  return {
-    estimatedCostKrw: Number((((promptTokens / 1000) * inputRate) + ((outputTokens / 1000) * outputRate)).toFixed(4)),
-    costBasis: `usageMetadata token-based estimate: input=${inputRate} KRW/1K, output=${outputRate} KRW/1K`
-  };
+function normalizeHeaderName(header) {
+  return Object.prototype.hasOwnProperty.call(HEADER_ALIASES, header)
+    ? HEADER_ALIASES[header]
+    : header;
 }
 
 // 쉼표와 큰따옴표가 꼬여있는 정규화 CSV 파서
@@ -608,7 +561,8 @@ function parseCSV(text) {
   if (lines.length <= 1) return [];
 
   // 헤더 추출 및 청소 (BOM 문자거르기)
-  const headers = parseCSVLine(lines[0]).map(h => h.replace(/^\uFEFF/, '').trim());
+  // 042 P8r2 — BOM 제거 · 공백 정리 뒤에 별칭을 표준명으로 바꾼다.
+  const headers = parseCSVLine(lines[0]).map(h => normalizeHeaderName(h.replace(/^\uFEFF/, '').trim()));
   const results = [];
 
   for (let i = 1; i < lines.length; i++) {
@@ -648,109 +602,4 @@ function parseCSVLine(line) {
   }
   result.push(current.trim());
   return result;
-}
-
-// Gemini 2.5 Flash API 활용 비정형 카테고리 태깅 엔진
-async function classifyDefectTypeWithGemini(defectType, log) {
-  if (!GEMINI_API_KEY) {
-    log('[WARNING] Gemini API key is missing. Assigning fallback: "기타"');
-    return {
-      standardCategory: '기타',
-      source: 'rule_fallback',
-      geminiCalls: 0,
-      promptTokens: 0,
-      outputTokens: 0,
-      totalTokens: 0
-    };
-  }
-
-  // 1회 크론 한계 및 Few-shot 6 주물부적합 완벽 보완 프롬프트
-  const systemInstruction = `너는 신우밸브주식회사 품질보증부의 인수검사 데이터 정제 전문가이다.
-제공되는 입고/검사 데이터의 [부적합 유형] 텍스트를 정밀 분석하여, 아래 정의된 JSON 스키마 규격에 맞춰 정확히 매핑된 데이터만을 반환해야 한다. 절대 설명이나 마크다운 태그를 붙이지 말고 순수 JSON만 반환하라.
-
-[부적합 유형(defectCategory) 매핑 규칙]
-- 외관 불량, 흠집, 도장 불량, 사출 들뜸, 외관부적합 ➔ "외관부적합"
-- 나사산 가공 불량, 리머 가공 오류, 홀 누락, 조립부 가공 오차, 가공부적합 ➔ "가공부적합"
-- 치수 미달, 공차 초과, 금형 변형, 주물치수부적합, 주물부적합, 주물 부적합 ➔ "주물치수부적합"
-- 조립 뻑뻑함, 부품 누락, 유격 오류, 조립부적합 ➔ "조립부적합"
-- 재질 상이, 성적서 불일치, 인장 강도 미달, 재질부적합 ➔ "재질부적합"
-- 해당 없음, 합격, 빈 문자열 또는 공란 ➔ "합격"
-- 그 외 어떤 매핑 규칙에도 속하지 않는 경우 ➔ "기타"`;
-
-  const fewShots = [
-    { input: '주물 치수 부적합', output: '주물치수부적합' },
-    { input: '가공부적합', output: '가공부적합' },
-    { input: '외관부적합', output: '외관부적합' },
-    { input: '사출 들뜸', output: '외관부적합' },
-    { input: '', output: '합격' },
-    { input: '주물부적합', output: '주물치수부적합' } // Few-shot 6번 주물부적합 완벽 매핑 강제
-  ];
-
-  const fewShotPrompt = fewShots.map(f => `입력: "${f.input}" ➔ 출력 JSON: {"defectCategory": "${f.output}"}`).join('\n');
-  const userPrompt = `아래 입력 텍스트를 분류하여 JSON으로만 대답해라.
----
-입력: "${defectType}"`;
-
-  const fullPrompt = `${systemInstruction}\n\n[입출력 예시 (Few-shot)]\n${fewShotPrompt}\n\n${userPrompt}`;
-
-  try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
-    const payload = {
-      contents: [{ parts: [{ text: fullPrompt }] }],
-      generationConfig: {
-        responseMimeType: 'application/json'
-      }
-    };
-
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-
-    if (!response.ok) {
-      throw new Error(`Gemini status code error: ${response.status}`);
-    }
-
-    const resJson = await response.json();
-    const usage = resJson.usageMetadata || {};
-    const promptTokenCount = Number(usage.promptTokenCount || 0);
-    const candidatesTokenCount = Number(usage.candidatesTokenCount || 0);
-    const totalTokenCount = Number(usage.totalTokenCount || 0);
-    if (!resJson.usageMetadata) {
-      log(`[WARNING] Gemini usageMetadata missing for "${defectType}"`);
-    }
-
-    const responseText = resJson.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    const cleanText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
-
-    const result = JSON.parse(cleanText);
-    return {
-      standardCategory: normalizeStandardCategory(result?.defectCategory),
-      source: 'gemini',
-      geminiCalls: 1,
-      promptTokens: promptTokenCount,
-      outputTokens: candidatesTokenCount,
-      totalTokens: totalTokenCount
-    };
-  } catch (err) {
-    log(`[ERROR] Gemini classification failed for "${defectType}": ${err.message}`);
-    // 안전한 폴백: 텍스트에 포함된 단어를 기준으로 1차 자체 매핑 시도
-    const text = defectType.toLowerCase();
-    let fallbackCategory = '기타';
-    if (text.includes('외관') || text.includes('도장') || text.includes('흠집') || text.includes('사출')) fallbackCategory = '외관부적합';
-    else if (text.includes('가공') || text.includes('나사') || text.includes('리머') || text.includes('홀')) fallbackCategory = '가공부적합';
-    else if (text.includes('치수') || text.includes('공차') || text.includes('금형') || text.includes('주물')) fallbackCategory = '주물치수부적합';
-    else if (text.includes('조립') || text.includes('뻑뻑') || text.includes('유격')) fallbackCategory = '조립부적합';
-    else if (text.includes('재질') || text.includes('성적') || text.includes('강도')) fallbackCategory = '재질부적합';
-
-    return {
-      standardCategory: fallbackCategory,
-      source: 'rule_fallback',
-      geminiCalls: GEMINI_API_KEY ? 1 : 0,
-      promptTokens: 0,
-      outputTokens: 0,
-      totalTokens: 0
-    };
-  }
 }
