@@ -102,8 +102,10 @@
      · inbound_dash_area  : 'today' | 'summary' | 'trend' | 'nc' | 'cpk'
                             ← 모르는 값이 들어 있으면(예전 판·손댄 값) 'today' 로 되돌린다.
      · inbound_tv_mode    : TV 현황판 켜짐 ('1'/'0')
-     · inbound_tv_plan    : **P13 r13** TV 시작 계획
-                            {"areas":[{"key":"today","on":true,"sec":10}, … 5줄]}
+     · inbound_tv_plan    : **P13 r13** TV 시작 계획 (P15 r15 에서 asOf 가 늘었다)
+                            {"areas":[{"key":"today","on":true,"sec":10}, … 5줄],"asOf":""}
+                            asOf 가 비면 **자동 규칙**이다 — 오늘 검사가 0건이면
+                            가장 최근 검사일로 옮기고 그 사실을 화면에 적는다.
      · inbound_tv_interval: 예전(r12까지) 자동 순환 간격(초, 3~600).
                             r13 은 **읽기만** 한다 — 계획이 없을 때 다섯 줄에 옮긴다.
                             지우지도 덮어쓰지도 않는다(되돌리기 대비).
@@ -122,7 +124,7 @@ import {
     bySupplier, byItemType, topDefectTypes,
     rateByBucket, verdictByBucket, topVendorTrend, recentFails,
     todayYmd, dayStats, rangeStats, weekRange, mtdRange, prevSameRange,
-    recentRows, todayFails, addDays,
+    recentRows, todayFails, addDays, autoAsOf,
 } from '../lib/inboundStats';
 import {
     ScreenFrame, ScreenHeader, Card, Empty, GhostButton, Loading, ErrorCard,
@@ -234,7 +236,8 @@ const InboundOverview = ({ setActiveTab }) => {
     const [st, setSt] = useState({ loading: true, err: null, rows: [] });
     const [sync, setSync] = useState(null);           // 마지막 동기화 시각 (없으면 null)
     const [tv, setTv] = useStickyFlag(TV_KEY, false);
-    const [plan, setPlan] = useTvPlan(TV_PLAN_KEY, AREA_KEYS, TV_PLAN_OPT);   /* P13 r13 */
+    /* P15 r15 : 셋째 칸이 늘었다 — TV 시작 팝업에서 정한 「기준일」('' 이면 자동 규칙) */
+    const [plan, setPlan, tvAsOf] = useTvPlan(TV_PLAN_KEY, AREA_KEYS, TV_PLAN_OPT);
     const [area, setArea] = useStickyString(AREA_KEY, 'today', AREA_KEYS);
     const [ask, setAsk] = useState(false);            // TV 시작 팝오버
     const [paused, setPaused] = useState(false);      // Space 일시정지 (P13 r13)
@@ -504,8 +507,21 @@ const InboundOverview = ({ setActiveTab }) => {
 
     /* ── 영역 0 「오늘 현황」 파생값 ──────────────────────────────────────────
        기간 필터를 타지 않는다. **기준일 하나**로 오늘/어제/이번 주/이번 달을 낸다.
-       TV 현황판은 사람이 못 만지므로 언제나 오늘이다. */
-    const asOfEff = tv ? todayYmd() : asOf;
+
+       P15 r15 — TV 현황판의 기준일 규칙이 둘이 됐다(차장 확정 09-09).
+         · TV 시작 팝업에서 날짜를 **적었으면** 그 날로 고정이다.
+         · 비웠으면 **자동**이다 : 오늘 검사가 0건이면 가장 최근 검사일로 옮긴다.
+           주말·휴무·이른 아침에 「오늘 0건」만 종일 떠 있으면 그 화면은 아무 말도
+           하지 않는 화면이 된다. 대신 **옮겼다는 사실을 반드시 화면에 적는다**
+           (「09-08 기준 · 오늘 자료 없음」) — 말없이 옮기면 어제 숫자를 오늘 숫자로
+           읽는다. 그게 더 위험하다.
+       데스크톱은 예전 그대로다 — 사람이 날짜칸으로 고른다(저장하지 않는다). */
+    const asOfAuto = useMemo(() => autoAsOf(st.rows), [st.rows]);
+    const asOfEff = tv ? (tvAsOf || asOfAuto.day) : asOf;
+    /* 「오늘 자료 없음」 딱지는 **자동으로 옮겼을 때만** 뜬다. 팝업에서 날짜를 못 박았으면
+       그건 사람이 고른 값이라 알릴 것이 없다. */
+    const asOfMoved = tv && !tvAsOf && asOfAuto.fallback;
+    const asOfNote = asOfMoved ? `${asOfEff.slice(5)} 기준 · 오늘 자료 없음` : '';
     const T = useMemo(() => {
         const d = asOfEff;
         const wk = weekRange(d);
@@ -548,7 +564,7 @@ const InboundOverview = ({ setActiveTab }) => {
         if (isToday) {
             return (
                 <A0Today tv={tv} T={T} asOf={asOfEff} sync={sync} span={span}
-                    onAsOf={tv ? null : setAsOf} />
+                    note={asOfNote} onAsOf={tv ? null : setAsOf} />
             );
         }
         if (isCpk) return <A4Capability tv={tv} go={go} onInfo={setCpkInfo} />;
@@ -593,6 +609,9 @@ const InboundOverview = ({ setActiveTab }) => {
                     title="인수검사 — 대시보드"
                     meta={<>
                         <span>{isToday ? '기준일 하루 · 기간 필터 무관' : (isCpk ? '기간 무관 전체 스냅샷' : (tv ? '올해 · 월별 (현황판 고정)' : (flt.quick ? '빠른기간' : '직접 지정')))}</span>
+                        {/* P15 r15 : 기준일을 자동으로 옮겼으면 머리줄에도 적는다 — 영역 안의
+                            기준일 칸만 보고 지나가는 사람이 있어서다. */}
+                        {isToday && asOfNote && <span className="ib-tvpause tabular-nums" data-ib="asofnote">{asOfNote}</span>}
                         {!isToday && !isCpk && <span className="tabular-nums">{eff.range.start || '—'} ~ {eff.range.end || '—'}</span>}
                         <span>불량률 = 부적합 수량 ÷ 입고 수량 · 목표 100 PPM</span>
                         {!tv && <span className="tabular-nums">검사 기록 {fmt(st.rows.length)}건 · 자료 {span.min || '—'} ~ {span.max || '—'}</span>}
@@ -653,7 +672,7 @@ const InboundOverview = ({ setActiveTab }) => {
                         <div style={{ marginBottom: -8 }}>
                             <InboundPeriodFilter
                                 range={flt.range} quick={flt.quick} group={flt.group} manualGroup={flt.manualGroup}
-                                span={span} onChange={setFlt}
+                                span={span} rows={st.rows} onChange={setFlt}
                             />
                         </div>
                     ))}
@@ -670,10 +689,11 @@ const InboundOverview = ({ setActiveTab }) => {
             {toast && <Toast tone={toast.tone} text={toast.text} onClose={() => setToast(null)} />}
 
             {ask && (
-                <TvStartDialog areas={AREAS} plan={plan} min={TV_IV_MIN} max={TV_IV_MAX} def={TV_IV_DEFAULT}
+                <TvStartDialog areas={AREAS} plan={plan} asOf={tvAsOf} autoAsOfDay={asOfAuto.day}
+                    min={TV_IV_MIN} max={TV_IV_MAX} def={TV_IV_DEFAULT}
                     onCancel={() => setAsk(false)}
-                    onStart={(next) => {
-                        setPlan(next);
+                    onStart={(next, nextAsOf) => {
+                        setPlan(next, nextAsOf);
                         setAsk(false);
                         setTick(0);
                         pausedRef.current = false;

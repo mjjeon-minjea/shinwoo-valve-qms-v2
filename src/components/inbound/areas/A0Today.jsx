@@ -40,6 +40,13 @@
      · **목표치가 없다.** 달성률·잔여 건수 같은 칸을 지어내지 않는다.
      · 입고 예정·검사 대기 자료가 없다. 「대기 N건」을 만들지 않는다.
 
+   ── P15 r15 (차장 확정 09-09) — TV 의 기준일 ────────────────────────────────
+     오늘 검사가 0건이면 기준일이 **가장 최근 검사일**로 자동으로 옮겨진다
+     (규칙은 lib/inboundStats.js 의 autoAsOf, 판단은 InboundOverview 가 한다).
+     옮겨졌으면 이 화면의 기준일 칸에 호박색으로 「09-08 기준 · 오늘 자료 없음」이
+     붙는다(note 값). TV 시작 팝업에서 날짜를 못 박았으면 옮기지 않고 딱지도 없다.
+     데스크톱의 날짜칸은 예전 그대로다 — 사람이 고르고, 저장하지 않는다.
+
    숫자는 하나도 여기서 세지 않는다 — 전부 lib/inboundStats.js 가 낸 값이다.
    불량률 = 부적합 수량 ÷ 입고 수량 (차장 확정 09-01). 그래서 입고 수량도 같이 적는다.
    ───────────────────────────────────────────────────────────────────────────── */
@@ -155,7 +162,7 @@ const TickRow = ({ r, bad }) => (
 );
 
 /* ═══════════════════════════════════════════════════════════════════════════ */
-const A0Today = ({ tv, T, asOf, onAsOf, sync, span }) => {
+const A0Today = ({ tv, T, asOf, onAsOf, sync, span, note }) => {
     const C = useInboundTheme();
     const rm = useReducedMotion();
     const tone = todayTone(T.D);
@@ -191,6 +198,11 @@ const A0Today = ({ tv, T, asOf, onAsOf, sync, span }) => {
                             aria-label="기준일" className="tabular-nums" />
                     )
                     : <b className="tabular-nums" style={{ color: 'var(--ib-ink)', fontWeight: 800 }}>{asOf}</b>}
+
+                {/* P15 r15 — 기준일을 **자동으로 옮겼을 때만** 뜬다(「09-08 기준 · 오늘 자료 없음」).
+                    벽걸이 TV 는 사람이 날짜를 못 고치므로 오늘 검사가 0건이면 최근 검사일로
+                    옮긴다. 옮겼다는 말이 없으면 어제 숫자를 오늘 숫자로 읽는다 — 그게 더 위험하다. */}
+                {note && <StatusBadge tone="warn">{note}</StatusBadge>}
 
                 <StatusBadge tone={tone}>{TONE_TEXT[tone]} · 불합격 {fmt(T.D.ngCount)}건</StatusBadge>
 

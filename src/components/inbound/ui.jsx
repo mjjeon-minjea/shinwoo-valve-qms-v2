@@ -13,7 +13,7 @@
 
    ※ 새 npm 의존성은 하나도 늘리지 않았다. 스파크라인·게이지·랭킹막대는 인라인 SVG 다.
    ───────────────────────────────────────────────────────────────────────────── */
-import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 
 /* ── 숫자 표기 ── 값이 없으면 0 이 아니라 '—' 다. 0 으로 적으면 "없음"으로 잘못 읽힌다. */
 export const fmt = (v) => (v === null || v === undefined || Number.isNaN(v) ? '—' : Number(v).toLocaleString('ko-KR'));
@@ -591,6 +591,100 @@ export const GhostButton = ({ children, ...rest }) => (
         {...rest}>{children}</button>
 );
 
+/* ═════════════════════════════════════════════════════════════════════════════
+   P15 r15 — 공용 쪽넘김 (차장 확정 09-09)
+
+   r14 까지 쪽넘김은 InboundItems.jsx 안에만 있었고 한 쪽이 **20줄**이었다. 표 넷이
+   한 화면에 서게 되면서(품목 검색 · 측정치 검색 · 부적합 검색 · 협력업체 현황)
+   20줄짜리 표는 화면 하나를 통째로 먹는다. 그래서 **한 쪽 10줄**로 줄이고, 조각을
+   여기로 올려 네 표가 **같은 것**을 쓰게 했다 — 표마다 쪽넘김이 다르게 생기면
+   같은 화면으로 안 읽힌다.
+
+     [ 3,331건 중 1–10 ]                       ‹  1 2 3 … 34  ›
+
+   · 쪽 번호는 **저장하지 않는다.** 다시 열면 늘 1쪽이다 — 어제 보던 17쪽이 오늘
+     떠 있으면 그게 어디인지 아무도 모른다. (기간·정렬·검색은 저장한다. 그건 뜻이 있다.)
+   · 검색어나 정렬이 바뀌면 1쪽으로 되돌린다(usePaged). 3쪽을 보다 검색하면 결과가
+     두 쪽뿐일 수 있고, 그때 빈 화면이 뜨면 「찾은 게 없다」로 잘못 읽힌다.
+   ═════════════════════════════════════════════════════════════════════════════ */
+
+/** 한 쪽에 담는 줄 수. 네 표가 전부 이 값을 쓴다. */
+export const PAGE_ROWS = 10;
+
+/** 번호를 다 그리면 30쪽짜리 표에서 줄이 두 줄이 된다. 앞뒤 2쪽과 처음·끝만 그린다. */
+export const pageList = (cur, last) => {
+    const out = [];
+    for (let i = 1; i <= last; i += 1) {
+        if (i === 1 || i === last || Math.abs(i - cur) <= 2) out.push(i);
+        else if (out[out.length - 1] !== '…') out.push('…');
+    }
+    return out;
+};
+
+/**
+ * 쪽넘김 한 줄. 표 아래(카드 안)에 붙인다.
+ * @param {number} page 지금 쪽 (1부터) · @param {number} last 마지막 쪽
+ * @param {(p:number)=>void} onGo · @param {number} from,to,total 「N건 중 a–b」
+ */
+export const Pager = ({ page, last, onGo, from, to, total, unit = '건' }) => {
+    const line = { padding: '10px var(--ib-pad)', borderTop: '1px solid var(--ib-grid)' };
+    const cnt = { fontSize: 'calc(var(--ib-lbl)*.95)', color: 'var(--ib-ink4)' };
+    if (last <= 1) {
+        return (
+            <div style={line}>
+                <span className="tabular-nums" style={cnt}>{fmt(total)}{unit} 전부</span>
+            </div>
+        );
+    }
+    const btn = (on) => ({
+        minWidth: 30, padding: '5px 9px', borderRadius: 8, fontSize: 'var(--ib-lbl)', fontWeight: on ? 800 : 600,
+        background: on ? 'var(--ib-ink)' : 'var(--ib-chip)', color: on ? '#fff' : 'var(--ib-ink2)',
+    });
+    return (
+        <div className="flex flex-wrap items-center gap-2" style={line}>
+            <span className="tabular-nums" style={cnt}>
+                {fmt(total)}{unit} 중 {fmt(from)}–{fmt(to)}
+            </span>
+            <span className="flex-1" />
+            <button type="button" onClick={() => onGo(page - 1)} disabled={page <= 1} aria-label="이전 쪽"
+                style={{ ...btn(false), opacity: page <= 1 ? .45 : 1 }}>‹</button>
+            {pageList(page, last).map((p, i) => (
+                p === '…'
+                    ? <span key={`d${i}`} style={{ color: 'var(--ib-ink4)', padding: '0 2px' }}>…</span>
+                    : <button key={p} type="button" onClick={() => onGo(p)} aria-current={p === page ? 'page' : undefined}
+                        className="tabular-nums" style={btn(p === page)}>{p}</button>
+            ))}
+            <button type="button" onClick={() => onGo(page + 1)} disabled={page >= last} aria-label="다음 쪽"
+                style={{ ...btn(false), opacity: page >= last ? .45 : 1 }}>›</button>
+        </div>
+    );
+};
+
+/**
+ * 검색어 + 쪽넘김 한 벌. 검색어(q)나 목록(list)이 바뀌면 1쪽으로 되돌린다.
+ * 검색이 없는 표는 q·matches 를 안 넘기면 된다(정렬만으로도 1쪽으로 돌아간다).
+ * @param {Array} list 원본 줄들 · @param {string} q 검색어 · @param {(x,s)=>boolean} matches
+ */
+export function usePaged(list, q, matches) {
+    const [page, setPage] = useState(1);
+    const src = list || [];
+    const hits = useMemo(() => {
+        const s = String(q || '').trim().toLowerCase();
+        if (s === '' || typeof matches !== 'function') return src;
+        return src.filter((x) => matches(x, s));
+    }, [src, q]);   // eslint-disable-line react-hooks/exhaustive-deps
+    const last = Math.max(1, Math.ceil(hits.length / PAGE_ROWS));
+    const cur = Math.min(page, last);
+    useEffect(() => { setPage(1); }, [q, list]);
+    const from = hits.length === 0 ? 0 : (cur - 1) * PAGE_ROWS + 1;
+    const to = Math.min(cur * PAGE_ROWS, hits.length);
+    return {
+        hits, page: cur, last, from, to,
+        rows: hits.slice((cur - 1) * PAGE_ROWS, cur * PAGE_ROWS),
+        go: (p) => setPage(Math.max(1, Math.min(last, p))),
+    };
+}
+
 /* ── 화면 뼈대 ────────────────────────────────────────────────────────────── */
 
 /**
@@ -830,6 +924,17 @@ export function normalizeTvPlan(raw, areaKeys, opt) {
     });
 }
 
+/**
+ * P15 r15 — 계획에 붙은 **기준일**. 'YYYY-MM-DD' 이거나 '' (비면 자동 규칙)이다.
+ * 자동 규칙은 lib/inboundStats.js 의 autoAsOf() 다 — 오늘 검사가 0건이면
+ * 가장 최근 검사일로 옮기고, 옮겼다는 사실을 화면에 적는다.
+ */
+export function tvPlanAsOf(raw) {
+    const v = raw && raw.asOf;
+    const s = String(v === null || v === undefined ? '' : v).trim();
+    return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : '';
+}
+
 /** 켠 화면들의 key 배열 (차례 그대로) */
 export const tvPlanKeys = (plan) => (plan || []).filter((a) => a && a.on).map((a) => a.key);
 /** 한 바퀴 초 — 켠 화면들의 초 합계 */
@@ -864,14 +969,17 @@ export function useTvPlan(key, areaKeys, opt) {
                 raw = { areas: (areaKeys || []).map((k) => ({ key: k, on: true, sec: Number(iv) })) };
             }
         }
-        return normalizeTvPlan(raw, areaKeys, { min, max, def });
+        return { areas: normalizeTvPlan(raw, areaKeys, { min, max, def }), asOf: tvPlanAsOf(raw) };
     });
-    const set = useCallback((next) => {
+    /* P15 r15 : set(계획, 기준일). 기준일을 안 넘기면 '' 다(= 자동 규칙). */
+    const set = useCallback((next, nextAsOf) => {
         const p = normalizeTvPlan({ areas: next }, keySig ? keySig.split('|') : [], { min, max, def });
-        setV(p);
-        try { window.localStorage.setItem(key, JSON.stringify({ areas: p })); } catch (e) { /* 저장 못 해도 화면은 돈다 */ }
+        const a = tvPlanAsOf({ asOf: nextAsOf });
+        setV({ areas: p, asOf: a });
+        try { window.localStorage.setItem(key, JSON.stringify({ areas: p, asOf: a })); } catch (e) { /* 저장 못 해도 화면은 돈다 */ }
     }, [key, keySig, min, max, def]);
-    return [v, set];
+    /* 셋째 칸(기준일)은 r15 에서 늘었다 — [plan, set] 만 받던 예전 호출도 그대로 돈다. */
+    return [v.areas, set, v.asOf];
 }
 
 /**
@@ -879,13 +987,15 @@ export function useTvPlan(key, areaKeys, opt) {
  * 켜 놓고 나서 계획을 못 바꾸면 사다리를 놓고 TV 앞으로 가야 하기 때문이다.
  * 줄 하나가 화면 하나다: [체크] [이름] [초] 초.
  */
-export const TvStartDialog = ({ areas, plan, min = TV_SEC_MIN, max = TV_SEC_MAX, def = TV_SEC_DEFAULT, onStart, onCancel }) => {
+export const TvStartDialog = ({ areas, plan, asOf, autoAsOfDay, min = TV_SEC_MIN, max = TV_SEC_MAX, def = TV_SEC_DEFAULT, onStart, onCancel }) => {
     const list = areas || [];
     const build = useCallback((p) => list.map((a) => {
         const r = (p || []).find((x) => x && x.key === a.key);
         return { key: a.key, label: a.label, on: r ? r.on !== false : true, sec: String(r ? r.sec : def) };
     }), [list, def]);
     const [rows, setRows] = useState(() => build(plan));
+    /* P15 r15 — 「오늘 현황」의 기준일. 비우면 자동 규칙이다(오늘 0건이면 최근 검사일). */
+    const [day, setDay] = useState(() => String(asOf || ''));
     const ref = useRef(null);
     useEffect(() => { if (ref.current) ref.current.focus(); }, []);
 
@@ -903,7 +1013,7 @@ export const TvStartDialog = ({ areas, plan, min = TV_SEC_MIN, max = TV_SEC_MAX,
 
     const setRow = (k, patch) => setRows((rs) => rs.map((r) => (r.key === k ? { ...r, ...patch } : r)));
     const allOn = () => setRows((rs) => rs.map((r) => ({ ...r, on: true })));
-    const reset = () => setRows((rs) => rs.map((r) => ({ ...r, on: true, sec: String(def) })));
+    const reset = () => { setRows((rs) => rs.map((r) => ({ ...r, on: true, sec: String(def) }))); setDay(''); };
 
     const submit = (e) => {
         if (e) e.preventDefault();
@@ -912,7 +1022,7 @@ export const TvStartDialog = ({ areas, plan, min = TV_SEC_MIN, max = TV_SEC_MAX,
             key: r.key,
             on: !!r.on,
             sec: secOk(r.sec) ? Math.round(Number(r.sec)) : def,
-        })));
+        })), day);
     };
 
     const foot = nOn === 0
@@ -951,6 +1061,23 @@ export const TvStartDialog = ({ areas, plan, min = TV_SEC_MIN, max = TV_SEC_MAX,
                     })}
                 </div>
 
+                {/* P15 r15 — 기준일. 벽걸이 TV 는 사다리를 놓지 않으면 못 고치므로 여기서 정한다.
+                    비워 두면 자동이다 : 오늘 검사가 0건이면 **가장 최근 검사일**로 옮기고,
+                    옮겼다는 사실을 화면에 적는다(「09-08 기준 · 오늘 자료 없음」). */}
+                <div className="flex flex-wrap items-center gap-2" style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid rgba(15,23,42,.10)' }}>
+                    <label htmlFor="ib-tvasof" style={{ fontSize: 12, fontWeight: 800, color: '#0f172a' }}>기준일</label>
+                    <input id="ib-tvasof" type="date" className="tabular-nums" value={day}
+                        onChange={(e) => setDay(e.target.value)} aria-label="오늘 현황 기준일"
+                        style={{ padding: '5px 8px', borderRadius: 8, border: '1px solid rgba(15,23,42,.16)', fontSize: 12, fontFamily: 'inherit', color: '#0f172a' }} />
+                    <button type="button" className="ib-tvmini" onClick={() => setDay('')} disabled={!day}
+                        style={day ? undefined : { opacity: .45 }}>비우기</button>
+                    <span style={{ fontSize: 11.5, color: '#64748b', lineHeight: 1.45 }}>
+                        {day
+                            ? '이 날짜로 고정된다'
+                            : `자동 — 오늘 검사가 0건이면 최근 검사일${autoAsOfDay ? ` (지금은 ${autoAsOfDay})` : ''}`}
+                    </span>
+                </div>
+
                 <div className="ib-tvfoot">
                     <span className={`ib-tvsum tabular-nums${canStart ? '' : ' warn'}`} data-ib="tvsum">{foot}</span>
                     <button type="button" className="ib-tvmini" onClick={allOn}>전체 선택</button>
@@ -984,6 +1111,7 @@ export default {
     Chip, Segmented, GhostButton, ScreenFrame, ScreenHeader, Loading, ErrorCard, Empty,
     TooltipBox, CountUp, useCountUp, useReducedMotion, useStickyFlag,
     useStickyNumber, useStickyString, AreaBar, TvArrow, Dots, ProgressLine, IntervalDialog,
-    TvStartDialog, useTvPlan, normalizeTvPlan, tvPlanKeys, tvPlanLoop, tvSecOf,
+    TvStartDialog, useTvPlan, normalizeTvPlan, tvPlanKeys, tvPlanLoop, tvSecOf, tvPlanAsOf,
+    PAGE_ROWS, pageList, Pager, usePaged,
     TV_SEC_MIN, TV_SEC_MAX, TV_SEC_DEFAULT,
 };

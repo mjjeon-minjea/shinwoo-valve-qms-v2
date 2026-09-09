@@ -1,10 +1,34 @@
 /* ─────────────────────────────────────────────────────────────────────────────
-   InboundSuppliers.jsx — 인수검사 「협력업체」   (플랜 042 / P14 r14)
+   InboundSuppliers.jsx — 인수검사 「협력업체」   (플랜 042 / P15 r16)
+
+   r15 → r16 (차장 요구 09-09) : **「업체 상세」가 제 탭으로 나왔다 — 탭이 2 → 3개.**
+
+       협력업체 현황     KPI 4타일 + 업체 표(정렬 · 쪽넘김)      ← 대장 기준
+       Cpk 랭킹보드      Ppk 랭킹보드**만**                      ← 측정값 기준
+       Cpk 업체별 분석   업체 상세**만** (대장 요약 · 최근 입고 · 관리도 · 히스토그램)
+
+     예전엔 랭킹보드와 업체 상세가 **한 탭('cpk') 안에 세로로** 붙어 있어 상세를 보려면
+     랭킹보드 스무 줄을 지나쳐야 했다. 이제 탭 하나가 한 가지만 보여 준다.
+       · 랭킹보드에서 업체를 누르면 → 「Cpk 업체별 분석」 탭으로 넘어가고 그 업체가
+         **선택된 채** 열린다(pick → setSel + setTab('detail') + 화면 맨 위로).
+       · 「Cpk 업체별 분석」 탭 안의 **드롭다운**으로도 업체를 바꾼다 — 랭킹보드를
+         거치지 않아도 된다. 차례는 랭킹보드와 같다(Ppk 높은 차례 · pickList).
+         측정값이 없어 랭킹보드에 없는 업체는 그 뒤에 표 차례대로 붙는다.
+       · 업체를 안 고르고 그 탭에 바로 들어오면 **표 첫 줄(sorted[0])** 이 기본이다
+         — 옛 폴백 그대로다.
+       · 저장 열쇠는 `inbound_sup_tab` 그대로다. 옛 값 `'cpk'` 는 그대로 **랭킹보드**로
+         열린다(키를 안 바꿨다). Dashboard.jsx 는 한 글자도 안 고쳤다.
+     숫자·계산·집계는 한 글자도 안 바뀌었다.
+
+   r14 → r15 (차장 확정 09-09) : **「협력업체 현황」 표에 쪽넘김이 붙었다.**
+   한 쪽 10줄이고 조각은 네 표가 함께 쓰는 components/inbound/ui.jsx 의 Pager 다.
+   정렬을 바꾸면 1쪽으로 되돌아가고, 쪽 번호는 저장하지 않는다. 메달(1·2·3)은
+   쪽 안 순서가 아니라 **표 전체의** 상위 3행이다. 숫자·계산은 한 글자도 안 바뀌었다.
 
    r9 → r14 (차장 승인 09-04) : **「측정 데이터 7/14~」 한 문구만 늘었다.**
    09-04 에 옛 인수검사 기록(1/2~7/13)이 대장에 들어왔지만 그 기록에는 치수 측정값이
-   없다. 그래서 이 화면의 「협력업체 현황」 탭(대장 기준)은 1월부터, 「Cpk 랭킹보드」
-   탭(측정값 기준)은 7/14 부터다 — 같은 기간 칩을 눌러도 두 탭이 보는 자료의 시작이
+   없다. 그래서 이 화면의 「협력업체 현황」 탭(대장 기준)은 1월부터, Cpk 탭 둘
+   (측정값 기준)은 7/14 부터다 — 같은 기간 칩을 눌러도 보는 자료의 시작이
    다르다. 그 사실을 Cpk 탭 안내줄에 적는다. 계산·자료는 한 글자도 안 바뀌었다.
 
    r8 → r9 (차장 피드백 09-02)
@@ -13,6 +37,7 @@
         고른 탭은 localStorage `inbound_sup_tab` 에 남는다.
           · 협력업체 현황 : KPI 4타일 + 업체 표(정렬)
           · Cpk 랭킹보드 : Ppk 랭킹보드 + 업체 상세(최근 입고 · 관리도 · 히스토그램)
+            ※ r16 에서 이 둘이 갈라져 「Cpk 랭킹보드」·「Cpk 업체별 분석」 두 탭이 됐다.
         예전에는 이 넷이 한 페이지에 세로로 쌓여 있어 표를 보려고 스크롤을 한참 내렸다.
      2. **기간 필터가 붙었다** (A안, 「묶음」은 감춘다 — 이 화면엔 추이 차트가 없다).
         기간은 대시보드와 **같은 값**이다(localStorage `inbound_period`). 한 화면에서
@@ -34,7 +59,7 @@
    ※ 이 화면은 「대시보드」와 달리 한 장에 안 들어간다 — **페이지가** 구르는 게 맞다.
      카드 안에서 구르지 않게 하는 규칙(.ib-scroll)은 대시보드 전용이다.
    ───────────────────────────────────────────────────────────────────────────── */
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
 import '../styles/inbound.css';
 import { loadInboundSpc, GRADE_BOUND, PPK_DOMAIN, reportDateMap, rowsInRange } from '../lib/inboundSpc';
@@ -46,7 +71,8 @@ import {
 import InboundPeriodFilter, { useSharedPeriod } from './InboundPeriodFilter';
 import {
     ScreenFrame, ScreenHeader, Card, SectionTitle, KpiTile, GradeChip, GhostButton, AreaBar,
-    Loading, ErrorCard, Empty, StatusBadge, fmt, pctText, gradeColor, useInboundTheme, useStickyString,
+    Loading, ErrorCard, Empty, StatusBadge, Pager, usePaged, PAGE_ROWS,
+    fmt, pctText, gradeColor, useInboundTheme, useStickyString,
 } from './inbound/ui';
 
 const sgn = (v) => (v > 0 ? '+' : '') + v;
@@ -58,6 +84,7 @@ const MEDAL = ['#c8a227', '#94a3b8', '#a97142'];
 const SUP_TABS = [
     { key: 'status', label: '협력업체 현황' },
     { key: 'cpk', label: 'Cpk 랭킹보드' },
+    { key: 'detail', label: 'Cpk 업체별 분석' },
 ];
 const SUP_TAB_KEYS = SUP_TABS.map((t) => t.key);
 const SUP_TAB_KEY = 'inbound_sup_tab';
@@ -276,7 +303,6 @@ const Body = ({ st, reload }) => {
     const [sel, setSel] = useState(null);
     const [sort, setSort] = useState({ key: 'defectRate', dir: 'desc' });
     const [boardOpen, setBoardOpen] = useState(true);
-    const detailRef = useRef(null);
 
     /* ── 기간 (대시보드와 같은 값 — localStorage `inbound_period`) ── */
     const span = useMemo(() => dataSpan(st.insp), [st.insp]);
@@ -343,6 +369,10 @@ const Body = ({ st, reload }) => {
         return s;
     }, [rows, sort]);
 
+    /* P15 r15 — 한 쪽 10줄. 정렬을 바꾸면 1쪽으로 되돌아간다(usePaged 가 목록 신원을 본다).
+       쪽 번호는 저장하지 않는다 — 다시 열면 늘 1쪽이다. */
+    const PG = usePaged(sorted);
+
     /* 고른 업체가 기간 밖으로 사라지면 첫 줄로 되돌린다(빈 상세를 남기지 않는다) */
     useEffect(() => {
         if (!sorted.length) return;
@@ -354,12 +384,24 @@ const Body = ({ st, reload }) => {
     /* 요주의 = 등급 4등급 이거나 불량률 1% 이상인 업체 */
     const watch = rows.filter((r) => r.grade === '4등급' || (r.defectRate !== null && r.defectRate >= 1)).length;
 
+    /* 「Cpk 업체별 분석」 탭의 업체 고르개 차례 — **랭킹보드와 같은 순서**(Ppk 높은 차례)다.
+       측정값이 없어 랭킹보드에 없는 업체는 뒤에 표 차례대로 붙인다(빠뜨리지 않는다). */
+    const pickList = useMemo(() => {
+        const rank = new Map(board.map((b, i) => [b.vendor, i]));
+        const at = (nm) => (rank.has(nm) ? rank.get(nm) : Number.POSITIVE_INFINITY);
+        return sorted.slice().sort((a, b) => at(a.name) - at(b.name));
+    }, [sorted, board]);
+
     const R = sorted.find((x) => x.name === sel) || sorted[0];
     const v = R ? R.v : null;
 
+    /* P15 r16 — 랭킹보드에서 업체를 누르면 **「Cpk 업체별 분석」 탭으로 넘어간다.**
+       예전에는 같은 탭 아래에 붙어 있는 상세로 스크롤만 했다(detailRef). 이제 상세가
+       다른 탭이라 스크롤할 대상이 그 자리에 없다 — 탭을 바꾸고 화면 맨 위로 올린다. */
     const pick = (name) => {
         setSel(name);
-        if (detailRef.current) detailRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        setTab('detail');
+        try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) { /* 무시 */ }
     };
     const toggleSort = (key) => {
         setSort((s) => (s.key === key ? { key, dir: s.dir === 'desc' ? 'asc' : 'desc' } : { key, dir: 'desc' }));
@@ -382,7 +424,10 @@ const Body = ({ st, reload }) => {
         </th>
     );
 
-    const isCpk = tab === 'cpk';
+    /* 탭 셋 — 'cpk' 는 **랭킹보드만**, 'detail' 은 **업체 상세만**이다.
+       예전 저장값 'cpk' 는 그대로 랭킹보드로 열린다(열쇠를 바꾸지 않았다). */
+    const isBoard = tab === 'cpk';
+    const isCpk = isBoard || tab === 'detail';   /* 안내줄은 Cpk 탭 둘 다 측정값 기준이다 */
     const periodText = `${flt.range.start || '—'} ~ ${flt.range.end || '—'}`;
 
     return (
@@ -409,7 +454,7 @@ const Body = ({ st, reload }) => {
             {/* 기간 필터 — 「묶음」은 감춘다(이 화면엔 추이 차트가 없다) */}
             <InboundPeriodFilter
                 range={flt.range} quick={flt.quick} group={flt.group} manualGroup={flt.manualGroup}
-                span={span} onChange={setFlt} showGroup={false}
+                span={span} rows={st.insp} onChange={setFlt} showGroup={false}
             />
 
             <div role="tabpanel" id={`ibsup-panel-${tab}`} aria-labelledby={`ibsup-tab-${tab}`}>
@@ -435,7 +480,7 @@ const Body = ({ st, reload }) => {
                                     right={R ? (
                                         <span className="inline-flex items-center gap-2 flex-none">
                                             <StatusBadge tone="mute">선택 {R.name}</StatusBadge>
-                                            <GhostButton onClick={() => setTab('cpk')}>Cpk 상세 →</GhostButton>
+                                            <GhostButton onClick={() => setTab('detail')}>Cpk 상세 →</GhostButton>
                                         </span>
                                     ) : null} />
                             </div>
@@ -445,7 +490,10 @@ const Body = ({ st, reload }) => {
                                         <table className="ib-table" style={{ minWidth: 880, fontSize: 'var(--ib-body)' }}>
                                             <thead><tr>{COLS.map(th)}</tr></thead>
                                             <tbody>
-                                                {sorted.map((x, i) => {
+                                                {PG.rows.map((x, j) => {
+                                                    /* 메달은 **표 전체의** 상위 3행이다 — 쪽이 바뀌어도 4쪽 첫 줄이
+                                                       1등이 되면 안 되므로 쪽 번호를 더해 진짜 자리를 센다. */
+                                                    const i = (PG.page - 1) * PAGE_ROWS + j;
                                                     const on = x.name === sel;
                                                     return (
                                                         <tr key={x.name} onClick={() => setSel(x.name)} className="cursor-pointer"
@@ -479,18 +527,20 @@ const Body = ({ st, reload }) => {
                                             </tbody>
                                         </table>
                                     </div>
-                                    <div style={{ padding: '12px var(--ib-pad)', borderTop: '1px solid var(--ib-grid)', fontSize: 'calc(var(--ib-lbl)*.95)', color: 'var(--ib-ink4)', lineHeight: 1.5 }}>
+                                    <Pager page={PG.page} last={PG.last} onGo={PG.go} from={PG.from} to={PG.to} total={PG.hits.length} unit="곳" />
+                                    <div style={{ padding: '12px var(--ib-pad) 14px', fontSize: 'calc(var(--ib-lbl)*.95)', color: 'var(--ib-ink4)', lineHeight: 1.5 }}>
                                         측정 n = 측정값기록서에 실린 개별 측정치 개수. n&lt;30 은 Ppk 변동이 크다.
                                         &lsquo;(대장 없음)&rsquo; 은 측정값에만 있고 입고 대장에 성적서번호가 연결되지 않은 업체다.
-                                        메달은 지금 정렬 기준의 상위 3행이다. 표 전체가 위 기간({periodText}) 안의 값이다.
+                                        메달은 지금 정렬 기준의 상위 3행이다(쪽을 넘겨도 자리는 그대로다).
+                                        표 전체가 위 기간({periodText}) 안의 값이다.
                                     </div>
                                 </>
                             )}
                         </Card>
                     </>
-                ) : (
+                ) : isBoard ? (
                     <>
-                        {/* Ppk 랭킹보드 */}
+                        {/* ══ 탭 2 · Cpk 랭킹보드 ══ (P15 r16 : 이 탭에는 랭킹보드**만** 있다) */}
                         <Card delay={0.08} style={{ marginBottom: 16 }}>
                             <button type="button" onClick={() => setBoardOpen((o) => !o)} className="w-full flex items-center justify-between text-left">
                                 <SectionTitle title="Ppk 랭킹보드"
@@ -567,19 +617,22 @@ const Body = ({ st, reload }) => {
                                 </div>
                             ))}
                         </Card>
-
-                        {/* 업체 상세 */}
-                        <div ref={detailRef}>
+                    </>
+                ) : (
+                    <>
+                        {/* ══ 탭 3 · Cpk 업체별 분석 ══ (P15 r16 : 이 탭에는 업체 상세**만** 있다) */}
+                        <div>
                             <Card delay={0.12}>
                                 {!R ? <Empty t="업체를 고르면 상세가 나온다" /> : (
                                     <>
-                                        <SectionTitle title={`업체 상세 — ${R.name}`} subtitle="대장 요약 · 최근 입고 · 관리도/공정능력" />
+                                        <SectionTitle title={`업체 상세 — ${R.name}`}
+                                            subtitle="대장 요약 · 최근 입고 · 관리도/공정능력 · 아래 고르개로 업체를 바꾼다(차례는 랭킹보드와 같다)" />
 
                                         <div className="flex flex-wrap items-center gap-3" style={{ margin: '14px 0', paddingBottom: 14, borderBottom: '1px solid var(--ib-grid)' }}>
                                             <select value={R.name} onChange={(e) => setSel(e.target.value)} aria-label="업체 선택"
                                                 className="rounded-lg cursor-pointer max-w-full"
                                                 style={{ padding: '8px 12px', fontSize: 'var(--ib-body)', fontWeight: 700, color: 'var(--ib-ink)', background: 'var(--ib-card)', border: '1px solid var(--ib-cardline)' }}>
-                                                {sorted.map((x) => (
+                                                {pickList.map((x) => (
                                                     <option key={x.name} value={x.name}>
                                                         {x.name}{x.idx !== null ? ` — Ppk ${x.idx.toFixed(2)} (${x.grade}, n=${x.n})` : ' — 측정값 없음'}
                                                     </option>

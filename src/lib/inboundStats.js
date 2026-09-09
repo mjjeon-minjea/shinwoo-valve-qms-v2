@@ -175,6 +175,47 @@ export function byItemCode(rows) {
     return out;
 }
 
+/**
+ * P15 r15 — **모델명별**. 품명 첫 토큰(parseItem().model)이 키다.
+ *
+ * 왜 품번이 아니라 모델명인가 (차장 확정 09-09) — 품번(55910308004)은 사람이 외우는
+ * 이름이 아니다. 현업이 「많이 들어오는 것」을 셀 때 세는 단위는 모델명(TOV-12A)이고,
+ * 한 모델이 사이즈별로 품번 여러 개를 갖는다. 품번으로 세면 같은 모델이 열 줄로
+ * 흩어져 Top 10 이 실제 물량 순서와 어긋난다.
+ *
+ * 담는 값 — groupBy 의 합계에 셋을 더한다.
+ *   codes    그 모델에 걸린 **품번 가짓수**(개수만이다. 품번 자체는 담지 않는다 —
+ *            품번은 「품목 검색」 표에서만 보여 준다).
+ *   topName  검사 건수가 가장 많은 품번의 품명 = **대표 품명**.
+ *   size     그 대표 품명에서 뽑은 사이즈.
+ */
+export function byModel(rows) {
+    const keyOf = (r) => {
+        const m = parseItem(r && r.itemName).model;
+        return m === '—' ? '' : m;
+    };
+    const out = groupBy(rows, keyOf, '(미상)');
+    /* 모델 -> (품번 -> {n, name}) . 품번이 비면 품명으로 센다(byItemCode 와 같은 규칙). */
+    const per = new Map();
+    for (const r of rows || []) {
+        const k = keyOf(r) || '(미상)';
+        const code = String((r && (r.item_code || r.itemName)) || '').trim() || '(미상)';
+        if (!per.has(k)) per.set(k, new Map());
+        const m = per.get(k);
+        if (!m.has(code)) m.set(code, { n: 0, name: String((r && r.itemName) || '').trim() });
+        m.get(code).n += 1;
+    }
+    out.forEach((o) => {
+        const m = per.get(o.key) || new Map();
+        o.codes = m.size;
+        let best = null;
+        m.forEach((v) => { if (!best || v.n > best.n) best = v; });
+        o.topName = best ? best.name : '';
+        o.size = parseItem(o.topName).size;
+    });
+    return out;
+}
+
 /** 불량유형 Top — '-' · 빈칸은 유형이 아니라 '없음'이므로 뺀다. */
 export function topDefectTypes(rows, n) {
     const m = new Map();
@@ -454,7 +495,9 @@ export function daySpan(start, end) {
 /**
  * 빠른기간 칩 → {start, end}
  * '전체' 는 **자료가 있는 전 구간**이다(빈 값이 아니다). 날짜칸에 그대로 찍혀야 하기 때문이다.
- * @param {string} key  QUICK_PERIODS 의 key
+ * @param {string} key  'all' | 'y:YYYY' | 'm:YYYY-MM' (P15 r15)
+ *                       옛 키 'year'(올해)·'month'(이번달)·'d30'·'d7' 도 그대로 돈다 —
+ *                       TV 현황판이 quickRange('year') 를 부르고 있다.
  * @param {{min?:string,max?:string,today?:Date}} opt  min/max = dataSpan 결과
  */
 export function quickRange(key, opt) {
@@ -463,6 +506,9 @@ export function quickRange(key, opt) {
     const t = o.today || new Date();
     const y = t.getFullYear();
     if (key === 'all') return { start: min, end: max };
+    /* P15 r15 — 새 칩. 'y:2026' 그 해 전체 · 'm:2026-08' 그 달 전체. */
+    if (periodMode(key) === 'year') return yearRange(periodYear(key));
+    if (periodMode(key) === 'month') return monthRange(periodYear(key), periodMonth(key));
     if (key === 'year') return { start: `${y}-01-01`, end: `${y}-12-31` };
     if (key === 'month') {
         const last = new Date(y, t.getMonth() + 1, 0);
@@ -472,6 +518,112 @@ export function quickRange(key, opt) {
     if (key === 'd30') return { start: addDays(base, -29), end: base };
     if (key === 'd7') return { start: addDays(base, -6), end: base };
     return { start: min, end: max };
+}
+
+/* =============================================================================
+   P15 r15 — 빠른기간 개편  (차장 확정 09-09)
+
+   칩은 넉 장이다 :  [전체] [연도] [월] [직접 기간]
+     · 「연도」·「월」은 **자료에서 뽑는다**. 검사 기록이 한 줄도 없는 해는 칩을
+       만들지 않고, 없는 달은 흐리게 잠근다. 없는 기간을 고르게 해 놓고 「자료 없음」을
+       띄우면 그건 조작부가 거짓말을 한 것이다.
+     · 저장 열쇠(inbound_period)의 quick 값이 늘었다 —
+         'all'         전체 (자료가 있는 전 구간)
+         'y:2026'      그 해 1/1 ~ 12/31
+         'm:2026-08'   그 달 1일 ~ 말일
+         null          직접 지정
+       예전 값('year' 올해 · 'month' 이번달 · 'd30' · 'd7')은 **읽을 때 옮긴다**
+       (InboundPeriodFilter 의 normalize). 날짜 두 개는 그대로 살아 있으므로
+       옮겨진 뒤에도 화면의 숫자는 어제와 같다.
+     · 처음 여는 사람의 기본값은 **올해**다(예전엔 '전체'였다).
+   묶음(일별/월별/년별) 자동 규칙은 **한 줄도 안 고쳤다** — autoGroup() 그대로다.
+     월 선택(28~31일)  -> 일별      연도(365일·12개월) -> 월별
+     전체              -> 길이에 따라 월별(<=24개월) / 년별
+   ============================================================================= */
+
+/** 빠른기간 칩 4장. 「연도」·「월」은 누르면 아래에 고르는 줄이 펼쳐진다. */
+export const PERIOD_MODES = [
+    { key: 'all', label: '전체' },
+    { key: 'year', label: '연도' },
+    { key: 'month', label: '월' },
+    { key: 'custom', label: '직접 기간' },
+];
+
+const YEAR_KEY = /^y:(\d{4})$/;
+const MONTH_KEY = /^m:(\d{4})-(\d{2})$/;
+
+/** 연도 칩의 quick 값 — yearQuick(2026) === 'y:2026' */
+export const yearQuick = (y) => `y:${y}`;
+/** 월 칩의 quick 값 — monthQuick(2026, 8) === 'm:2026-08' */
+export const monthQuick = (y, m) => `m:${y}-${two(m)}`;
+
+/** quick 값 -> 'all' | 'year' | 'month' | 'custom' (모르는 값은 전부 '직접 지정'이다) */
+export function periodMode(quick) {
+    if (quick === 'all') return 'all';
+    const s = String(quick === null || quick === undefined ? '' : quick);
+    if (YEAR_KEY.test(s)) return 'year';
+    if (MONTH_KEY.test(s)) return 'month';
+    return 'custom';
+}
+
+/** quick 값의 연도(숫자). 연도·월 칩이 아니면 null */
+export function periodYear(quick) {
+    const s = String(quick === null || quick === undefined ? '' : quick);
+    const y = YEAR_KEY.exec(s);
+    if (y) return Number(y[1]);
+    const m = MONTH_KEY.exec(s);
+    return m ? Number(m[1]) : null;
+}
+
+/** quick 값의 달(1~12). 월 칩이 아니면 null */
+export function periodMonth(quick) {
+    const m = MONTH_KEY.exec(String(quick === null || quick === undefined ? '' : quick));
+    return m ? Number(m[2]) : null;
+}
+
+/** 화면에 적는 선택 이름 — 「전체」 · 「2026년」 · 「2026년 8월」 · 「직접 지정」 */
+export function periodLabel(quick) {
+    const mode = periodMode(quick);
+    if (mode === 'all') return '전체';
+    if (mode === 'year') return `${periodYear(quick)}년`;
+    if (mode === 'month') return `${periodYear(quick)}년 ${periodMonth(quick)}월`;
+    return '직접 지정';
+}
+
+/** 그 해 1/1 ~ 12/31 */
+export function yearRange(y) {
+    const n = Number(y);
+    if (!Number.isFinite(n)) return { start: '', end: '' };
+    return { start: `${n}-01-01`, end: `${n}-12-31` };
+}
+
+/** 그 달 1일 ~ 말일 (달력 말일이다 — 자료가 있는 마지막 날이 아니다) */
+export function monthRange(y, m) {
+    const yy = Number(y), mm = Number(m);
+    if (!Number.isFinite(yy) || !Number.isFinite(mm) || mm < 1 || mm > 12) return { start: '', end: '' };
+    const last = new Date(Date.UTC(yy, mm, 0)).getUTCDate();
+    return { start: `${yy}-${two(mm)}-01`, end: `${yy}-${two(mm)}-${two(last)}` };
+}
+
+/** 검사 기록이 있는 연도 (오름차순 숫자 배열). 자료가 없으면 빈 배열이다. */
+export function dataYears(rows) {
+    const s = new Set();
+    for (const r of rows || []) {
+        const d = ymd(r && r.date);
+        if (d) s.add(Number(d.slice(0, 4)));
+    }
+    return Array.from(s).filter((n) => Number.isFinite(n)).sort((a, b) => a - b);
+}
+
+/** 그 해에 검사 기록이 있는 달 (1~12 오름차순). 없으면 빈 배열이다. */
+export function dataMonths(rows, y) {
+    const yy = String(Number(y));
+    const s = new Set();
+    for (const r of rows || []) {
+        const d = ymd(r && r.date);
+        if (d && d.slice(0, 4) === yy) s.add(Number(d.slice(5, 7)));
+    }
+    return Array.from(s).filter((n) => Number.isFinite(n)).sort((a, b) => a - b);
 }
 
 /** {start,end} 로 거른다. 빈 값은 '제한 없음'이다. 날짜가 비어 있는 행은 언제나 빠진다. */
@@ -922,6 +1074,31 @@ export function todayYmd(today) {
     return local(today || new Date());
 }
 
+/**
+ * P15 r15 — 「오늘 현황」의 **기준일 자동 규칙** (차장 확정 09-09)
+ *
+ * 벽걸이 TV 는 사람이 날짜를 못 고친다. 그런데 검사가 없는 날(주말·휴무·아침 일찍)에
+ * 「오늘 검사 0건」만 종일 떠 있으면 그 화면은 아무 말도 하지 않는 화면이 된다.
+ * 그래서 **오늘 검사가 0건이면 가장 최근 검사일로 기준일을 옮긴다.**
+ * 옮겼다는 사실은 반드시 화면에 적는다(「09-08 기준 · 오늘 자료 없음」) —
+ * 말없이 옮기면 어제 숫자를 오늘 숫자로 읽는다. 그게 더 위험하다.
+ *
+ * @returns {{day:string, fallback:boolean, today:string}}
+ *          fallback=true 면 옮긴 것이다. 자료가 아예 없으면 day = 오늘, fallback=false.
+ */
+export function autoAsOf(rows, today) {
+    const t = todayYmd(today);
+    let has = false, best = '';
+    for (const r of rows || []) {
+        const d = ymd(r && r.date);
+        if (!d) continue;
+        if (d === t) { has = true; break; }
+        if (d < t && d > best) best = d;
+    }
+    if (has || best === '') return { day: t, fallback: false, today: t };
+    return { day: best, fallback: true, today: t };
+}
+
 /** 하루치 합계. summarize() 와 같은 모양이라 KPI 계산이 한 벌로 끝난다. */
 export function dayStats(rows, day) {
     const d = String(day || '');
@@ -1020,6 +1197,8 @@ export default {
     SYNC_PATH, SYNC_TIMEOUT_MS, NO_SYNC_SERVER, syncEndpoint, syncCountOf, runSheetSync,
     QUICK_PERIODS, GROUPS, dataSpan, addDays, daySpan, quickRange, rangeFilter,
     autoGroup, bucketBy, previousRange,
+    PERIOD_MODES, yearQuick, monthQuick, periodMode, periodYear, periodMonth, periodLabel,
+    yearRange, monthRange, dataYears, dataMonths, byModel, autoAsOf,
     PPM_TARGET, ppm, ppmState, rateState, PPM_STATE_TEXT, fmtRate, fmtPpm,
     RECORD_CHANGE_DATE, RECORD_CHANGE_NOTE, MEASURE_SINCE_NOTE, changeIndexOf,
     activeDays, prevMonthOf, addYears, comparisonBasis, avgStats,
