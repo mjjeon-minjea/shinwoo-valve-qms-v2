@@ -53,6 +53,14 @@
        두 배로 키우고, 값은 여기 한 곳에서만 정한다. */
     --ib-rankbar: 28px;
     --ib-rankpad: 8px;
+    /* ── 「종합현황」 히어로 전용 눈금 (P12 r12) ────────────────────────────
+       링 지름 · 월별 PPM 막대 칸 · 기간 내 추이 칸의 높이를 한 곳으로 모았다.
+       **데스크톱 값은 r11 까지와 한 픽셀도 다르지 않다** — 예전에 A1Summary.jsx
+       안에 박혀 있던 그 식을 글자 그대로 옮겨 놓은 것뿐이다. 낮은 TV 화면에서만
+       아래 .inbound-tv 가 이 값을 더 조인다. */
+    --ib-heroring: 112px;
+    --ib-heroppm: clamp(72px, 15.5vh, 165px);
+    --ib-herospark: clamp(90px, 13vh, 140px);
 
     position: relative;
     color: var(--ib-ink);
@@ -91,7 +99,22 @@
          · 위 끝 = 예전 값 그대로 → 1080p TV 는 보이던 그대로다.
          · vh 계수 = 예전 값 ÷ 1080 → 1080p 에서 정확히 같은 크기가 나온다.
          · 아래 끝 = 4 m 밖에서 그래도 읽히는 최소치. */
-    --ib-hero: clamp(56px, 10.37vh, 112px);
+    /* ── P12 r12 · 「종합현황」 히어로가 1366×768 에서 38px 넘치던 것 ──────
+       r7 의 눈금은 「1080 값 ÷ 1080」 을 그대로 vh 계수로 삼았다. 그러면 높이에
+       **정비례**로만 준다 — 히어로 안에는 높이를 따라 줄지 않는 것(증감 칩 ·
+       각주 두 줄 · 상태 배지)이 100px 넘게 있어서, 768 에서는 정비례로는 부족했다.
+       그래서 히어로의 네 눈금만 **더 가파른 직선**으로 바꾼다:
+         · 1080 에서는 여전히 위 끝(112 · 190 · 165 · 140)에 걸린다 → 1080p TV 는 그대로다.
+         · 768 에서는 64 · 148 · 96 · 86 이 되어 히어로가 넘치지 않는다.
+       (아래 식의 상수는 「1080 에서 위 끝을 넘고, 768 에서 목표값」 두 점으로 정했다.
+        --ib-hero 의 위 끝만 min(112px, 10.37vh) 인데, 1080 에서 예전 식이 내던
+        111.996px 을 **소수점까지 그대로** 내놓으려는 것이다 — 112px 로 잘라 두면
+        0.004px 차이로 글자 테두리의 흐림점이 달라진다. 1080 위쪽에서는 예전처럼
+        112px 에서 멈춘다.) */
+    --ib-hero: clamp(56px, calc(16vh - 58.9px), min(112px, 10.37vh));
+    --ib-heroring: clamp(110px, calc(14vh + 40.5px), 190px);
+    --ib-heroppm: clamp(72px, calc(23vh - 80.6px), 165px);
+    --ib-herospark: clamp(70px, calc(18vh - 52.2px), 140px);
     --ib-kpi: clamp(30px, 5.19vh, 56px);
     --ib-num: clamp(22px, 3.70vh, 40px);
     --ib-lbl: clamp(14px, 2.22vh, 24px);
@@ -550,6 +573,140 @@
     box-shadow: 0 24px 60px rgba(15, 23, 42, .28);
     padding: 18px 20px;
     color: #0f172a;
+}
+
+/* ── TV 현황판 시작 팝오버 (P13 r13) ─────────────────────────────────────────
+   줄 하나가 화면 하나다: [체크] [이름] [초] 초.  끈 줄과 「고정 화면」의 초 칸은
+   회색으로 잠근다 — 잠긴 칸을 눌러 보고서야 "안 되는구나" 하는 일이 없게 한다. */
+.ib-modal-tv {
+    width: 392px;
+}
+
+.ib-tvplan {
+    margin-top: 10px;
+    display: flex;
+    flex-direction: column;
+}
+
+.ib-tvrow {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 8px;
+    border-radius: 10px;
+}
+
+.ib-tvrow+.ib-tvrow {
+    border-top: 1px solid rgba(15, 23, 42, .06);
+}
+
+.ib-tvrow input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    flex: none;
+    accent-color: #0f172a;
+    cursor: pointer;
+}
+
+.ib-tvname {
+    flex: 1;
+    min-width: 0;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: #0f172a;
+    cursor: pointer;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ib-tvrow.off .ib-tvname {
+    color: #94a3b8;
+    font-weight: 600;
+}
+
+.ib-tvsec {
+    width: 66px;
+    flex: none;
+    padding: 5px 9px;
+    border-radius: 8px;
+    border: 1px solid rgba(15, 23, 42, .16);
+    background: #fff;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 800;
+    color: #0f172a;
+    text-align: right;
+}
+
+.ib-tvsec:disabled {
+    background: rgba(15, 23, 42, .05);
+    border-color: rgba(15, 23, 42, .08);
+    color: #94a3b8;
+    cursor: not-allowed;
+}
+
+.ib-tvsec.bad {
+    border-color: #f43f5e;
+    color: #be123c;
+}
+
+.ib-tvunit {
+    flex: none;
+    width: 13px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #64748b;
+}
+
+.ib-tvrow.off .ib-tvunit {
+    color: #cbd5e1;
+}
+
+.ib-tvfoot {
+    margin-top: 12px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.ib-tvsum {
+    flex: 1;
+    min-width: 0;
+    font-size: 11.5px;
+    font-weight: 800;
+    color: #334155;
+}
+
+.ib-tvsum.warn {
+    color: #be123c;
+}
+
+.ib-tvmini {
+    flex: none;
+    padding: 5px 11px;
+    border-radius: 8px;
+    font-size: 11.5px;
+    font-weight: 700;
+    color: #334155;
+    background: rgba(15, 23, 42, .06);
+}
+
+.ib-tvmini:hover {
+    background: rgba(15, 23, 42, .11);
+}
+
+/* 「⏸ 일시정지」 알약 — 머리줄에서만 쓴다 */
+.ib-tvpause {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 10px;
+    border-radius: 999px;
+    background: rgba(245, 158, 11, .18);
+    color: var(--ib-warn2);
+    font-weight: 800;
+    letter-spacing: .02em;
 }
 
 /* ═════════════════════════════════════════════════════════════════════════════

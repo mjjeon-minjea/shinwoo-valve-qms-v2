@@ -779,49 +779,202 @@ export const ProgressLine = ({ p }) => {
     );
 };
 
+/* ═════════════════════════════════════════════════════════════════════════════
+   P13 r13 — TV 현황판 「시작 계획」 (차장 승인 09-03)
+
+   r12 까지는 간격 칸이 **하나**였다. 다섯 영역을 다 돌되 전부 같은 초였다.
+   현장에서 나온 말은 둘이다 —
+     · 「공정능력은 하루에 한 번 보면 되는데 10초씩 잡아먹는다」 → **화면을 고르고 싶다**
+     · 「오늘 현황은 좀 더 오래 띄워 달라」                      → **화면마다 초가 다르다**
+   그래서 값이 숫자 하나에서 **계획**으로 바뀌었다.
+
+     계획 = [{ key, on, sec } × 5]   — 차례는 영역 차례 그대로다(오늘 현황이 맨 앞).
+
+   규칙은 셋뿐이다.
+     · 켠 화면이 2개 이상 → 켠 것만 **차례대로** 돈다. 화면마다 제 초를 지킨다.
+     · 켠 화면이 딱 1개   → **고정 화면**이다. 돌지 않으니 초 칸은 회색으로 잠근다.
+     · 0개                 → 「시작」이 잠긴다. 아무것도 안 뜨는 현황판은 현황판이 아니다.
+
+   저장은 localStorage `inbound_tv_plan` 한 열쇠다. 예전 열쇠 `inbound_tv_interval` 은
+   **읽기만** 한다 — 계획이 없을 때 그 값을 다섯 줄에 그대로 옮겨 첫 화면을 만든다.
+   지우지 않는다: r12 로 되돌린 앱이 그 값을 도로 써야 하기 때문이다.
+   ═════════════════════════════════════════════════════════════════════════════ */
+
+export const TV_SEC_MIN = 3;
+export const TV_SEC_MAX = 600;
+export const TV_SEC_DEFAULT = 10;
+
 /**
- * 자동 순환 간격 입력 팝오버. 「TV 현황판」을 누르면 먼저 이게 뜬다 —
- * 켜 놓고 나서 간격을 못 바꾸면 사다리를 놓고 TV 앞으로 가야 하기 때문이다.
+ * 저장값을 화면이 쓸 모양으로 손질한다.
+ *   · 모르는 key 는 버린다(예전 판·손댄 값이 들어와도 화면이 깨지지 않는다).
+ *   · 빠진 영역은 「켬 · 기본 초」로 채운다 — 영역이 늘어난 판으로 올라가도 그대로 돈다.
+ *   · 초는 언제나 min~max 안의 정수다.
+ * 돌려주는 배열의 차례는 **언제나 areaKeys 차례**다. TV 순환 차례가 곧 이 차례다.
  */
-export const IntervalDialog = ({ value, min, max, areas, onStart, onCancel }) => {
-    const nArea = Number.isFinite(Number(areas)) ? Number(areas) : 5;   /* P6 r6: 영역이 5개가 됐다 */
-    const [v, setV] = useState(String(value));
+export function normalizeTvPlan(raw, areaKeys, opt) {
+    const min = (opt && opt.min) || TV_SEC_MIN;
+    const max = (opt && opt.max) || TV_SEC_MAX;
+    const def = (opt && opt.def) || TV_SEC_DEFAULT;
+    const clampSec = (n) => {
+        const x = Math.round(Number(n));
+        if (!Number.isFinite(x)) return def;
+        return Math.min(max, Math.max(min, x));
+    };
+    const by = {};
+    if (raw && Array.isArray(raw.areas)) {
+        raw.areas.forEach((a) => { if (a && typeof a.key === 'string' && !(a.key in by)) by[a.key] = a; });
+    }
+    return (areaKeys || []).map((k) => {
+        const a = by[k];
+        return { key: k, on: a ? a.on !== false : true, sec: a ? clampSec(a.sec) : def };
+    });
+}
+
+/** 켠 화면들의 key 배열 (차례 그대로) */
+export const tvPlanKeys = (plan) => (plan || []).filter((a) => a && a.on).map((a) => a.key);
+/** 한 바퀴 초 — 켠 화면들의 초 합계 */
+export const tvPlanLoop = (plan) => (plan || []).reduce((a, b) => a + (b && b.on ? Number(b.sec) || 0 : 0), 0);
+/** 지금 화면이 머무를 초. 계획에 없으면 기본값이다. */
+export const tvSecOf = (plan, key) => {
+    const a = (plan || []).find((x) => x && x.key === key);
+    return a && Number.isFinite(Number(a.sec)) ? Number(a.sec) : TV_SEC_DEFAULT;
+};
+
+/**
+ * TV 계획을 localStorage 에 남기는 훅.
+ * opt.legacyKey 를 주면 계획이 없을 때 그 열쇠(옛 간격 한 개)를 다섯 줄에 옮긴다 —
+ * **옛 열쇠는 읽기만 하고 건드리지 않는다.**
+ */
+export function useTvPlan(key, areaKeys, opt) {
+    const keySig = (areaKeys || []).join('|');
+    const legacyKey = opt && opt.legacyKey;
+    const min = (opt && opt.min) || TV_SEC_MIN;
+    const max = (opt && opt.max) || TV_SEC_MAX;
+    const def = (opt && opt.def) || TV_SEC_DEFAULT;
+    const [v, setV] = useState(() => {
+        let raw = null;
+        try {
+            const s = window.localStorage.getItem(key);
+            if (s) raw = JSON.parse(s);
+        } catch (e) { raw = null; }
+        if (!raw && legacyKey) {
+            let iv = null;
+            try { iv = window.localStorage.getItem(legacyKey); } catch (e) { iv = null; }
+            if (iv !== null && iv !== '' && Number.isFinite(Number(iv))) {
+                raw = { areas: (areaKeys || []).map((k) => ({ key: k, on: true, sec: Number(iv) })) };
+            }
+        }
+        return normalizeTvPlan(raw, areaKeys, { min, max, def });
+    });
+    const set = useCallback((next) => {
+        const p = normalizeTvPlan({ areas: next }, keySig ? keySig.split('|') : [], { min, max, def });
+        setV(p);
+        try { window.localStorage.setItem(key, JSON.stringify({ areas: p })); } catch (e) { /* 저장 못 해도 화면은 돈다 */ }
+    }, [key, keySig, min, max, def]);
+    return [v, set];
+}
+
+/**
+ * TV 현황판 시작 팝오버. 「TV 현황판」을 누르면 먼저 이게 뜬다 —
+ * 켜 놓고 나서 계획을 못 바꾸면 사다리를 놓고 TV 앞으로 가야 하기 때문이다.
+ * 줄 하나가 화면 하나다: [체크] [이름] [초] 초.
+ */
+export const TvStartDialog = ({ areas, plan, min = TV_SEC_MIN, max = TV_SEC_MAX, def = TV_SEC_DEFAULT, onStart, onCancel }) => {
+    const list = areas || [];
+    const build = useCallback((p) => list.map((a) => {
+        const r = (p || []).find((x) => x && x.key === a.key);
+        return { key: a.key, label: a.label, on: r ? r.on !== false : true, sec: String(r ? r.sec : def) };
+    }), [list, def]);
+    const [rows, setRows] = useState(() => build(plan));
     const ref = useRef(null);
     useEffect(() => { if (ref.current) ref.current.focus(); }, []);
-    const num = Number(v);
-    const bad = !Number.isFinite(num) || num < min || num > max;
-    const submit = (e) => { if (e) e.preventDefault(); if (!bad) onStart(Math.round(num)); };
+
+    const secOk = (s) => {
+        const n = Number(s);
+        return Number.isFinite(n) && Math.round(n) >= min && Math.round(n) <= max && String(s).trim() !== '';
+    };
+    const on = rows.filter((r) => r.on);
+    const nOn = on.length;
+    const fixed = nOn === 1;
+    /* 고정 화면은 돌지 않으니 그 줄의 초는 따지지 않는다 — 잠긴 칸이 「시작」을 막으면 이상하다. */
+    const badRows = fixed ? [] : on.filter((r) => !secOk(r.sec));
+    const canStart = nOn >= 1 && badRows.length === 0;
+    const loop = on.reduce((a, r) => a + (secOk(r.sec) ? Math.round(Number(r.sec)) : 0), 0);
+
+    const setRow = (k, patch) => setRows((rs) => rs.map((r) => (r.key === k ? { ...r, ...patch } : r)));
+    const allOn = () => setRows((rs) => rs.map((r) => ({ ...r, on: true })));
+    const reset = () => setRows((rs) => rs.map((r) => ({ ...r, on: true, sec: String(def) })));
+
+    const submit = (e) => {
+        if (e) e.preventDefault();
+        if (!canStart) return;
+        onStart(rows.map((r) => ({
+            key: r.key,
+            on: !!r.on,
+            sec: secOk(r.sec) ? Math.round(Number(r.sec)) : def,
+        })));
+    };
+
+    const foot = nOn === 0
+        ? '최소 1개 선택'
+        : (fixed ? `고정 · ${on[0].label}` : `선택 ${nOn}개 · 한 바퀴 ${loop}초`);
+
     return (
         <div className="ib-modalwrap" role="presentation"
             onMouseDown={(e) => { if (e.target === e.currentTarget) onCancel(); }}>
-            <form className="ib-modal" role="dialog" aria-modal="true" aria-label="TV 현황판 자동 순환 간격"
+            <form className="ib-modal ib-modal-tv" role="dialog" aria-modal="true" aria-label="TV 현황판 시작"
                 onSubmit={submit}
                 onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); onCancel(); } }}>
                 <b style={{ fontSize: 15, fontWeight: 800, display: 'block' }}>TV 현황판 시작</b>
-                <label htmlFor="ib-iv" style={{ display: 'block', marginTop: 12, fontSize: 12.5, fontWeight: 700, color: '#475569' }}>
-                    자동 순환 간격(초)
-                </label>
-                <input id="ib-iv" ref={ref} type="number" inputMode="numeric" min={min} max={max} step="1"
-                    value={v} onChange={(e) => setV(e.target.value)}
-                    className="tabular-nums"
-                    style={{
-                        marginTop: 6, width: '100%', padding: '9px 12px', borderRadius: 10,
-                        border: `1px solid ${bad ? '#f43f5e' : 'rgba(15,23,42,.16)'}`,
-                        fontSize: 18, fontWeight: 800, fontFamily: 'inherit', color: '#0f172a',
-                    }} />
-                <div style={{ marginTop: 6, fontSize: 11.5, color: bad ? '#be123c' : '#64748b' }}>
-                    {bad ? `${min} ~ ${max} 사이의 초 단위 값이어야 한다.` : `${min}초 ~ ${max}초 · ${nArea}개 영역을 이 간격으로 돌린다.`}
+                <p style={{ marginTop: 6, fontSize: 11.5, lineHeight: 1.55, color: '#64748b' }}>
+                    띄울 화면을 고르고 머무를 시간을 정한다. 하나만 고르면 그 화면만 계속 띄운다.
+                </p>
+
+                <div className="ib-tvplan" data-ib="tvplan">
+                    {rows.map((r, i) => {
+                        const off = !r.on;
+                        const lock = off || fixed;                 /* 고정 화면이면 초 칸도 잠근다 */
+                        const bad = !off && !fixed && !secOk(r.sec);
+                        return (
+                            <div key={r.key} className={`ib-tvrow${off ? ' off' : ''}`} data-ib-row={r.key}>
+                                <input id={`ib-tvon-${r.key}`} ref={i === 0 ? ref : null} type="checkbox"
+                                    checked={!!r.on} aria-label={`${r.label} 사용`}
+                                    onChange={(e) => setRow(r.key, { on: e.target.checked })} />
+                                <label className="ib-tvname" htmlFor={`ib-tvon-${r.key}`}>{r.label}</label>
+                                <input type="number" inputMode="numeric" min={min} max={max} step="1"
+                                    className={`ib-tvsec tabular-nums${bad ? ' bad' : ''}`}
+                                    aria-label={`${r.label} 표시 시간(초)`} disabled={lock}
+                                    value={r.sec} onChange={(e) => setRow(r.key, { sec: e.target.value })} />
+                                <span className="ib-tvunit">초</span>
+                            </div>
+                        );
+                    })}
                 </div>
-                <div className="flex items-center justify-end gap-2" style={{ marginTop: 16 }}>
+
+                <div className="ib-tvfoot">
+                    <span className={`ib-tvsum tabular-nums${canStart ? '' : ' warn'}`} data-ib="tvsum">{foot}</span>
+                    <button type="button" className="ib-tvmini" onClick={allOn}>전체 선택</button>
+                    <button type="button" className="ib-tvmini" onClick={reset}>기본값</button>
+                </div>
+                {badRows.length > 0 && (
+                    <div style={{ marginTop: 8, fontSize: 11.5, color: '#be123c' }}>
+                        {`${min} ~ ${max} 사이의 초 단위 값이어야 한다.`}
+                    </div>
+                )}
+
+                <div className="flex items-center justify-end gap-2" style={{ marginTop: 14 }}>
                     <button type="button" onClick={onCancel} className="rounded-lg"
                         style={{ padding: '8px 14px', fontSize: 12.5, fontWeight: 700, color: '#475569', background: 'rgba(15,23,42,.06)' }}>취소</button>
-                    <button type="submit" disabled={bad} className="rounded-lg"
-                        style={{ padding: '8px 16px', fontSize: 12.5, fontWeight: 800, color: '#fff', background: bad ? '#94a3b8' : '#0f172a' }}>시작</button>
+                    <button type="submit" disabled={!canStart} className="rounded-lg"
+                        style={{ padding: '8px 16px', fontSize: 12.5, fontWeight: 800, color: '#fff', background: canStart ? '#0f172a' : '#94a3b8' }}>시작</button>
                 </div>
             </form>
         </div>
     );
 };
+
+/** 예전 이름. 다른 화면이 아직 부를 수 있어 남겨 둔다(속은 같은 조각이다). */
+export const IntervalDialog = TvStartDialog;
 
 export default {
     fmt, fx, pctText, GRADE_UI, GRADE_ORDER5, gradeColor, TONE, PALETTE, useInboundTheme,
@@ -831,4 +984,6 @@ export default {
     Chip, Segmented, GhostButton, ScreenFrame, ScreenHeader, Loading, ErrorCard, Empty,
     TooltipBox, CountUp, useCountUp, useReducedMotion, useStickyFlag,
     useStickyNumber, useStickyString, AreaBar, TvArrow, Dots, ProgressLine, IntervalDialog,
+    TvStartDialog, useTvPlan, normalizeTvPlan, tvPlanKeys, tvPlanLoop, tvSecOf,
+    TV_SEC_MIN, TV_SEC_MAX, TV_SEC_DEFAULT,
 };

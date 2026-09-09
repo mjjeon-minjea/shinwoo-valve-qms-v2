@@ -1,5 +1,12 @@
 /* ─────────────────────────────────────────────────────────────────────────────
-   areas/A4Capability.jsx — 「대시보드」 영역 4 · 공정능력(Cpk)   (플랜 042 / P9 r9)
+   areas/A4Capability.jsx — 「대시보드」 영역 4 · 공정능력(Cpk)   (플랜 042 / P14 r14)
+
+   r9 → r14 (차장 승인 09-04) : **「측정 데이터 7/14~」 한 문구만 늘었다.**
+   09-04 에 옛 인수검사 기록(1/2~7/13)이 대장에 들어왔다. 그런데 그 기록에는 치수
+   측정값이 없다 — 공정능력은 **7/14 부터의 측정값만**으로 낸 값이다. 대장 통계는
+   1월부터인데 이 화면만 7/14 부터라는 사실을 적어 두지 않으면, 같은 화면 안의 두
+   숫자가 같은 기간의 것으로 읽힌다. 계산·자료·등급은 한 글자도 안 바뀌었다.
+   문구는 lib/inboundStats.js 의 MEASURE_SINCE_NOTE 한 곳이 정한다.
 
    r8 → r9 : **줄 여백만** 줄였다(계산·구성은 그대로다). 대시보드에서 스크롤 막대를
    없앴으므로 「요주의 하위 5개사」 다섯 줄이 1366×768 짜리 TV 에서도 카드 안에
@@ -26,6 +33,7 @@ import {
     fmt, fx, gradeColor, useInboundTheme,
 } from '../ui';
 import { loadInboundSpc, gradeOf, partGrades, gradeCounts } from '../../../lib/inboundSpc';
+import { MEASURE_SINCE_NOTE } from '../../../lib/inboundStats';
 
 const MIN_N = 30;
 
@@ -76,7 +84,7 @@ const A4Capability = ({ tv, go, onInfo }) => {
         else if (st.err) onInfo('측정값을 불러오지 못했다');
         else if (st.D) {
             const O = st.D.overall;
-            onInfo(`측정값기록서 ${fmt(O.n)}개 측정치 · 기간 필터와 무관한 전체 스냅샷 · 등급 = 회사 공식 5등급`);
+            onInfo(`측정값기록서 ${fmt(O.n)}개 측정치 · ${MEASURE_SINCE_NOTE} · 기간 필터와 무관한 전체 스냅샷 · 등급 = 회사 공식 5등급`);
         }
     }, [st.loading, st.err, st.D]);   // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -116,7 +124,8 @@ const A4Capability = ({ tv, go, onInfo }) => {
     return (
         <div className="ib-area-grid ib-g4">
             <Card style={{ gridRow: 'span 2' }} delay={0.06}>
-                <SectionTitle title="전체 판정지수 Ppk" subtitle="측정값기록서 전체" />
+                {/* P14 r14 : TV·데스크톱 어디서나 보이는 자리다(안내줄은 데스크톱에만 뜬다) */}
+                <SectionTitle title="전체 판정지수 Ppk" subtitle={`측정값기록서 전체 · ${MEASURE_SINCE_NOTE}`} />
                 <div className="ib-cardbody items-center justify-center">
                     <GaugeRing value={O.idx} grade={g} size={tv ? 400 : 260} />
                     <div style={{ marginTop: 10, fontSize: 'calc(var(--ib-lbl)*.98)', color: 'var(--ib-ink3)', lineHeight: 1.5, textAlign: 'center' }}>

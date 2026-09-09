@@ -536,6 +536,48 @@ export function previousRange(range) {
 }
 
 /* ═════════════════════════════════════════════════════════════════════════════
+   P14 r14 — 기록 방식이 바뀐 날 = **2026-07-14**  (차장 승인 09-04)
+
+   09-04 에 옛 인수검사 기록(1/2 ~ 7/13, 2,687행)을 대장에 한 번 병합했다.
+   그 앞뒤는 같은 표에 있지만 **같은 방식으로 적힌 기록이 아니다** —
+     · 7/13 까지(옛 시트)  : 판정·수량만 있다. 치수 측정값이 없다.
+     · 7/14 부터(정본 시트) : 측정값기록서가 붙는다. 공정능력(Cpk)은 여기서부터만 나온다.
+   그래서 추이 그래프는 그 날에 **세로 점선 한 줄**을 그어 앞뒤를 가르고,
+   공정능력 화면은 제목 옆에 「측정 데이터 7/14~」를 적는다.
+   숫자는 하나도 바꾸지 않는다 — **어디서 방식이 갈렸는지만** 그림에 표시한다.
+   모르고 보면 7월 앞뒤를 같은 자로 읽게 된다.
+
+   ※ 날짜를 바꾸려면 **이 한 줄**만 고친다. 화면 셋이 이 상수를 본다.
+   ═════════════════════════════════════════════════════════════════════════════ */
+export const RECORD_CHANGE_DATE = '2026-07-14';
+/** 추이 그래프의 세로 점선 딱지 */
+export const RECORD_CHANGE_NOTE = '기록 방식 변경 7/14';
+/** 공정능력(Cpk) 화면의 안내 문구 */
+export const MEASURE_SINCE_NOTE = '측정 데이터 7/14~';
+
+/**
+ * 구간 키 목록에서 **새 방식이 시작되는 첫 구간**의 자리(index). 그을 곳이 없으면 -1.
+ * 키 모양으로 묶음을 알아본다 — 'YYYY-MM-DD'(일별) · 'YYYY-MM'(월별) · 'YYYY'(년별).
+ *   · 년별      : -1. 한 해 **안**에서 갈리므로 해와 해 사이에 선을 그을 수 없다.
+ *   · 구간 1개  : -1. 앞뒤가 없으면 가를 것도 없다.
+ *   · 전부 변경 앞 / 전부 변경 뒤 : -1. 표시 기간에 그 날이 걸치지 않는다는 뜻이다.
+ * 일별에서 7/14 자리에 자료가 없으면 **그 다음 구간** 앞에 선다(없는 날을 지어내지 않는다).
+ * @param {Array<string>} keys  bucketBy() 가 낸 구간 키(오름차순)
+ */
+export function changeIndexOf(keys, date) {
+    const list = keys || [];
+    if (list.length < 2) return -1;
+    const k0 = String(list[0] === null || list[0] === undefined ? '' : list[0]);
+    if (k0.length !== 7 && k0.length !== 10) return -1;
+    const k = String(date || RECORD_CHANGE_DATE).slice(0, k0.length);
+    if (k0 >= k) return -1;
+    for (let i = 1; i < list.length; i += 1) {
+        if (String(list[i]) >= k) return i;
+    }
+    return -1;
+}
+
+/* ═════════════════════════════════════════════════════════════════════════════
    P8 r8 — 「vs 이전」 비교 기준  (차장 확정 09-02)
 
    r7 까지의 규칙은 "같은 길이의 직전 구간, 없으면 기간을 반으로 갈라 후반↔전반" 이었다.
@@ -979,6 +1021,7 @@ export default {
     QUICK_PERIODS, GROUPS, dataSpan, addDays, daySpan, quickRange, rangeFilter,
     autoGroup, bucketBy, previousRange,
     PPM_TARGET, ppm, ppmState, rateState, PPM_STATE_TEXT, fmtRate, fmtPpm,
+    RECORD_CHANGE_DATE, RECORD_CHANGE_NOTE, MEASURE_SINCE_NOTE, changeIndexOf,
     activeDays, prevMonthOf, addYears, comparisonBasis, avgStats,
     rateByBucket, verdictByBucket, topVendorTrend, recentFails, parseItem,
     todayYmd, dayStats, rangeStats, weekRange, mtdRange, prevSameRange, recentRows, todayFails,

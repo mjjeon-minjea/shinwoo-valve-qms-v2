@@ -1,5 +1,11 @@
 /* ─────────────────────────────────────────────────────────────────────────────
-   InboundSuppliers.jsx — 인수검사 「협력업체」   (플랜 042 / P9 r9)
+   InboundSuppliers.jsx — 인수검사 「협력업체」   (플랜 042 / P14 r14)
+
+   r9 → r14 (차장 승인 09-04) : **「측정 데이터 7/14~」 한 문구만 늘었다.**
+   09-04 에 옛 인수검사 기록(1/2~7/13)이 대장에 들어왔지만 그 기록에는 치수 측정값이
+   없다. 그래서 이 화면의 「협력업체 현황」 탭(대장 기준)은 1월부터, 「Cpk 랭킹보드」
+   탭(측정값 기준)은 7/14 부터다 — 같은 기간 칩을 눌러도 두 탭이 보는 자료의 시작이
+   다르다. 그 사실을 Cpk 탭 안내줄에 적는다. 계산·자료는 한 글자도 안 바뀌었다.
 
    r8 → r9 (차장 피드백 09-02)
      1. **화면 위에 세그먼트 바가 생겼다** — 「협력업체 현황」 | 「Cpk 랭킹보드」.
@@ -33,7 +39,10 @@ import { RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
 import '../styles/inbound.css';
 import { loadInboundSpc, GRADE_BOUND, PPK_DOMAIN, reportDateMap, rowsInRange } from '../lib/inboundSpc';
 import { buildD } from '../lib/spcCore';
-import { loadInspections, bySupplier, ymd, summarize, dataSpan, rangeFilter, fmtRate, fmtPpm } from '../lib/inboundStats';
+import {
+    loadInspections, bySupplier, ymd, summarize, dataSpan, rangeFilter, fmtRate, fmtPpm,
+    MEASURE_SINCE_NOTE,
+} from '../lib/inboundStats';
 import InboundPeriodFilter, { useSharedPeriod } from './InboundPeriodFilter';
 import {
     ScreenFrame, ScreenHeader, Card, SectionTitle, KpiTile, GradeChip, GhostButton, AreaBar,
@@ -392,7 +401,9 @@ const Body = ({ st, reload }) => {
 
             <AreaBar items={SUP_TABS} value={tab} onPick={setTab} idPrefix="ibsup" ariaLabel="협력업체 화면"
                 right={<span style={{ fontSize: 'calc(var(--ib-lbl)*.95)', color: 'var(--ib-ink4)' }}>
-                    {isCpk ? '측정값기록서 기준 · 기간 안의 측정값으로 다시 계산한다' : '인수검사 기록 기준'}
+                    {/* P14 r14 : 측정값은 7/14 부터다(옛 기록 1/2~7/13 에는 치수 측정값이 없다).
+                        대장 통계는 1월부터이므로 이 탭의 기간과 다르다는 것을 여기서 밝힌다. */}
+                    {isCpk ? `측정값기록서 기준 · ${MEASURE_SINCE_NOTE} · 기간 안의 측정값으로 다시 계산한다` : '인수검사 기록 기준'}
                 </span>} />
 
             {/* 기간 필터 — 「묶음」은 감춘다(이 화면엔 추이 차트가 없다) */}

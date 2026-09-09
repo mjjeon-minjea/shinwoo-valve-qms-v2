@@ -43,7 +43,9 @@ const A1Summary = ({ tv, S, B, MPPM, P, Cc, basis, group }) => {
                 <SectionTitle title="불량률" subtitle="부적합 수량 ÷ 입고 수량 · 목표 100 PPM" />
                 <div className="ib-cardbody ib-scroll" style={{ justifyContent: 'space-between' }}>
                     <div className="flex flex-wrap items-center gap-4 flex-none">
-                        <Ring pct={S.passRate || 0} color={C.ok2} size={tv ? 190 : 112}
+                        {/* r12: 지름을 CSS 눈금(--ib-heroring)에 맡긴다. 데스크톱 112 · 1080p TV 190
+                            은 그대로고, 낮은 TV 화면에서만 같이 준다(inbound.css 한 곳이 정한다). */}
+                        <Ring pct={S.passRate || 0} color={C.ok2} size="var(--ib-heroring)"
                             label={`${fx(S.passRate, 1)}%`} sub="합격률(건수)" />
                         <div className="flex-1" style={{ minWidth: 120 }}>
                             <div className="tabular-nums" style={{
@@ -75,7 +77,7 @@ const A1Summary = ({ tv, S, B, MPPM, P, Cc, basis, group }) => {
                     </div>
 
                     {/* G — 히어로 빈자리 : 월별 PPM 미니 막대 + 목표선 */}
-                    <div className="flex flex-col" style={{ marginTop: 10, flex: 1, minHeight: 'clamp(72px, 15.5vh, 165px)' }}>
+                    <div className="flex flex-col" style={{ marginTop: 10, flex: 1, minHeight: 'var(--ib-heroppm)' }}>
                         <div style={{ fontSize: 'calc(var(--ib-lbl)*.95)', fontWeight: 700, color: 'var(--ib-ink3)' }}>
                             월별 PPM <span style={{ color: 'var(--ib-ink4)', fontWeight: 600 }}>최근 {MPPM.length}개월 · 점선 = 목표</span>
                         </div>
@@ -83,7 +85,7 @@ const A1Summary = ({ tv, S, B, MPPM, P, Cc, basis, group }) => {
                     </div>
 
                     {/* C — 기간 내 추이. 묶음을 따라간다. */}
-                    <div className="flex flex-col flex-none" style={{ marginTop: 10, height: 'clamp(90px, 13vh, 140px)' }}>
+                    <div className="flex flex-col flex-none" style={{ marginTop: 10, height: 'var(--ib-herospark)' }}>
                         <div style={{ fontSize: 'calc(var(--ib-lbl)*.95)', fontWeight: 700, color: 'var(--ib-ink3)' }}>
                             기간 내 추이 <span style={{ color: 'var(--ib-ink4)', fontWeight: 600 }}>부적합 수량({gl})</span>
                         </div>
