@@ -316,7 +316,9 @@ const InboundOverview = ({ setActiveTab }) => {
         setToast(null);
         try {
             const r = await runSheetSync();
-            setToast({ tone: 'ok', text: r.count === null ? '동기화 완료' : `동기화 완료 · ${fmt(r.count)}건` });
+            setToast(r.skipped
+                ? { tone: 'bad', text: '이미 다른 동기화가 진행 중이다 — 이번 요청은 건너뛰었다' }
+                : { tone: 'ok', text: r.count === null ? '동기화 완료' : `동기화 완료 · ${fmt(r.count)}건` });
             await load(true);       /* 캐시를 버리고 다시 받는다 — 안 그러면 화면이 옛날 값이다 */
         } catch (e) {
             setToast({ tone: 'bad', text: e.message || String(e) });

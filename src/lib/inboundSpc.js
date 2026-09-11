@@ -18,6 +18,9 @@
    ※ 여기서 하는 일은 "표 → rows" 뿐이다. 계산은 전부 spcCore 가 한다.
 
    rows 규칙 (spc_core.load 이식 — 이 4줄이 값의 정확도를 좌우한다)
+     0) (P8e r3) **missing_confirmed_at 이 채워진 행만** 뺀다 — 「최초 부재로부터
+        24시간이 지난 뒤의 정상 수집에서도 여전히 시트에 없었다」가 확인된 줄이다.
+        그 칸이 비었으면 **예전과 완전히 같게** 남긴다. 열이 아예 없어도 같다.
      1) kind === '수치' 인 행만 쓴다.
      2) nominal(T) · tol_upper · tol_lower 가 모두 숫자여야 한다. 하나라도 없으면 그 행은 버린다.
      3) x1..x5 중 null·빈칸·비수치는 **빼고** 담는다. 0 으로 바꾸지 않는다(0 은 실측값이다).
@@ -52,6 +55,67 @@ export const gradeOf = (idx) =>
 
 export const colorOf = (g) => GRADE_COLOR[g] || GRADE_COLOR['4등급'];
 
+/* ── (042 P8e r3) 시트에서 「사라진 줄」을 언제 계산에서 뺄 것인가 ──────────
+   동기화는 시트에서 없어진 줄을 **지우지 않는다**. 대신 —
+     · 없어진 시각                                   → missing_since
+     · 정상 수집에서 없던 것으로 확인된 횟수          → missing_seen
+     · **최초 부재로부터 24시간이 지난 뒤의 정상 수집에서도 여전히 없었음**
+                                                     → **missing_confirmed_at**
+   을 적어 둔다(sql/07).
+
+   ── 여기서 빼는 조건은 **missing_confirmed_at 이 있다** 하나뿐이다 ──────────
+   r2 는 「missing_since 가 24시간 초과 **AND** missing_seen >= 2」였다.
+   예림 3차 회신(2026-09-10 12:41) 이 그 구멍을 짚었다 :
+   「횟수는 괜찮으나 **두 번째 이후의 정상 부재 확인이 「최초 부재로부터 24시간
+    지난 뒤」에 있어야 한다.** 초기에 부재를 두 번 확인한 뒤 수집 장애가 이어지면,
+    단순히 「24시간 초과 AND missing_seen>=2」만으로는 **시간 경과 후 제외될 수
+    있다.**」
+
+   실제로 그렇다 — 두 조건이 서로 **다른 시점**을 보기 때문이다.
+       09:00 정상 수집, 부재 1회  → missing_since=09:00, missing_seen=1
+       09:10 정상 수집, 부재 2회  → missing_seen=2 (아직 24시간 전이다)
+       09:20 부터 수집 장애가 계속 → 보류된 판은 표를 안 건드린다(아무 것도 안 는다)
+       이틀 뒤                      → 24시간도 넘었고 seen 도 2 다 → **빠진다.**
+                                      그런데 **24시간 뒤에 확인한 사람은 아무도 없다.**
+
+   그래서 r3 은 「24시간 뒤의 정상 수집에서도 여전히 없었다」를 **사실로 기록**한
+   칸(missing_confirmed_at)을 보고, **그 칸이 있을 때만** 뺀다. 동기화는 이 칸을
+     ㉠ 검증을 통과한 **정상 수집**에서,
+     ㉡ 그 줄이 이번에도 시트에 **없고**,
+     ㉢ now() >= missing_since + 24시간
+   일 때 **처음 한 번만** 채운다(보류·차단된 판은 표를 아예 안 건드린다).
+   시트에 다시 나타나면 세 칸을 **전부 초기화**한다.
+
+   **missing_seen >= 2 를 함께 두지 않는 이유** — 위 ㉠㉡㉢ 를 만족한 판이 곧
+   「부재 확인」이고, missing_since 를 찍은 판이 그 앞에 반드시 있었으므로
+   「정상 수집에서 2회 이상 확인」은 이 칸 하나에 이미 들어 있다(중복 조건이다).
+   조건을 더 얹으면 오히려, missing_since 는 있는데 missing_seen 이 비어 있는
+   **옛 배포 잔재 행**에서 진짜 삭제가 한 판 더 늦게까지 남는다. 판정 근거를
+   **한 칸**으로 모으는 편이 맞다. missing_seen 은 사람이 「몇 번 확인됐나」를
+   보기 위한 값으로 남는다.
+
+   왜 즉시 빼지 않나 — 「시트에서 안 보인다」에는 두 가지가 섞여 있다.
+     ㉮ 검사원이 그 줄을 정말로 지웠다        → 계산에서 빠져야 맞다
+     ㉯ 그 판만 수집이 잘못됐다               → 다음 판이면 돌아온다
+   24시간이면 10분짜리 크론이 144판을 도는 시간이라, 일시적 실패는 그 안에 복구된다.
+
+   **열이 아직 없는 DB(마이그레이션 07 전)** 에서는 값이 undefined 라 조건이
+   성립하지 않는다 → 예전과 완전히 똑같이 전부 포함한다(회귀 0).
+
+   ※ (r3 ③) review_reason(「정정 확인 대상」) 이 붙은 줄은 **여기서 아무 영향도
+     받지 않는다.** 그 표시는 차장이 볼 표시일 뿐이고, 그 줄의 값·규격은 그대로라
+     Cpk 에도 예전 그대로 들어간다. */
+export const MISSING_GRACE_MS = 24 * 60 * 60 * 1000;   // 동기화 쪽 MEAS_MISSING_CONFIRM_MS 와 같은 값이어야 한다
+export const MISSING_SEEN_REQUIRED = 2;                // (참고용) 화면 판정에는 더 이상 쓰지 않는다
+
+/* 「시트에서 진짜로 없어진 줄」인가 — **missing_confirmed_at 하나만** 본다.
+   **NULL·없음·못 읽는 값은 전부 false** — 즉 지금과 완전히 똑같이 포함한다.
+   (열이 아직 없는 DB 에서는 undefined 가 오므로 화면이 깨지지 않는다.) */
+function isConfirmedGone(confirmedAt) {
+    if (confirmedAt === null || confirmedAt === undefined || confirmedAt === '') return false;
+    return Number.isFinite(Date.parse(String(confirmedAt)));
+}
+
 /* ── 숫자 변환: 숫자면 그대로, 문자열이면 trim 후 Number. 못 읽으면 null ── */
 function num(v) {
     if (v === null || v === undefined) return null;
@@ -80,7 +144,9 @@ export function vendorMap(inspections) {
  */
 export function buildRows(measurements, inspections) {
     const vmap = vendorMap(inspections);
-    const stat = { read: 0, used: 0, dropKind: 0, dropSpec: 0, dropX: 0, unlinked: 0 };
+    const stat = { read: 0, used: 0, dropKind: 0, dropSpec: 0, dropX: 0, dropMissing: 0, unlinked: 0 };
+    /* (r3) '지금'을 여기서 읽던 줄을 없앴다 — 제외 판정이 시각 계산을 하지 않고
+       missing_confirmed_at 이 **있는지만** 보므로 더 이상 필요 없다. */
 
     const src = (measurements || []).slice().sort((a, b) => {
         const x = Number(a && a.source_row), y = Number(b && b.source_row);
@@ -91,6 +157,7 @@ export function buildRows(measurements, inspections) {
     const rows = [];
     for (const r of src) {
         stat.read++;
+        if (isConfirmedGone(r.missing_confirmed_at)) { stat.dropMissing++; continue; }  // 규칙 0 (P8e r3)
         if (r.kind !== '수치') { stat.dropKind++; continue; }              // 규칙 1
 
         const T = num(r.nominal), tu = num(r.tol_upper), tl = num(r.tol_lower);

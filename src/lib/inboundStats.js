@@ -436,7 +436,7 @@ export async function runSheetSync(opt) {
     }
     let body = null;
     try { body = await res.json(); } catch (e) { body = null; }
-    return { ok: true, count: syncCountOf(body), url };
+    return { ok: true, skipped: !!(body && body.skipped), count: syncCountOf(body), url };
 }
 
 /* ═════════════════════════════════════════════════════════════════════════════
