@@ -149,11 +149,18 @@ export const groupReferencePages = (items) => {
     return pages;
 };
 
-const fmtDate = (iso) => (iso || '').slice(0, 10);
+/* 인쇄 시각은 한국시간(KST)으로 — ISO 문자열을 자르면 UTC가 그대로 찍힌다. */
+const kstStr = (iso) => {
+    const d = new Date(iso);
+    return isNaN(d) ? '' : d.toLocaleString('sv-SE', { timeZone: 'Asia/Seoul' });
+};
+const fmtDate = (iso) => {
+    const s = iso || ''; if (!s) return '';
+    return s.length <= 10 ? s.slice(0, 10) : (kstStr(s).slice(0, 10) || s.slice(0, 10));
+};
 const fmtDT = (iso) => {
-    const s = iso || '';
-    if (!s) return '';
-    return s.length >= 16 ? `${s.slice(0, 10)} ${s.slice(11, 16)}` : s.slice(0, 10);
+    const s = iso || ''; if (!s) return '';
+    return s.length <= 10 ? s : (kstStr(s).slice(0, 16) || `${s.slice(0, 10)} ${s.slice(11, 16)}`);
 };
 const won = (n) => `₩${Number(n || 0).toLocaleString()}`;
 
