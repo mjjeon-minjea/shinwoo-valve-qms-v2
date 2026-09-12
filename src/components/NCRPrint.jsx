@@ -77,6 +77,10 @@ table.ncrp-rev tr{break-inside:avoid;page-break-inside:avoid;}
 .ncrp-empty{aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;color:#94a3b8;border:1px dashed #cbd5e1;font-size:11px;}
 .ncrp-att{border:1px solid #cbd5e1;padding:8px;margin-bottom:12px;break-inside:avoid;page-break-inside:avoid;}
 .ncrp-att img{width:100%;max-height:118mm;object-fit:contain;background:#f8fafc;display:block;}
+.ncrp-refpage{page-break-after:always;break-after:page;}
+.ncrp-refpage:last-child{page-break-after:auto;break-after:auto;}
+.ncrp-refpage.images{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.ncrp-refpage.images .ncrp-att{margin-bottom:0;}
 .ncrp-cap{font-family:monospace;font-size:10px;color:#475569;text-align:center;margin-top:4px;word-break:break-all;}
 /* H-④ 첨부 목록 표 — 종이만 봐도 무슨 증거가 붙어 있는지 알 수 있게 본문 끝에 인쇄.
    table-layout:fixed + 백분율 col 폭 + word-break로 긴 파일명이 A4 폭을 밀어내지 않게 한다(과거 N-1 재발 방지). */
@@ -122,6 +126,27 @@ const chunk2 = (arr) => {
     const out = [];
     for (let i = 0; i < arr.length; i += 2) out.push(arr.slice(i, i + 2));
     return out;
+};
+
+/* #3은 업로드 순서대로 이미지만 2장씩 한 쪽에 묶고, 중간 비이미지는 그 자리에 파일명으로 남긴다. */
+export const groupReferencePages = (items) => {
+    const pages = [];
+    let images = [];
+    const flushImages = () => {
+        if (images.length) pages.push({ kind: 'images', items: images });
+        images = [];
+    };
+    (items || []).forEach(item => {
+        if (isImageAtt(item)) {
+            images.push(item);
+            if (images.length === 2) flushImages();
+        } else {
+            flushImages();
+            pages.push({ kind: 'file', items: [item] });
+        }
+    });
+    flushImages();
+    return pages;
 };
 
 const fmtDate = (iso) => (iso || '').slice(0, 10);
@@ -709,7 +734,7 @@ const NCRPrint = ({ report, history, attachments, onClose }) => {
 
     const PairCell = ({ att, side }) => (
         <div className={`ncrp-cell ${side}`}>
-            <h5>{side === 'good' ? '정 상 (양 품)' : '부 적 합 (불 량)'}</h5>
+            <h5>{side === 'good' ? '정상(양품) · 선택' : '부 적 합 (불 량)'}</h5>
             {att ? <img className="ncrp-photo" src={attUrl(att)} alt={att.name || ''} /> : <div className="ncrp-empty">사진 없음</div>}
             {att?.name && <div className="ncrp-cap">{att.name}</div>}
         </div>
@@ -728,6 +753,24 @@ const NCRPrint = ({ report, history, attachments, onClose }) => {
                     ) : (
                         /* Phase 4: 비이미지 첨부 — 파일명 텍스트 줄만 출력 */
                         <div className="ncrp-cap" style={{ textAlign: 'left' }}>첨부 파일: {a.name || `자료 ${i + 1}`}</div>
+                    )}
+                </div>
+            ))}
+        </div>
+    );
+
+    const ReferenceSection = ({ items }) => (
+        <div className="ncrp-sect">
+            <h4>첨부#3 — 관련자료 <small>{items.length}건 · 이미지 2장/쪽</small></h4>
+            {groupReferencePages(items).map((page, pi) => (
+                <div key={pi} className={`ncrp-refpage ${page.kind}`}>
+                    {page.kind === 'images' ? page.items.map((a, i) => (
+                        <div key={a.id ?? i} className="ncrp-att">
+                            <img src={attUrl(a)} alt={a.name || ''} />
+                            <div className="ncrp-cap">{a.name || `자료 ${i + 1}`}</div>
+                        </div>
+                    )) : (
+                        <div className="ncrp-att"><div className="ncrp-cap" style={{ textAlign: 'left' }}>첨부 파일: {page.items[0].name || `자료 ${pi + 1}`}</div></div>
                     )}
                 </div>
             ))}
@@ -851,9 +894,9 @@ const NCRPrint = ({ report, history, attachments, onClose }) => {
                     </div>
                 )}
 
-                {/* ── #2 도면 · #3 관련자료 · #4 처리확인 증빙: 이미지 크게 1쪽당 1~2장 ── */}
+                {/* ── #2·#4·#5는 기존 별지 규칙, #3만 업로드 순서 이미지 2장/쪽 ── */}
                 {drawings.length > 0 && <AttSection title="첨부#2 — 해당 도면" count={drawings.length} items={drawings} />}
-                {refs.length > 0 && <AttSection title="첨부#3 — 관련자료" count={refs.length} items={refs} />}
+                {refs.length > 0 && <ReferenceSection items={refs} />}
                 {/* H-④ 처리확인 증빙 별지 — 이미지는 인쇄, 비이미지는 파일명 텍스트만(#2·#3과 동일 규칙) */}
                 {closedAtts.length > 0 && <AttSection title="첨부#4 — 처리확인 증빙" count={closedAtts.length} items={closedAtts} />}
                 {/* 09-02 특채 요청서(933-16) 별지 — #4와 동일 규칙 */}

@@ -26,7 +26,7 @@ const CODE_GROUPS = [                   // 코드 접두 → optgroup 라벨 (�
    목록에 '이사'가 없어 최용석·황사빈 부서장이 담당자로 떴고,
    목록에 '차장'이 있어 정준길·황경빈 실무자가 빠졌다.
    판정은 role로만 한다(ncrRoles.isNcrRouteStaff — 스테이징과 동일 정본). */
-const ROUTE_EXCLUDE = ['품질보증부', '응용기술팀'];      // 회람 지정 대상에서 제외(주관·선행회람 부서)
+const ROUTE_EXCLUDE = ['품질보증부'];                    // 주관 부서만 일반 회람 대상에서 제외
 const QA_DEPT = '품질보증부';                             // 처리방안 마련 전속 부서
 const CONCESSION = '특채(Concession)';                   // v9.3 onDispChange 규칙 대상 처리방안
 
@@ -59,7 +59,7 @@ const AttSectionHead = ({ open, onToggle, title, badge }) => (
 const PairSlot = ({ att, kind, onPick, onClear, pasteKey, pz }) => (
     <div>
         <div className={`text-center text-xs font-bold tracking-widest py-1 mb-1.5 rounded border ${kind === '정상' ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-red-700 bg-red-50 border-red-200'}`}>
-            {kind === '정상' ? '정상 (양품)' : '불량 (부적합)'}
+            {kind === '정상' ? '정상(양품) · 선택' : '불량 (부적합)'}
         </div>
         {att ? (
             <div className="relative group">
@@ -312,7 +312,7 @@ const NCRCreate = ({ user }) => {
 
     const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
-    /* v10.1 회람 지정 대상 부서 — users.company 중 품질보증부·응용기술팀 제외 */
+    /* v10.1 회람 지정 대상 부서 — 품질보증부만 제외. 응용기술팀은 일반 회람에도 선택 가능하다. */
     const routeDepts = depts.filter(d => !ROUTE_EXCLUDE.includes(d));
     const staffOf = (dept) => staffAll.filter(u => u.company === dept && isNcrRouteStaff(u));
     /* 처리방안 마련자는 품질보증부 전속(차장 확정) — 직급 제한 없음. 부서장도 마련자가 될 수 있다. */
@@ -384,7 +384,8 @@ const NCRCreate = ({ user }) => {
         attachmentRestoreRef.current = restore;
         setAttachmentRestore(restore);
         try {
-            setEditDoc({ id: r.id, ncr_no: r.ncr_no, status: r.status, reject_note: r.reject_note || '' });
+            /* 복구 경고의 다시 불러오기는 이 객체를 다시 loadDraft에 넘긴다. 본문 문맥을 버리지 않는다. */
+            setEditDoc({ ...r, reject_note: r.reject_note || '' });
             /* 다른 문서의 기존 화면값을 keep-set으로 오인하지 않도록 복원 전에는 비운다. */
             setPairs([]); setDrawings([]); setRefDocs([]); setAttOpen({ 1: false, 2: false, 3: false });
             setOrigDisp(r.disposition || '');   // G-⑤ 목록 밖 값 보존용 원본 기억
@@ -540,9 +541,19 @@ const NCRCreate = ({ user }) => {
             const now = new Date().toISOString();
             const attKeyBase = editDoc?.id ?? '_draft';
             const toAttRow = async (a, extra) => {
-                if (a.path) return { id: a.id, name: a.name, path: a.path, ...extra };
-                if (a.legacy) return { id: a.id, name: a.name, dataurl: a.dataurl, ...extra };
-                return { id: a.id, name: a.name, path: await uploadAtt(attKeyBase, a.name, a.dataurl), ...extra };
+                if (a.path) return { id: a.id, name: a.name, path: a.path, formAtt: a, ...extra };
+                if (a.legacy) return { id: a.id, name: a.name, dataurl: a.dataurl, formAtt: a, ...extra };
+                return { id: a.id, name: a.name, path: await uploadAtt(attKeyBase, a.name, a.dataurl), formAtt: a, ...extra };
+            };
+            /* 새 첨부는 서버가 발급한 id/path를 즉시 폼에도 반영해야 다음 수정 저장에서 다시 업로드하지 않는다. */
+            const syncFormAttachment = (formAtt, stored) => {
+                if (!stored?.id || (!stored.path && !stored.dataurl)) return false;
+                const synced = { ...formAtt, id: stored.id, name: stored.name || formAtt.name,
+                    path: stored.path || null, dataurl: stored.dataurl || formAtt.dataurl || '', legacy: !!stored.dataurl };
+                setPairs(ps => ps.map(p => ({ good: p.good === formAtt ? synced : p.good, bad: p.bad === formAtt ? synced : p.bad })));
+                setDrawings(ds => ds.map(a => a === formAtt ? synced : a));
+                setRefDocs(rs => rs.map(a => a === formAtt ? synced : a));
+                return true;
             };
             const attRows = [
                 ...(await Promise.all(pairs.flatMap((p, i) => [
@@ -604,15 +615,23 @@ const NCRCreate = ({ user }) => {
                 (prev.path ?? '') === (row.path ?? '') &&
                 (prev.dataurl ?? '') === (row.dataurl ?? '') &&
                 String(prev.report_id) === String(reportId);
+            let attachmentSyncFailed = false;
             for (const row of attRows) {
-                const prev = row.id != null ? exMap.get(String(row.id)) : null;
+                const { formAtt, ...storedRow } = row;
+                const prev = storedRow.id != null ? exMap.get(String(storedRow.id)) : null;
                 if (prev && attSame(prev, row)) continue;                       // 변한 것 없음 → 손대지 않음
                 if (prev) {
                     /* 자리·내용이 바뀐 기존 첨부: 같은 id로 갱신(UPSERT) — 계보 유지. at은 원본 등록 시각 그대로 둔다 */
-                    await api.fetch('/ncr_attachments', { method: 'POST', body: { ...row, report_id: reportId } });
+                    await api.fetch('/ncr_attachments', { method: 'POST', body: { ...storedRow, report_id: reportId } });
                 } else {
                     const { id: _drop, ...ins } = row;                          // 새 첨부: id는 서버가 발급
-                    await api.fetch('/ncr_attachments', { method: 'POST', body: { report_id: reportId, ...ins, at: now } });
+                    const { formAtt: _formAtt, ...insertBody } = ins;
+                    const insRes = await api.fetch('/ncr_attachments', { method: 'POST', body: { report_id: reportId, ...insertBody, at: now } });
+                    /* POST는 반영됐지만 응답 본문이 깨지거나 id/path가 없으면 완료를 롤백으로
+                       오인하지 않는다. 재저장을 막고 첨부를 다시 불러오게 한다. */
+                    try {
+                        if (!syncFormAttachment(formAtt, await insRes.json())) attachmentSyncFailed = true;
+                    } catch { attachmentSyncFailed = true; }
                 }
             }
             /* P1-2 계보 보존: 반려 후 임시저장(작성중)을 경유해도 이력에 반려가 있으면 '재발행' 요청으로 표기.
@@ -643,6 +662,19 @@ const NCRCreate = ({ user }) => {
             const doneLabel = status === '작성중'
                 ? (editDoc ? '수정 저장' : '임시저장')
                 : (redo ? '재발행 승인 요청' : '발행승인 요청');
+            if (editDoc && status === '작성중') {
+                setConfirmOn(false);
+                if (attachmentSyncFailed) {
+                    const failed = { status: 'failed', docId: editDoc.id, draft: { ...editDoc, ...body, ...saved, id: reportId }, token: attachmentRestoreRef.current.token + 1 };
+                    attachmentRestoreRef.current = failed;
+                    setAttachmentRestore(failed);
+                    setMsg({ t: 'warn', s: `${docNo} ${doneLabel} 완료. 첨부 화면 동기화에 실패했습니다 — 첨부 다시 불러오기 후 재저장하세요.` });
+                } else {
+                    setMsg({ t: 'ok', s: `${docNo} ${doneLabel} 완료` });
+                }
+                loadDrafts();
+                return;
+            }
             setMsg({ t: 'ok', s: `${docNo} ${doneLabel} 완료` });
             const restore = { status: 'idle', docId: null, draft: null, token: attachmentRestoreRef.current.token + 1 };
             attachmentRestoreRef.current = restore;
@@ -928,6 +960,7 @@ const NCRCreate = ({ user }) => {
                                     className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50">
                                     <Plus className="w-3.5 h-3.5" /> 쌍 추가 (정상·불량)
                                 </button>
+                                <p className="text-[11px] text-slate-400">정상 사진은 비교 자료가 있을 때만 첨부하세요. 불량 사진만으로도 등록할 수 있습니다.</p>
                                 <p className="text-[11px] text-slate-400">쌍 단위 관리 — 인쇄 시 1쪽에 2쌍(사진 4장)씩 출력됩니다.</p>
                             </div>
                         )}
@@ -957,7 +990,7 @@ const NCRCreate = ({ user }) => {
                 </div>
 
                 {msg && (
-                    <div className={`text-sm px-4 py-2.5 rounded-lg ${msg.t === 'ok' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>{msg.s}</div>
+                    <div className={`text-sm px-4 py-2.5 rounded-lg ${msg.t === 'ok' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : msg.t === 'warn' ? 'bg-amber-50 text-amber-800 border border-amber-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>{msg.s}</div>
                 )}
                 {attachmentRestore.status === 'failed' && attachmentRestore.draft && (
                     <button type="button" onClick={() => loadDraft(attachmentRestore.draft)}

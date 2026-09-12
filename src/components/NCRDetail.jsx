@@ -1140,7 +1140,7 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
                                 <div key={i} className="grid grid-cols-2 gap-3">
                                     {['good', 'bad'].map(side => (
                                         <div key={side}>
-                                            <div className={`text-center text-[10px] font-bold tracking-widest py-0.5 mb-1 rounded ${side === 'good' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>{side === 'good' ? '정상 (양품)' : '불량 (부적합)'}</div>
+                                            <div className={`text-center text-[10px] font-bold tracking-widest py-0.5 mb-1 rounded ${side === 'good' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>{side === 'good' ? '정상(양품) · 선택' : '불량 (부적합)'}</div>
                                             {p[side] ? <a href={attUrl(p[side])} target="_blank" rel="noreferrer"><img src={attUrl(p[side])} alt="" className="w-full aspect-[4/3] object-cover rounded-lg border border-slate-200" /></a> : <div className="w-full aspect-[4/3] rounded-lg border border-dashed border-slate-200 flex items-center justify-center text-xs text-slate-300">사진 없음</div>}
                                         </div>
                                     ))}
