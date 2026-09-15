@@ -10,7 +10,7 @@ import { attUrl, isImageAtt } from '../lib/attach.jsx';
    · @page A4 세로, body 직계 자식 중 오버레이만 출력(display:none 방식 — visibility 방식은 백지 페이지 유발 실측)
    · 결재란 5칸(작성/발행승인/최종승인/완료확인/종결승인) — 인영 SVG 대신 서명자 성명 텍스트(고딕 굵게)
    · 본문 섹터 1~5 + 별지(응용기술팀 선행 문의) + 부서 회람표, 데이터 있는 섹터만 출력
-   · 사진대지 1쪽=2쌍(가로형 4:3 사진 4장), 첨부 섹션별 page-break-before
+   · 사진대지 1쪽=3쌍(가로형 4:3 사진 6장), 첨부 섹션별 page-break-before
    · 레거시(flow_ver 'v10.0' 또는 값 없음) 문서는 종전 렌더(결재란 2칸 + 본문 표)를 그대로 유지 — 판정은 lib/ncrFlow.js
    portal로 document.body 직하에 렌더하여 앱 UI(#root)를 인쇄에서 통째로 제외 */
 
@@ -101,13 +101,14 @@ table.ncrp-attlist tr{break-inside:avoid;page-break-inside:avoid;}
   .ncrp-noprint{display:none!important;}
   .ncrp-sheet{max-width:none!important;margin:0!important;padding:0!important;box-shadow:none!important;}
   .ncrp-bsect,.ncrp-head,table.ncrp-apr,table.ncrp-rev tr,.ncrp-void{break-inside:avoid!important;page-break-inside:avoid!important;}
-  .ncrp-photo{max-height:64mm;}
+  .ncrp-photo{max-height:56mm;}
   .ncrp-att img{max-height:110mm;}
+  .ncrp-sect > .ncrp-att img{max-height:245mm;}
   img{max-width:100%;}
 }
 `;
 
-/* 쌍 그룹핑: category 1을 pair_no별 {good, bad}로 — 인쇄 1쪽=2쌍 */
+/* 쌍 그룹핑: category 1을 pair_no별 {good, bad}로 — 인쇄 1쪽=3쌍 */
 /* v10.2 D-07 — 같은 pair_no·같은 kind 사진이 2장 이상이면 기존에는 나중 것이 앞 것을 조용히 덮어써
    증거 사진이 유실되었다. 이제 자리가 찬 경우 다음 빈 쌍으로 이월해 한 장도 버리지 않는다. */
 export const groupPairs = (atts) => {
@@ -122,13 +123,13 @@ export const groupPairs = (atts) => {
     return [...map.values()].sort((a, b) => a.no - b.no);
 };
 
-const chunk2 = (arr) => {
+const chunk3 = (arr) => {
     const out = [];
-    for (let i = 0; i < arr.length; i += 2) out.push(arr.slice(i, i + 2));
+    for (let i = 0; i < arr.length; i += 3) out.push(arr.slice(i, i + 3));
     return out;
 };
 
-/* #3은 업로드 순서대로 이미지만 2장씩 한 쪽에 묶고, 중간 비이미지는 그 자리에 파일명으로 남긴다. */
+/* #3은 업로드 순서대로 이미지만 4장씩 한 쪽에 묶고, 중간 비이미지는 그 자리에 파일명으로 남긴다. */
 export const groupReferencePages = (items) => {
     const pages = [];
     let images = [];
@@ -139,7 +140,7 @@ export const groupReferencePages = (items) => {
     (items || []).forEach(item => {
         if (isImageAtt(item)) {
             images.push(item);
-            if (images.length === 2) flushImages();
+            if (images.length === 4) flushImages();
         } else {
             flushImages();
             pages.push({ kind: 'file', items: [item] });
@@ -768,7 +769,7 @@ const NCRPrint = ({ report, history, attachments, onClose }) => {
 
     const ReferenceSection = ({ items }) => (
         <div className="ncrp-sect">
-            <h4>첨부#3 — 관련자료 <small>{items.length}건 · 이미지 2장/쪽</small></h4>
+            <h4>첨부#3 — 관련자료 <small>{items.length}건 · 이미지 4장/쪽</small></h4>
             {groupReferencePages(items).map((page, pi) => (
                 <div key={pi} className={`ncrp-refpage ${page.kind}`}>
                     {page.kind === 'images' ? page.items.map((a, i) => (
@@ -794,9 +795,9 @@ const NCRPrint = ({ report, history, attachments, onClose }) => {
     const showClosed = newFlow && !isVoid && !!closed;
 
     return createPortal(
-        <div className="ncrp-root">
+        <div className="ncrp-root" onClick={e => { e.stopPropagation(); onClose(); }}>
             <style>{PRINT_CSS}</style>
-            <div className="ncrp-toolbar ncrp-noprint">
+            <div className="ncrp-toolbar ncrp-noprint" onClick={e => e.stopPropagation()}>
                 <span style={{ fontSize: 13, fontWeight: 700 }}>인쇄 미리보기 — {report.ncr_no} (FORM 933-07)</span>
                 <span style={{ display: 'flex', gap: 8 }}>
                     <button onClick={() => window.print()}
@@ -810,7 +811,7 @@ const NCRPrint = ({ report, history, attachments, onClose }) => {
                 </span>
             </div>
 
-            <div className="ncrp-sheet">
+            <div className="ncrp-sheet" onClick={e => e.stopPropagation()}>
                 {/* ── 1쪽: 933-07 본문 서식 ── */}
                 <div className="ncrp-head">
                     <div>
@@ -883,11 +884,11 @@ const NCRPrint = ({ report, history, attachments, onClose }) => {
                     <span>FORM 933-07 (REV.2) · {report.ncr_no}</span>
                 </div>
 
-                {/* ── #1 사진대지: 1쪽=2쌍(가로형 4:3 사진 4장) ── */}
+                {/* ── #1 사진대지: 1쪽=3쌍(가로형 4:3 사진 6장) ── */}
                 {pairs.length > 0 && (
                     <div className="ncrp-sect">
-                        <h4>첨부#1 — 사진 전·후 대비표 (사진대지) <small>{pairs.length}쌍 · 1쪽=2쌍(사진 4장)</small></h4>
-                        {chunk2(pairs).map((page, pi) => (
+                        <h4>첨부#1 — 사진 전·후 대비표 (사진대지) <small>{pairs.length}쌍 · 1쪽=3쌍(사진 6장)</small></h4>
+                        {chunk3(pairs).map((page, pi) => (
                             <div key={pi} className="ncrp-pairpage">
                                 {page.map(p => (
                                     <div key={p.no} className="ncrp-pair">
@@ -901,7 +902,7 @@ const NCRPrint = ({ report, history, attachments, onClose }) => {
                     </div>
                 )}
 
-                {/* ── #2·#4·#5는 기존 별지 규칙, #3만 업로드 순서 이미지 2장/쪽 ── */}
+                {/* ── #2·#4·#5는 기존 별지 규칙, #3만 업로드 순서 이미지 4장/쪽 ── */}
                 {drawings.length > 0 && <AttSection title="첨부#2 — 해당 도면" count={drawings.length} items={drawings} />}
                 {refs.length > 0 && <ReferenceSection items={refs} />}
                 {/* H-④ 처리확인 증빙 별지 — 이미지는 인쇄, 비이미지는 파일명 텍스트만(#2·#3과 동일 규칙) */}

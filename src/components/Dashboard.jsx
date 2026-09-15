@@ -10,7 +10,7 @@ import {
     Settings, CheckCircle, HelpCircle, ChevronRight, ChevronDown,
     MoreHorizontal, User, RefreshCw, MessageSquare,
     Plus, Trash2, Edit, X, Upload, FileText, LayoutDashboard, Search,
-    Monitor, Save, Filter
+    Monitor, Save, Filter, Menu
 } from 'lucide-react';
 import Chatbot from './Chatbot';
 import UserManagement from './UserManagement';
@@ -602,8 +602,7 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
         return hash ? hash : 'home';
     };
     const [activeTab, setActiveTab] = useState(getInitialTab); // Default to home (or current hash)
-    // eslint-disable-next-line no-unused-vars
-    const [isMenuOpen, setIsMenuOpen] = useState(true);
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [mainExpanded, setMainExpanded] = useState(true);
     const [inboundExpanded, setInboundExpanded] = useState(true);
     const [processExpanded, setProcessExpanded] = useState(true);
@@ -727,8 +726,17 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
 
     return (
         <div className="flex min-h-[calc(100vh-64px)] bg-slate-50 pt-16">
+            <button
+                type="button"
+                aria-label={isMenuOpen ? '메뉴 닫기' : '메뉴 열기'}
+                aria-expanded={isMenuOpen}
+                onClick={() => setIsMenuOpen(!isMenuOpen)}
+                className="fixed left-4 top-20 z-50 rounded-lg bg-slate-800 p-2 text-white shadow lg:hidden focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            >
+                {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </button>
             {/* Sidebar (Dark-Grey Premium Banner) */}
-            <aside className="w-64 bg-[#1e293b] border-r border-[#0f172a]/20 fixed h-full z-40 hidden lg:block overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
+            <aside className={`w-64 bg-[#1e293b] border-r border-[#0f172a]/20 fixed h-full z-40 ${isMenuOpen ? 'block lg:block' : 'hidden lg:block'} overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']`}>
                 <div className="p-6">
                     <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">
                         Dashboards
@@ -737,7 +745,7 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
                         {/* Main Screen Group */}
                         <div>
                             <button
-                                onClick={() => { setActiveTab('home'); setMainExpanded(!mainExpanded); }}
+                                onClick={() => { setActiveTab('home'); setMainExpanded(!mainExpanded); setIsMenuOpen(false); }}
                                 className={`w-full flex items-center justify-between px-3 py-2.5 text-sm font-semibold rounded-lg transition-all ${['home', 'notices', 'resources', 'dev_notes', 'suggestions'].includes(activeTab)
                                     ? 'bg-slate-800 text-white border-l-4 border-blue-500'
                                     : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'
@@ -753,7 +761,7 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
                             {mainExpanded && (
                                 <div className="mt-1.5 space-y-1.5 pl-6 border-l border-slate-700/50 ml-5">
                                     <button
-                                        onClick={() => setActiveTab('home')}
+                                        onClick={() => { setActiveTab('home'); setIsMenuOpen(false); }}
                                         className={`w-full flex items-center px-3 py-2 text-xs font-medium rounded-md transition-all ${activeTab === 'home' ? 'text-blue-400 font-bold bg-slate-800/40' : 'text-slate-400 hover:text-white'}`}
                                     >
                                         대시보드 홈
@@ -924,7 +932,7 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
                                         </button>
                                     )}
                                     <button
-                                        onClick={() => setActiveTab('ncr_inbox')}
+                                        onClick={() => { setActiveTab('ncr_inbox'); setIsMenuOpen(false); }}
                                         className={`w-full flex items-center px-3 py-2 text-xs font-medium rounded-md transition-all ${activeTab === 'ncr_inbox' ? 'text-blue-400 font-bold bg-slate-800/40' : 'text-slate-400 hover:text-white'}`}
                                     >
                                         결재함
