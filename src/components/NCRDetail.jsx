@@ -235,7 +235,7 @@ const Panel = ({ title, children, footer, onSubmit, submitLabel, color, needComm
 );
 
 const NCRDetail = ({ report, user, onClose, onChanged }) => {
-    const [history, setHistory] = useState([]);
+    const [history, setHistory] = useState(null);
     const [atts, setAtts] = useState([]);
     const [settings, setSettings] = useState(null);
     const [saving, setSaving] = useState(false);
@@ -1101,7 +1101,7 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
                         {!newFlow && <span className="inline-block px-2 py-0.5 text-[10px] rounded-full bg-slate-100 text-slate-500 border border-slate-200">구 흐름 문서</span>}
                     </div>
                     <div className="flex items-center gap-2">
-                        <button onClick={() => setShowPrint(true)} className="flex items-center px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50">
+                        <button onClick={() => setShowPrint(true)} disabled={history === null} className="flex items-center px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-wait">
                             <Printer className="w-3.5 h-3.5 mr-1.5" /> 인쇄
                         </button>
                         <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400"><X className="w-5 h-5" /></button>
@@ -1284,7 +1284,7 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
 
                     <div>
                         <div className="text-xs font-bold text-slate-500 mb-2">결재 이력</div>
-                        {history.length === 0 ? <div className="text-xs text-slate-400">이력이 없습니다.</div> : (
+                        {history === null ? <div className="text-xs text-slate-400">이력을 불러오는 중...</div> : history.length === 0 ? <div className="text-xs text-slate-400">이력이 없습니다.</div> : (
                             <ol className="relative border-l border-slate-200 ml-1.5 space-y-3">
                                 {history.map((h, i) => (
                                     <li key={i} className="ml-4">

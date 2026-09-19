@@ -135,3 +135,10 @@ test('기술팀 row만 있는 정상 기술경로는 알려진 부서를 prior�
     assert.deepEqual(activeReviewDepartments({ 응용기술팀: { state: 'done' } }, options), []);
     assert.deepEqual(activeReviewDepartments({ 생산부: { state: 'done' }, 자재부: { state: 'skip' } }, options), ['생산부']);
 });
+
+test('결재 이력 로드 전에는 빈 이력으로 인쇄를 열지 않는다', () => {
+    const source = readFileSync(new URL('../src/components/NCRDetail.jsx', import.meta.url), 'utf8');
+    assert.match(source, /const \[history, setHistory\] = useState\(null\)/);
+    const printButton = source.slice(source.indexOf('setShowPrint(true)') - 100, source.indexOf('setShowPrint(true)') + 500);
+    assert.match(printButton, /disabled=\{history === null\}/);
+});
