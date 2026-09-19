@@ -39,6 +39,7 @@ export const isNewFlow = (r) => !isLegacyFlow(r);
 export const STATUS_LABEL = {
     '회람중': '처리방안-회람중',
     '종합검토': '처리방안-회신완료',
+    '특채요청 결재 대기': '처리방안-특채요청결재대기',
     '특채판단': '처리방안-특채판단',
     '특채승인 대기': '처리방안-특채승인대기',
     '최종승인 대기': '처리방안-최종승인대기',
@@ -50,4 +51,94 @@ export const STATUS_LABEL = {
 export const statusLabel = (status) => {
     const s = status == null ? '' : String(status);
     return STATUS_LABEL[s] || s;
+};
+
+const blankReview = (roundNo, history, state) => ({
+    round_no: roundNo,
+    ...(history.length ? { review_rounds: history } : {}),
+    state,
+    staff_email: null,
+    staff_name: null,
+    opinion: null,
+    staff_cmt: '',
+    staff_at: null,
+    head_name: null,
+    head_cmt: '',
+    head_at: null,
+    deputy: false,
+    remand_note: ''
+});
+
+/* 기존 회신을 부서 row 안에 보존하고 다음 회차만 비운다.
+   기술문의 row는 본회람이 아니므로 그대로 둔다. */
+export const startNextReviewRound = (reviews, selectedDepartments, allDepartments = []) => {
+    const src = reviews || {};
+    const selected = new Set(selectedDepartments || []);
+    const depts = new Set([
+        ...Object.keys(src).filter(d => d !== '응용기술팀'),
+        ...(allDepartments || []),
+        ...selected
+    ]);
+    const next = {};
+
+    if (src['응용기술팀']) next['응용기술팀'] = src['응용기술팀'];
+
+    depts.forEach(dept => {
+        const row = src[dept] || {};
+        const history = Array.isArray(row.review_rounds) ? [...row.review_rounds] : [];
+        const storedRound = row.round_no;
+        const snapshot = { ...row };
+        delete snapshot.review_rounds;
+        delete snapshot.round_no;
+        const hasRound = Object.keys(snapshot).length > 0;
+        const roundNo = hasRound ? Number(storedRound || 1) : 0;
+        if (hasRound) history.push({ round_no: roundNo, ...snapshot });
+        next[dept] = blankReview(roundNo + 1, history, selected.has(dept) ? 'wait' : 'skip');
+    });
+
+    return next;
+};
+
+/* 최종반려 때 최신 보존 회차의 처리방안 요청을 다시 미해결로 연다. */
+export const reopenLatestDispositionRequests = (reviews) => {
+    const next = { ...(reviews || {}) };
+    let count = 0;
+
+    Object.entries(next).forEach(([dept, row]) => {
+        if (dept === '응용기술팀' || row?.disp_req) return;
+        const history = Array.isArray(row?.review_rounds) ? row.review_rounds : [];
+        const archived = [...history].reverse().find(x => x?.disp_req?.resolved);
+        if (!archived) return;
+        const request = { ...archived.disp_req };
+        delete request.resolved;
+        delete request.resolved_by;
+        delete request.resolved_at;
+        next[dept] = { ...row, disp_req: request };
+        count += 1;
+    });
+
+    return { reviews: next, count };
+};
+
+const SPECIAL_REQUEST_DECISIONS = new Set([
+    '특채요청 채택·기술검토',
+    '특채요청 채택·품질판단',
+    '특채요청 승인불가',
+    '특채요청 반려·담당자 재검토',
+    '특채요청 반려·요청부서 보완'
+]);
+
+/* 마지막 담당자 상신 뒤의 결재만 같은 회차 결재로 본다. */
+export const latestSpecialRequestApprovalCycle = (history) => {
+    const rows = Array.isArray(history) ? history : [];
+    let submitIndex = -1;
+    for (let i = rows.length - 1; i >= 0; i -= 1) {
+        if (rows[i]?.action === '특채요청 검토 상신') { submitIndex = i; break; }
+    }
+    if (submitIndex < 0) return { submit: null, decision: null };
+    let decision = null;
+    for (let i = rows.length - 1; i > submitIndex; i -= 1) {
+        if (SPECIAL_REQUEST_DECISIONS.has(rows[i]?.action)) { decision = rows[i]; break; }
+    }
+    return { submit: rows[submitIndex], decision };
 };

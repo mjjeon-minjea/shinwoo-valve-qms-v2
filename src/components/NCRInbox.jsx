@@ -14,6 +14,7 @@ const STATUS_BADGE = {
     '기술문의': 'bg-violet-50 text-violet-700 border-violet-200',
     '특채판단': 'bg-amber-100 text-amber-800 border-amber-300',
     '특채승인 대기': 'bg-amber-50 text-amber-700 border-amber-200',
+    '특채요청 결재 대기': 'bg-orange-50 text-orange-800 border-orange-300',
     '회람중': 'bg-blue-50 text-blue-700 border-blue-200',
     '종합검토': 'bg-indigo-50 text-indigo-700 border-indigo-200',
     '최종승인 대기': 'bg-purple-50 text-purple-700 border-purple-200',
@@ -28,7 +29,7 @@ const STATUS_BADGE = {
 };
 
 /* v10.1 진행 중 상태군 (레거시 '발행'·'특채 판단' 포함) */
-const PROGRESS_ST = ['발행승인 대기', '기술문의', '특채판단', '특채승인 대기', '회람중', '종합검토', '최종승인 대기', '처리중', '종결승인 대기', '무효승인 대기', '발행', '특채 판단'];
+const PROGRESS_ST = ['발행승인 대기', '기술문의', '특채판단', '특채승인 대기', '특채요청 결재 대기', '회람중', '종합검토', '최종승인 대기', '처리중', '종결승인 대기', '무효승인 대기', '발행', '특채 판단'];
 
 const NCRInbox = ({ user }) => {
     const [rows, setRows] = useState([]);

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Printer, X } from 'lucide-react';
 import { api } from '../lib/api';
-import { isNewFlow, statusLabel } from '../lib/ncrFlow';
+import { isNewFlow, latestSpecialRequestApprovalCycle, statusLabel } from '../lib/ncrFlow';
 import { attUrl, isImageAtt } from '../lib/attach.jsx';
 
 /* NCR 인쇄 뷰 — FORM 933-07 REV.2 · v10.1 정통 복원
@@ -261,6 +261,9 @@ const NCRPrint = ({ report, history, attachments, onClose }) => {
 
     /* ── 7-2. 결재란 5칸 데이터 ── */
     const aIssue = lastOf(hist, '발행승인');
+    const requestCycle = latestSpecialRequestApprovalCycle(hist);
+    const aRequestSubmit = requestCycle.submit;
+    const aRequestDecision = requestCycle.decision;
     const aFinal = lastOf(hist, '최종승인');
     const aClose = lastOf(hist, '종결승인');
     const aDone = lastOf(hist, '완료확인');
@@ -270,7 +273,7 @@ const NCRPrint = ({ report, history, attachments, onClose }) => {
        disposition은 종합검토 상신 시점에 이미 바뀌므로, 최종승인 이력이 없는 문서에 승인 문구를 쓰면
        일어나지 않은 결재를 종이가 단언하게 된다 → 최종승인 이력 유무로 분기한다. */
     const dispChangeDept = Object.entries(report.reviews || {})
-        .filter(([, r]) => r?.disp_req?.resolved === '수락')
+        .filter(([, r]) => r?.disp_req?.resolved === '수락' || (r?.review_rounds || []).some(x => x?.disp_req?.resolved === '수락'))
         .map(([d]) => d).join('·');
     /* 미정('')에서 바뀐 경우도 변경으로 표기한다 — 빈 문자열은 거짓값이라 누락됐다(260829). */
     const dispChangeNote = (report.disposition_prev !== null && report.disposition_prev !== undefined)
@@ -292,6 +295,13 @@ const NCRPrint = ({ report, history, attachments, onClose }) => {
             /* 재발행 대기·작성 복귀 중엔 이전 결재 은닉 (v9.0 감사수리 C-1+M-1) */
             done: !!aIssue && !['작성중', '발행승인 대기'].includes(status)
         },
+        ...(aRequestSubmit || aRequestDecision ? [{
+            label: '특채요청 결재',
+            name: aRequestDecision?.actor_name || '',
+            at: aRequestDecision?.at,
+            done: !!aRequestDecision,
+            waiting: !aRequestDecision && status === '특채요청 결재 대기' ? '결재 대기' : null
+        }] : []),
         {
             label: '최종승인',
             name: aFinal?.actor_name || '',
@@ -475,7 +485,13 @@ const NCRPrint = ({ report, history, attachments, onClose }) => {
         const rv = report.reviews || {};
         const order = (settings?.routing?.default_depts || []).filter(d => d in rv);
         const rest = Object.keys(rv).filter(d => !order.includes(d));
-        return [...order, ...rest].map(dept => ({ dept, r: rv[dept] || {} }));
+        return [...order, ...rest].flatMap(dept => {
+            const current = rv[dept] || {};
+            const previous = Array.isArray(current.review_rounds)
+                ? current.review_rounds.map((r, i) => ({ dept, r, round: Number(r.round_no || i + 1), archived: true }))
+                : [];
+            return [...previous, { dept, r: current, round: Number(current.round_no || 1), archived: false }];
+        });
     };
 
     const ReviewTable = () => {
@@ -485,7 +501,8 @@ const NCRPrint = ({ report, history, attachments, onClose }) => {
             <table className="ncrp-rev">
                 <thead>
                     <tr>
-                        <th style={{ width: 78 }}>회람 부서</th>
+                        <th style={{ width: 38 }}>회차</th>
+                        <th style={{ width: 70 }}>회람 부서</th>
                         <th style={{ width: 84 }}>담당 검토인</th>
                         <th>검토 의견</th>
                         <th style={{ width: 92 }}>부서장 결재</th>
@@ -493,11 +510,12 @@ const NCRPrint = ({ report, history, attachments, onClose }) => {
                     </tr>
                 </thead>
                 <tbody>
-                    {rows.map(({ dept, r }) => {
+                    {rows.map(({ dept, r, round, archived }, rowIndex) => {
                         /* 응용기술팀: 특채 트랙 선행 문의 — 본회람 제외 */
                         if (dept === '응용기술팀' && report.tech_flag) {
                             return (
-                                <tr key={dept}>
+                                <tr key={`${dept}-${round}-${rowIndex}`} style={archived ? { background: '#f8fafc' } : undefined}>
+                                    <td className="c">{round}차</td>
                                     <td className="c">{dept}</td>
                                     <td colSpan={4} className="ncrp-note" style={{ marginTop: 0 }}>
                                         선행 문의 완료 — 본회람 제외 · 회신 내용은 별지(응용기술팀 선행 문의) 참조
@@ -508,7 +526,8 @@ const NCRPrint = ({ report, history, attachments, onClose }) => {
                         /* 회람 제외 부서 */
                         if (r.state === 'skip') {
                             return (
-                                <tr key={dept}>
+                                <tr key={`${dept}-${round}-${rowIndex}`} style={archived ? { background: '#f8fafc' } : undefined}>
+                                    <td className="c">{round}차</td>
                                     <td className="c">{dept}</td>
                                     <td colSpan={4} className="ncrp-skip">회 람 제 외</td>
                                 </tr>
@@ -516,7 +535,8 @@ const NCRPrint = ({ report, history, attachments, onClose }) => {
                         }
                         const replied = r.state === 'staffDone' || r.state === 'done' || !!r.staff_at;
                         return (
-                            <tr key={dept}>
+                            <tr key={`${dept}-${round}-${rowIndex}`} style={archived ? { background: '#f8fafc' } : undefined}>
+                                <td className="c">{round}차</td>
                                 <td className="c">{dept}</td>
                                 <td className="c">
                                     {r.staff_name
@@ -538,6 +558,7 @@ const NCRPrint = ({ report, history, attachments, onClose }) => {
                                             {r.disp_req && (
                                                 <div className="ncrp-note">
                                                     [처분방안 변경 요청 → {r.disp_req.to}]{r.disp_req.resolved ? ` (${r.disp_req.resolved})` : ''}
+                                                    {r.disp_req.qa_review?.concession_type ? ` · 특채 유형 ${r.disp_req.qa_review.concession_type}${report.concession_type ? '' : ' (잠정)'}` : ''}
                                                 </div>
                                             )}
                                             {/* 09-04 059 B-12 — 이전 처분방안 변경 요청(disp_req_prev)도 종이에 남긴다 */}
@@ -588,6 +609,12 @@ const NCRPrint = ({ report, history, attachments, onClose }) => {
             {judge?.note && <div className="ncrp-pre s" style={{ marginBottom: 6 }}>{judge.note}</div>}
             {judge?.depts?.length > 0 && (
                 <div className="ncrp-note" style={{ marginBottom: 4 }}>회람 대상 지정: {judge.depts.join(' · ')}</div>
+            )}
+            {aRequestSubmit && (
+                <div className="ncrp-note">특채요청 검토 상신: {aRequestSubmit.actor_name || '—'} · {aRequestSubmit.comment || '—'} · {fmtDT(aRequestSubmit.at) || '—'}</div>
+            )}
+            {aRequestDecision && (
+                <div className="ncrp-note">특채요청 결재: {aRequestDecision.action.replace('특채요청 ', '')} · {aRequestDecision.actor_name || '—'} · {aRequestDecision.comment || '—'} · {fmtDT(aRequestDecision.at) || '—'}</div>
             )}
             {report.tech_reply?.summary && (
                 <div className="ncrp-note">
