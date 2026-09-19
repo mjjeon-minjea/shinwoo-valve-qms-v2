@@ -5,7 +5,9 @@ import { readFileSync } from 'node:fs';
 
 import {
     STATUS_LABEL,
+    activeReviewDepartments,
     latestSpecialRequestApprovalCycle,
+    reviewDepartmentOptions,
     reopenLatestDispositionRequests,
     startNextReviewRound
 } from '../src/lib/ncrFlow.js';
@@ -116,4 +118,20 @@ test('보완반려 뒤 재상신하면 과거 결재를 현재 회차 결재로 
     const completed = latestSpecialRequestApprovalCycle(history);
     assert.equal(completed.submit.actor_name, '담당2');
     assert.equal(completed.decision.action, '특채요청 채택·품질판단');
+});
+
+test('사용자 목록이 비어도 기존 1차 reviews에서 본회람 부서를 복원한다', () => {
+    const options = reviewDepartmentOptions({
+        생산부: { state: 'done' },
+        생산관리부: { state: 'skip' },
+        자재부: { state: 'skip' },
+        응용기술팀: { state: 'done' }
+    }, []);
+    assert.deepEqual(options, ['생산관리부', '생산부', '자재부']);
+});
+
+test('기술팀 row만 있는 정상 기술경로는 알려진 부서를 prior로 오선택하지 않는다', () => {
+    const options = ['생산관리부', '생산부', '자재부'];
+    assert.deepEqual(activeReviewDepartments({ 응용기술팀: { state: 'done' } }, options), []);
+    assert.deepEqual(activeReviewDepartments({ 생산부: { state: 'done' }, 자재부: { state: 'skip' } }, options), ['생산부']);
 });

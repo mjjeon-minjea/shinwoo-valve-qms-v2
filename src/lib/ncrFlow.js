@@ -142,3 +142,12 @@ export const latestSpecialRequestApprovalCycle = (history) => {
     }
     return { submit: rows[submitIndex], decision };
 };
+
+/* 비관리 사용자에게 /users 목록이 비어도 기존 회람 부서를 잃지 않는다. */
+export const reviewDepartmentOptions = (reviews, knownDepartments = []) => [...new Set([
+    ...(knownDepartments || []),
+    ...Object.keys(reviews || {}).filter(dept => dept !== '응용기술팀')
+])].sort();
+
+export const activeReviewDepartments = (reviews, options) => (options || [])
+    .filter(dept => reviews?.[dept] && reviews[dept].state !== 'skip');

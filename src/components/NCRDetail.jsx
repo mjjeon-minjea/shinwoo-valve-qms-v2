@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, CheckCircle2, XCircle, Printer, Undo2, Stamp, FlaskConical, Users, ClipboardCheck, Ban, Coins, Plus, Trash2, File as FileIcon } from 'lucide-react';
 import { api } from '../lib/api';
-import { isLegacyFlow, isNewFlow, reopenLatestDispositionRequests, startNextReviewRound, statusLabel } from '../lib/ncrFlow';
+import { activeReviewDepartments, isLegacyFlow, isNewFlow, reopenLatestDispositionRequests, reviewDepartmentOptions, startNextReviewRound, statusLabel } from '../lib/ncrFlow';
 import { roleOf, canApprove, techApprovalDecision } from '../lib/ncrRoles';
 /* v10.2 H-③ 처리확인 증빙 첨부 — 작성화면과 「같은 규칙」(1280px 축소 · 비이미지 5MB)을 쓰려고
    lib/attach.jsx의 공용 함수를 그대로 가져다 쓴다(NCRCreate에 있던 것을 lib로 옮긴 것). */
@@ -357,6 +357,7 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
         .map(([dept, rv]) => ({ dept, req: rv.disp_req }));
     const pendingConcReqs = pendingDispReqs.filter(({ req }) => req.to === CONCESSION);
     const provisionalConc = Object.values(reviews).find(rv => rv?.disp_req?.qa_review?.concession_type)?.disp_req.qa_review.concession_type || '';
+    const judgeRouteDepts = reviewDepartmentOptions(reviews, allDepts);
     const dispRemandOn = pendingDispReqs.some(({ dept }) => dispDecisions[dept] === '반송');
     const dispConcOn = pendingDispReqs.some(({ dept, req }) => dispDecisions[dept] === '수락' && req.to === CONCESSION);
     const collectDeptCosts = () => Object.entries(reviews)                     // 부서가 회람에서 올린 비용 항목 → 1차 미리채움
@@ -1327,7 +1328,7 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
                                 )}
                                 <div>
                                     <div className="text-xs font-semibold text-slate-600 mb-1">본회람 대상 (응용기술팀 제외 고정 — 선행 문의 완료)</div>
-                                    <div className="flex flex-wrap gap-3">{allDepts.map(d => (
+                                    <div className="flex flex-wrap gap-3">{judgeRouteDepts.map(d => (
                                         <label key={d} className="flex items-center gap-1.5 text-sm"><input type="checkbox" checked={judgeDepts.includes(d)} onChange={e => setJudgeDepts(p => e.target.checked ? [...p, d] : p.filter(x => x !== d))} />{d}</label>
                                     ))}</div>
                                 </div>
@@ -1574,7 +1575,7 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
                             </>)}
                             {newFlow && myTurn && report.status === '기술문의' && ro.isTechStaff && <button onClick={() => openPanel('techStaff')} className={`${btnP} bg-violet-600 hover:bg-violet-700`}>기술 검토 회신</button>}
                             {newFlow && myTurn && report.status === '기술문의' && ro.isTechApprover && <button onClick={() => openPanel('techHead')} className={`${btnP} bg-violet-700 hover:bg-violet-800`}>{`회신 확정 (${ro.isTechDeputy && !ro.isTechHead ? '차석 대결' : '기술부서장'})`}</button>}
-                            {newFlow && myTurn && report.status === '특채판단' && (<button onClick={() => { openPanel('judge'); setJudgeConc(provisionalConc); setJudgeDepts((settings?.routing?.default_depts || []).filter(d => allDepts.includes(d))); }} className={`${btnP} bg-amber-600 hover:bg-amber-700`}>특채 여부 판단 상신</button>)}
+                            {newFlow && myTurn && report.status === '특채판단' && (<button onClick={() => { const prior = activeReviewDepartments(reviews, judgeRouteDepts); openPanel('judge'); setJudgeConc(provisionalConc); setJudgeDepts(prior.length ? prior : (settings?.routing?.default_depts || []).filter(d => judgeRouteDepts.includes(d))); }} className={`${btnP} bg-amber-600 hover:bg-amber-700`}>특채 여부 판단 상신</button>)}
                             {newFlow && myTurn && report.status === '특채승인 대기' && ro.isQaApprover && (<>
                                 <button onClick={() => openPanel('specialNo')} className={`${btnO} text-red-600 border-red-200 hover:bg-red-50`}>반려</button>
                                 <button onClick={() => openPanel('specialOk')} className={`${btnP} bg-amber-600 hover:bg-amber-700 flex items-center`}><Stamp className="w-4 h-4 mr-1.5" /> 특채 승인 — 본회람 발사</button>
