@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { FileText, Save, Send, AlertTriangle, ChevronDown, ChevronRight, Plus, Trash2, ImagePlus, File as FileIcon, FilePlus2, RotateCcw, Info, Users } from 'lucide-react';
 import { api, supabase } from '../lib/api';
 import { isNcrRouteStaff } from '../lib/ncrRoles';
+import { concessionTypeLabel } from '../lib/ncrFlow';
 import { isNcrAttachmentRestoreReady } from '../lib/ncrAttachmentRestore';
 /* v10.2 H-① 캡처 붙여넣기 복원 — 축소·용량제한·붙여넣기 규칙은 lib/attach.jsx 한 곳에만 둔다(중복 정의 금지).
    결재화면(NCRDetail 처리확인 증빙)이 같은 함수를 쓰므로 이 파일에 다시 정의하지 않는다. */
@@ -1050,7 +1051,7 @@ const NCRCreate = ({ user }) => {
                                         ['부적합수량 / 전체', `${form.qty_defect || '—'} / ${form.qty_unknown ? '파악중' : (form.qty_total || '—')}`],
                                         ['처리방안', form.tech_flag
                                             ? '기술 문의 필요 — 특채판단 단계에서 확정'
-                                            : (form.disposition || '미지정') + (form.disposition === CONCESSION && form.concession_type ? ` · ${form.concession_type}` : '')],
+                                            : (form.disposition || '미지정') + (form.disposition === CONCESSION && form.concession_type ? ` · ${concessionTypeLabel(form.concession_type)}` : '')],
                                         ['회람 대상 부서', form.tech_flag
                                             ? '응용기술팀 (단독 선행회람)'
                                             : (form.routing_depts.length

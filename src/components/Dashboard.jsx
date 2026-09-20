@@ -602,6 +602,7 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
         return hash ? hash : 'home';
     };
     const [activeTab, setActiveTab] = useState(getInitialTab); // Default to home (or current hash)
+    const [ncrInboxTarget, setNcrInboxTarget] = useState(null);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [mainExpanded, setMainExpanded] = useState(true);
     const [inboundExpanded, setInboundExpanded] = useState(true);
@@ -689,6 +690,11 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
         checkPopup();
     }, []);
 
+    const openNcrInInbox = (reportId) => {
+        setNcrInboxTarget(reportId);
+        setActiveTab('ncr_inbox');
+    };
+
     const renderContent = () => {
         switch (activeTab) {
             case 'home': return <Home setActiveTab={setActiveTab} />;
@@ -709,8 +715,8 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
             case 'process_history': return <ProcessHistory />;
             case 'final': return <PlaceholderView title="최종검사 현황" icon={CheckCircle} />;
             case 'ncr_create': return user?.company === '품질보증부' ? <NCRCreate user={user} /> : <NCRInbox user={user} />;
-            case 'ncr_inbox': return <NCRInbox user={user} />;
-            case 'ncr_ledger': return <NCRLedger user={user} />;
+            case 'ncr_inbox': return <NCRInbox user={user} targetReportId={ncrInboxTarget} onTargetConsumed={() => setNcrInboxTarget(null)} />;
+            case 'ncr_ledger': return <NCRLedger user={user} onProcess={openNcrInInbox} />;
             case 'dev_notes': return <DevNotes user={user} />;
             case 'suggestions': return <Suggestions user={user} />;
             case 'post_approval': return isAdmin ? <PostApproval user={user} /> : null;

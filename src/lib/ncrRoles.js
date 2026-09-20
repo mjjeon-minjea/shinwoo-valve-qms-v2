@@ -9,6 +9,19 @@ const deputyEnabled = (settings) => settings?.allow_deputy === true;
 
 export const isNcrRouteStaff = (user) => hasRole(user, 'employee');
 
+export const isNcrFinished = (report) => ['종결', '무효'].includes(report?.status);
+
+/* 목록 가시성은 부서 단위 업무 기준. 품질은 전 건, 일반 부서는 실제 회람 row가 기준이다. */
+export const isNcrRelatedToUser = (user, report) => {
+    if (!user || !report) return false;
+    if (user.company === '품질보증부') return true;
+    if (report.author_email && report.author_email === user.email) return true;
+    const reviews = report.reviews || {};
+    const mine = reviews[user.company];
+    if (Object.keys(reviews).length > 0) return !!mine && mine.state !== 'skip';
+    return !!report.dept && report.dept === user.company;
+};
+
 export const roleOf = (user, settings) => {
     const company = user?.company || '';
     const rank = user?.rank || '';

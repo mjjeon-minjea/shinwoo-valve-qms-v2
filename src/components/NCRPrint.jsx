@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Printer, X } from 'lucide-react';
 import { api } from '../lib/api';
-import { isNewFlow, latestSpecialRequestApprovalCycle, statusLabel } from '../lib/ncrFlow';
+import { concessionTypeLabel, isNewFlow, latestSpecialRequestApprovalCycle, statusLabel } from '../lib/ncrFlow';
 import { attUrl, isImageAtt } from '../lib/attach.jsx';
 
 /* NCR 인쇄 뷰 — FORM 933-07 REV.2 · v10.1 정통 복원
@@ -253,11 +253,11 @@ const NCRPrint = ({ report, history, attachments, onClose }) => {
     const isSpecial = judge?.kind === 'special' || /특채/.test(report.disposition || '');
     const dispoText = (judgePending ? report.disposition : (judge?.disp || report.disposition)) || '';
     /* v10.2 특채 하위유형 병기 — 절차서 5.3.4 */
-    const concText = (judgePending ? (report.concession_type || '') : (judge?.conc || report.concession_type)) || '';
+    const concText = concessionTypeLabel((judgePending ? (report.concession_type || '') : (judge?.conc || report.concession_type)) || '');
     const dispoFull = dispoText ? (concText ? `${dispoText} — ${concText}` : dispoText) : '';
     /* 승인 전 상신 내용은 「(상신 · 승인 전)」으로 따로 보여준다 — 숨기지 않되 확정과 섞지 않는다 */
     const judgePendingText = judgePending && judge?.disp
-        ? `${judge.disp}${judge.conc ? ` — ${judge.conc}` : ''}` : '';
+        ? `${judge.disp}${judge.conc ? ` — ${concessionTypeLabel(judge.conc)}` : ''}` : '';
 
     /* ── 7-2. 결재란 5칸 데이터 ── */
     const aIssue = lastOf(hist, '발행승인');
@@ -558,7 +558,7 @@ const NCRPrint = ({ report, history, attachments, onClose }) => {
                                             {r.disp_req && (
                                                 <div className="ncrp-note">
                                                     [처분방안 변경 요청 → {r.disp_req.to}]{r.disp_req.resolved ? ` (${r.disp_req.resolved})` : ''}
-                                                    {r.disp_req.qa_review?.concession_type ? ` · 특채 유형 ${r.disp_req.qa_review.concession_type}${report.concession_type ? '' : ' (잠정)'}` : ''}
+                                                    {r.disp_req.qa_review?.concession_type ? ` · 특채 유형 ${concessionTypeLabel(r.disp_req.qa_review.concession_type)}${report.concession_type ? '' : ' (잠정)'}` : ''}
                                                 </div>
                                             )}
                                             {/* 09-04 059 B-12 — 이전 처분방안 변경 요청(disp_req_prev)도 종이에 남긴다 */}

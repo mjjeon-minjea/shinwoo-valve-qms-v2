@@ -151,3 +151,6 @@ export const reviewDepartmentOptions = (reviews, knownDepartments = []) => [...n
 
 export const activeReviewDepartments = (reviews, options) => (options || [])
     .filter(dept => reviews?.[dept] && reviews[dept].state !== 'skip');
+
+/* 저장값은 유지하고 사용자에게 보이는 특채 하위유형만 구분한다. */
+export const concessionTypeLabel = (value) => value === '수리' ? '특채-수리' : (value || '');

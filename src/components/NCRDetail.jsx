@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, CheckCircle2, XCircle, Printer, Undo2, Stamp, FlaskConical, Users, ClipboardCheck, Ban, Coins, Plus, Trash2, File as FileIcon } from 'lucide-react';
 import { api } from '../lib/api';
-import { activeReviewDepartments, isLegacyFlow, isNewFlow, reopenLatestDispositionRequests, reviewDepartmentOptions, startNextReviewRound, statusLabel } from '../lib/ncrFlow';
+import { activeReviewDepartments, concessionTypeLabel, isLegacyFlow, isNewFlow, reopenLatestDispositionRequests, reviewDepartmentOptions, startNextReviewRound, statusLabel } from '../lib/ncrFlow';
 import { roleOf, canApprove, techApprovalDecision } from '../lib/ncrRoles';
 /* v10.2 H-③ 처리확인 증빙 첨부 — 작성화면과 「같은 규칙」(1280px 축소 · 비이미지 5MB)을 쓰려고
    lib/attach.jsx의 공용 함수를 그대로 가져다 쓴다(NCRCreate에 있던 것을 lib로 옮긴 것). */
@@ -234,7 +234,7 @@ const Panel = ({ title, children, footer, onSubmit, submitLabel, color, needComm
     </div>
 );
 
-const NCRDetail = ({ report, user, onClose, onChanged }) => {
+const NCRDetail = ({ report, user, onClose, onChanged, readOnly = false, canProcess = false, onProcess }) => {
     const [history, setHistory] = useState(null);
     const [atts, setAtts] = useState([]);
     const [settings, setSettings] = useState(null);
@@ -1058,7 +1058,7 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
                     <div className="text-sm font-bold text-violet-800">특채요청서 검토 — 특채 유형 판단 (필수)</div>
                     <select value={concPick} onChange={e => setConcPick(e.target.value)} className={inputCls} aria-label="특채 유형">
                         <option value="">— 선택 —</option>
-                        {(settings?.concession_types || []).map(c => <option key={c} value={c}>{c}</option>)}
+                        {(settings?.concession_types || []).map(c => <option key={c} value={c}>{concessionTypeLabel(c)}</option>)}
                     </select>
                     <p className="text-[11px] text-violet-700">담당자가 요청서와 근거를 검토해 유형을 판단합니다. 상신 뒤 품질부서장이 기술검토·품질판단·승인불가·내부 재검토·요청 부서 보완 중 하나로 결재합니다.</p>
                 </div>
@@ -1128,7 +1128,7 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
                         <div className="col-span-2"><div className="text-xs text-slate-400 mb-0.5">품명</div><div className="font-medium text-slate-700">{report.item_name}{report.item_code ? <span className="ml-1 text-[10px] font-mono text-slate-400">{report.item_code}</span> : null}</div></div>
                         <div><div className="text-xs text-slate-400 mb-0.5">수량 (부적합/전체)</div><div className="font-medium"><span className="text-red-600 font-bold">{report.qty_defect}</span> / {report.qty_unknown ? '파악중' : report.qty_total}</div></div>
                         <div><div className="text-xs text-slate-400 mb-0.5">부적합 코드</div><div className="font-medium text-slate-700">{report.code ? `${report.code} — ${settings?.codes?.[report.code] || ''}` : '—'}</div></div>
-                        <div><div className="text-xs text-slate-400 mb-0.5">처리방안</div><div className="font-medium text-slate-700">{report.disposition || '— 미정 —'}{report.concession_type ? ` (${report.concession_type})` : ''}{hasDispChange(report) ? <span className="ml-1 text-[11px] font-normal text-slate-400">({dispPrevLabel(report)}에서 변경)</span> : null}</div></div>
+                        <div><div className="text-xs text-slate-400 mb-0.5">처리방안</div><div className="font-medium text-slate-700">{report.disposition || '— 미정 —'}{report.concession_type ? ` (${concessionTypeLabel(report.concession_type)})` : ''}{hasDispChange(report) ? <span className="ml-1 text-[11px] font-normal text-slate-400">({dispPrevLabel(report)}에서 변경)</span> : null}</div></div>
                         {/* 933-07 Recommended by — 회람 부서가 처리방안을 문의할 상대 */}
                         <div><div className="text-xs text-slate-400 mb-0.5">처리방안 마련자</div><div className="font-medium text-slate-700">{report.disposition_by || '— 미지정 —'}<span className="ml-1 text-[11px] font-normal text-slate-400">(품질보증부)</span></div></div>
                         <div><div className="text-xs text-slate-400 mb-0.5">작성자</div><div className="font-medium text-slate-700">{report.author_name} ({report.author_company})</div></div>
@@ -1147,7 +1147,7 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
                     {newFlow && report.judge_plan && report.status === '특채승인 대기' && (
                         <div className="text-sm px-4 py-3 rounded-lg bg-amber-50 border border-amber-200">
                             <div className="text-xs font-bold text-amber-700 mb-1">특채 판단 상신 내용</div>
-                            <div className="text-slate-700">{report.judge_plan.kind === 'special' ? `특채(Concession)로 진행${report.judge_plan.conc ? ` — ${report.judge_plan.conc}` : ''}` : `일반 처리로 전환 — ${report.judge_plan.disp}`} · 본회람: {(report.judge_plan.depts || []).join('·')}</div>
+                            <div className="text-slate-700">{report.judge_plan.kind === 'special' ? `특채(Concession)로 진행${report.judge_plan.conc ? ` — ${concessionTypeLabel(report.judge_plan.conc)}` : ''}` : `일반 처리로 전환 — ${report.judge_plan.disp}`} · 본회람: {(report.judge_plan.depts || []).join('·')}</div>
                             <div className="text-slate-600 mt-1">&ldquo;{report.judge_plan.note}&rdquo;</div>
                         </div>
                     )}
@@ -1180,7 +1180,7 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
                                                             )}
                                                             {rv.disp_req?.qa_review?.concession_type && (
                                                                 <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold mr-1 border bg-violet-50 text-violet-700 border-violet-200">
-                                                                    특채 유형 {rv.disp_req.qa_review.concession_type}{report.concession_type ? '' : ' (잠정)'}
+                                                                    특채 유형 {concessionTypeLabel(rv.disp_req.qa_review.concession_type)}{report.concession_type ? '' : ' (잠정)'}
                                                                 </span>
                                                             )}
                                                             {rv.staff_name} · {rv.staff_cmt}
@@ -1300,7 +1300,13 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
 
                     {err && <div className="text-sm px-4 py-2.5 rounded-lg bg-red-50 text-red-700 border border-red-200">{err}</div>}
 
-                    {mode ? (
+                    {readOnly ? (
+                        canProcess && onProcess ? (
+                            <div className="flex justify-end pt-2 border-t border-slate-100">
+                                <button onClick={() => onProcess(report.id)} className={`${btnP} bg-blue-600 hover:bg-blue-700`}>결재함에서 처리</button>
+                            </div>
+                        ) : null
+                    ) : mode ? (
                         mode === 'issueOk' ? <Panel {...panelBase} title={`발행 승인 — ${report.tech_flag ? (report.tech_reply ? '기존 기술 회신 재사용 → 특채 판단으로' : '응용기술팀 단독 선행회람 발사') : '부서 회람 발사'}`} onSubmit={doIssueApprove} submitLabel="발행 승인 확정" color="bg-blue-600 hover:bg-blue-700" /> :
                         mode === 'issueNo' ? <Panel {...panelBase} title="발행 반려 — 작성자에게 되돌립니다" onSubmit={doIssueReject} submitLabel="반려 확정" color="bg-red-600 hover:bg-red-700" needComment /> :
                         mode === 'techStaff' ? <Panel {...panelBase} title="기술 검토 회신" onSubmit={doTechStaff} submitLabel="검토 회신" color="bg-violet-600 hover:bg-violet-700" needComment commentLabel="(검토 의견 — 필수)">
@@ -1317,7 +1323,7 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
                                 {judgeKind === 'special' && (
                                     <select value={judgeConc} onChange={e => setJudgeConc(e.target.value)} className={inputCls}>
                                         <option value="">— 특채 유형 선택 (필수) —</option>
-                                        {(settings?.concession_types || ['현상태 사용', '수리', '재등급 부여', '관련부품 수정']).map(c => <option key={c}>{c}</option>)}
+                                        {(settings?.concession_types || ['현상태 사용', '수리', '재등급 부여', '관련부품 수정']).map(c => <option key={c} value={c}>{concessionTypeLabel(c)}</option>)}
                                     </select>
                                 )}
                                 {judgeKind === 'normal' && (
@@ -1340,11 +1346,11 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
                                     <div className="text-xs font-semibold text-amber-700">특채 유형 * <span className="font-normal text-slate-500">(구 버전 상신 문서 — 확정 전 지정 필요)</span></div>
                                     <select value={okConc} onChange={e => setOkConc(e.target.value)} className={inputCls}>
                                         <option value="">— 선택 —</option>
-                                        {(settings?.concession_types || ['현상태 사용', '수리', '재등급 부여', '관련부품 수정']).map(c => <option key={c}>{c}</option>)}
+                                        {(settings?.concession_types || ['현상태 사용', '수리', '재등급 부여', '관련부품 수정']).map(c => <option key={c} value={c}>{concessionTypeLabel(c)}</option>)}
                                     </select>
                                 </div>
                             )}
-                            {report.judge_plan?.conc && <div className="text-xs text-slate-600">특채 유형: <b className="text-amber-700">{report.judge_plan.conc}</b></div>}
+                            {report.judge_plan?.conc && <div className="text-xs text-slate-600">특채 유형: <b className="text-amber-700">{concessionTypeLabel(report.judge_plan.conc)}</b></div>}
                         </Panel> :
                         mode === 'specialNo' ? <Panel {...panelBase} title="특채 판단 반려 — 품질담당 재판단" onSubmit={doSpecialReject} submitLabel="반려 확정" color="bg-red-600 hover:bg-red-700" needComment /> :
                         mode === 'deptStaff' ? <Panel {...panelBase} footer={deptStaffExtra} title={`${ro.company} 담당 검토 회신 — 의견은 부서장이 검토 후 결정합니다`} onSubmit={doDeptStaff} submitLabel="검토 회신" color="bg-blue-600 hover:bg-blue-700" needComment commentLabel="(검토 의견 — 필수)">
@@ -1371,7 +1377,7 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
                             <div className="space-y-3 text-sm">
                                 {pendingConcReqs.map(({ dept, req }) => (
                                     <div key={dept} className="rounded-lg border border-violet-200 bg-violet-50 p-3">
-                                        <div className="font-bold text-violet-800">{dept} 특채요청 · 잠정 유형 {req.qa_review?.concession_type || '미지정'}</div>
+                                        <div className="font-bold text-violet-800">{dept} 특채요청 · 잠정 유형 {concessionTypeLabel(req.qa_review?.concession_type) || '미지정'}</div>
                                         <div className="text-xs text-slate-600 mt-1">담당 검토: {req.qa_review?.by || '—'} · {req.qa_review?.note || '—'}</div>
                                     </div>
                                 ))}
@@ -1528,7 +1534,7 @@ const NCRDetail = ({ report, user, onClose, onChanged }) => {
                                         <label className="block text-xs font-semibold text-slate-600 mb-1.5">특채 유형 * <span className="font-normal text-slate-500">(구 흐름 문서 — 확정 전 지정 필요)</span></label>
                                         <select value={okConc} onChange={e => setOkConc(e.target.value)} className={inputCls}>
                                             <option value="">— 선택 —</option>
-                                            {(settings?.concession_types || ['현상태 사용', '수리', '재등급 부여', '관련부품 수정']).map(c => <option key={c}>{c}</option>)}
+                                            {(settings?.concession_types || ['현상태 사용', '수리', '재등급 부여', '관련부품 수정']).map(c => <option key={c} value={c}>{concessionTypeLabel(c)}</option>)}
                                         </select>
                                         {report.disposition && <p className="mt-1 text-[11px] text-slate-500">처리방안: <b className="text-amber-700">{report.disposition}</b> (그대로 유지됩니다)</p>}
                                     </div>

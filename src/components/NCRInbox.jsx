@@ -3,6 +3,7 @@ import { Inbox, RefreshCw } from 'lucide-react';
 import { api } from '../lib/api';
 import NCRDetail, { fetchNcrSettings, myTurnV101 } from './NCRDetail';
 import { statusLabel } from '../lib/ncrFlow';
+import { isNcrFinished, isNcrRelatedToUser } from '../lib/ncrRoles';
 
 /* NCR 결재함 — Phase 2 + Phase 4(특채 판단·차석 허용)
    3분류: 내 차례(결재 가능 + 내 반려 문서) / 진행 중 / 완료 — 행 클릭 시 상세·결재 모달 */
@@ -31,7 +32,7 @@ const STATUS_BADGE = {
 /* v10.1 진행 중 상태군 (레거시 '발행'·'특채 판단' 포함) */
 const PROGRESS_ST = ['발행승인 대기', '기술문의', '특채판단', '특채승인 대기', '특채요청 결재 대기', '회람중', '종합검토', '최종승인 대기', '처리중', '종결승인 대기', '무효승인 대기', '발행', '특채 판단'];
 
-const NCRInbox = ({ user }) => {
+const NCRInbox = ({ user, targetReportId, onTargetConsumed }) => {
     const [rows, setRows] = useState([]);
     const [tab, setTab] = useState('progress');
     const [loading, setLoading] = useState(true);
@@ -51,11 +52,22 @@ const NCRInbox = ({ user }) => {
     };
     useEffect(() => { load(); }, []);
 
+    /* 대장의 이동 요청은 rows와 권한 설정이 모두 준비된 뒤 한 번만 소비한다. */
+    useEffect(() => {
+        if (!targetReportId || loading || !settings) return;
+        const target = rows.find(r => r.id === targetReportId);
+        if (target && myTurnV101(user, target, settings)) {
+            setTab('my_turn');
+            setSelected(target);
+        }
+        onTargetConsumed?.();
+    }, [targetReportId, loading, rows, settings, user, onTargetConsumed]);
+
     const mine = r => r.author_email === user?.email;
     const groups = {
         my_turn: rows.filter(r => myTurnV101(user, r, settings)),
-        progress: rows.filter(r => PROGRESS_ST.includes(r.status)),
-        done: rows.filter(r => ['종결', '무효'].includes(r.status))
+        progress: rows.filter(r => PROGRESS_ST.includes(r.status) && isNcrRelatedToUser(user, r)),
+        done: rows.filter(r => isNcrFinished(r) && isNcrRelatedToUser(user, r))
     };
     /* v10.2 G-⑧ — 「완료」 탭은 「내가 본 문서 중 끝난 것」 목록이므로 무효 문서도 그대로 둔다(차장 확정 08-22).
        다만 상세·인쇄가 「통계 제외」라고 말하는데 이 카운트에는 무효가 섞여 있어(F #72 실측)
