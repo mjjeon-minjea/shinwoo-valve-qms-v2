@@ -1069,7 +1069,7 @@ const NCRDetail = ({ report, user, onClose, onChanged, readOnly = false, canProc
                     <p className="text-[11px] text-slate-500">부서·항목별로 나눠 입력하면 합계가 자동 산출됩니다</p>
                     <CostRows rows={stage1Items} setRows={setStage1Items} addLabel="＋ 항목 추가" placeholder="항목명 (예: 주물비)" showDept inputCls={inputCls} />
                     {sumCosts(stage1Items) === 0 && (
-                        <input className={inputCls} placeholder="0원 사유 (예: 반송 — 당사 비용 발생 없음) — 필수" value={zeroWhy} onChange={e => setZeroWhy(e.target.value)} />
+                        <input className={inputCls} placeholder="0원 사유 (예: 불채용(반송) — 당사 비용 발생 없음) — 필수" value={zeroWhy} onChange={e => setZeroWhy(e.target.value)} />
                     )}
                 </div>
             )}

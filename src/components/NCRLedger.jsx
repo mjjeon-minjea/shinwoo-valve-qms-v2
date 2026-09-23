@@ -113,9 +113,9 @@ const NCRLedger = ({ user, onProcess }) => {
                     </thead>
                     <tbody>
                         {loading ? (
-                            <tr><td colSpan={9} className="px-4 py-10 text-center text-slate-400">불러오는 중...</td></tr>
+                            <tr><td colSpan={9} className="px-4 py-10 text-left md:text-center text-slate-400">불러오는 중...</td></tr>
                         ) : filtered.length === 0 ? (
-                            <tr><td colSpan={9} className="px-4 py-10 text-center text-slate-400">등록된 부적합보고서가 없습니다.</td></tr>
+                            <tr><td colSpan={9} className="px-4 py-10 text-left md:text-center text-slate-400">등록된 부적합보고서가 없습니다.</td></tr>
                         ) : filtered.map(r => (
                             <tr key={r.id} onClick={() => setSelected(r)} className="border-b border-slate-100 hover:bg-blue-50/40 cursor-pointer">
                                 <td className="px-4 py-3 font-mono font-semibold text-blue-700">{r.ncr_no}</td>
