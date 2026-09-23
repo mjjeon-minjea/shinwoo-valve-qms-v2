@@ -53,6 +53,13 @@ export const statusLabel = (status) => {
     return STATUS_LABEL[s] || s;
 };
 
+/* 처리방안 구용어는 저장값을 바꾸지 않고 화면·인쇄·CSV에서만 절차서 정본으로 표시한다. */
+const LEGACY_DISPOSITION_LABELS = new Set(['반송', '불채용', '반품']);
+export const dispositionLabel = (value) => {
+    const s = value == null ? '' : String(value);
+    return LEGACY_DISPOSITION_LABELS.has(s) ? '불채용(반송)' : s;
+};
+
 const blankReview = (roundNo, history, state) => ({
     round_no: roundNo,
     ...(history.length ? { review_rounds: history } : {}),

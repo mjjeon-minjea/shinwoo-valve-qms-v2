@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Printer, X } from 'lucide-react';
 import { api } from '../lib/api';
-import { concessionTypeLabel, isNewFlow, latestSpecialRequestApprovalCycle, statusLabel } from '../lib/ncrFlow';
+import { concessionTypeLabel, dispositionLabel, isNewFlow, latestSpecialRequestApprovalCycle, statusLabel } from '../lib/ncrFlow';
 import { attUrl, isImageAtt } from '../lib/attach.jsx';
 
 /* NCR 인쇄 뷰 — FORM 933-07 REV.2 · v10.1 정통 복원
@@ -251,13 +251,13 @@ const NCRPrint = ({ report, history, attachments, onClose }) => {
        레거시 문서의 '특채 승인'(공백 포함)을 놓쳐 종결 문서에도 「승인 전」이 찍힌다(D영역 회귀 실측). */
     const judgePending = newFlow && !isVoid && !!judge && ['특채판단', '특채승인 대기'].includes(report.status || '');
     const isSpecial = judge?.kind === 'special' || /특채/.test(report.disposition || '');
-    const dispoText = (judgePending ? report.disposition : (judge?.disp || report.disposition)) || '';
+    const dispoText = dispositionLabel(judgePending ? report.disposition : (judge?.disp || report.disposition));
     /* v10.2 특채 하위유형 병기 — 절차서 5.3.4 */
     const concText = concessionTypeLabel((judgePending ? (report.concession_type || '') : (judge?.conc || report.concession_type)) || '');
     const dispoFull = dispoText ? (concText ? `${dispoText} — ${concText}` : dispoText) : '';
     /* 승인 전 상신 내용은 「(상신 · 승인 전)」으로 따로 보여준다 — 숨기지 않되 확정과 섞지 않는다 */
     const judgePendingText = judgePending && judge?.disp
-        ? `${judge.disp}${judge.conc ? ` — ${concessionTypeLabel(judge.conc)}` : ''}` : '';
+        ? `${dispositionLabel(judge.disp)}${judge.conc ? ` — ${concessionTypeLabel(judge.conc)}` : ''}` : '';
 
     /* ── 7-2. 결재란 5칸 데이터 ── */
     const aIssue = lastOf(hist, '발행승인');
@@ -277,7 +277,7 @@ const NCRPrint = ({ report, history, attachments, onClose }) => {
         .map(([d]) => d).join('·');
     /* 미정('')에서 바뀐 경우도 변경으로 표기한다 — 빈 문자열은 거짓값이라 누락됐다(260829). */
     const dispChangeNote = (report.disposition_prev !== null && report.disposition_prev !== undefined)
-        ? `← ${report.disposition_prev || '미정'}에서 변경 (${dispChangeDept ? `요청 ${dispChangeDept} · ` : ''}${aFinal ? '승인 품질부서장 최종승인' : '최종승인 전'})`
+        ? `← ${dispositionLabel(report.disposition_prev) || '미정'}에서 변경 (${dispChangeDept ? `요청 ${dispChangeDept} · ` : ''}${aFinal ? '승인 품질부서장 최종승인' : '최종승인 전'})`
         : '';
 
     const aprCells = [
@@ -557,14 +557,14 @@ const NCRPrint = ({ report, history, attachments, onClose }) => {
                                             {/* B-20/B-21 — 거절된 변경 요청·부서가 올린 품질비용도 종이에 흔적을 남긴다 */}
                                             {r.disp_req && (
                                                 <div className="ncrp-note">
-                                                    [처분방안 변경 요청 → {r.disp_req.to}]{r.disp_req.resolved ? ` (${r.disp_req.resolved})` : ''}
+                                                    [처분방안 변경 요청 → {dispositionLabel(r.disp_req.to)}]{r.disp_req.resolved ? ` (${r.disp_req.resolved})` : ''}
                                                     {r.disp_req.qa_review?.concession_type ? ` · 특채 유형 ${concessionTypeLabel(r.disp_req.qa_review.concession_type)}${report.concession_type ? '' : ' (잠정)'}` : ''}
                                                 </div>
                                             )}
                                             {/* 09-04 059 B-12 — 이전 처분방안 변경 요청(disp_req_prev)도 종이에 남긴다 */}
                                             {Array.isArray(r.disp_req_prev) && r.disp_req_prev.map((q, i) => (
                                                 <div className="ncrp-note" key={i}>
-                                                    [이전 변경 요청 → {q.to}]{q.resolved ? ` (${q.resolved}${q.resolved_by ? ' · ' + q.resolved_by : ''}${q.resolved_at ? ' · ' + fmtDT(q.resolved_at) : ''})` : ' (미판정)'}
+                                                    [이전 변경 요청 → {dispositionLabel(q.to)}]{q.resolved ? ` (${q.resolved}${q.resolved_by ? ' · ' + q.resolved_by : ''}${q.resolved_at ? ' · ' + fmtDT(q.resolved_at) : ''})` : ' (미판정)'}
                                                 </div>
                                             ))}
                                             {Array.isArray(r.cost_items) && r.cost_items.length > 0 && (

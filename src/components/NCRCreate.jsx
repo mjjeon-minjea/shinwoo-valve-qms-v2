@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { FileText, Save, Send, AlertTriangle, ChevronDown, ChevronRight, Plus, Trash2, ImagePlus, File as FileIcon, FilePlus2, RotateCcw, Info, Users } from 'lucide-react';
 import { api, supabase } from '../lib/api';
 import { isNcrRouteStaff } from '../lib/ncrRoles';
-import { concessionTypeLabel } from '../lib/ncrFlow';
+import { concessionTypeLabel, dispositionLabel } from '../lib/ncrFlow';
 import { isNcrAttachmentRestoreReady } from '../lib/ncrAttachmentRestore';
 /* v10.2 H-① 캡처 붙여넣기 복원 — 축소·용량제한·붙여넣기 규칙은 lib/attach.jsx 한 곳에만 둔다(중복 정의 금지).
    결재화면(NCRDetail 처리확인 증빙)이 같은 함수를 쓰므로 이 파일에 다시 정의하지 않는다. */
@@ -288,7 +288,8 @@ const NCRCreate = ({ user }) => {
             const rows = (await res.json()) || [];
             const pick = (id) => rows.find(s => s.id === id) || {};
             setCodeMap(pick('codes').map || {});
-            setDispList(Array.isArray(pick('dispositions').list) ? pick('dispositions').list : []);
+            const dispositions = Array.isArray(pick('dispositions').list) ? pick('dispositions').list : [];
+            setDispList([...new Set(dispositions.map(dispositionLabel))]);
             setConcTypes(Array.isArray(pick('dispositions').concession_types) ? pick('dispositions').concession_types : []);
             const rt = pick('routing');
             setRoutingCfg({
@@ -865,7 +866,7 @@ const NCRCreate = ({ user }) => {
                         <select className={inputCls} value={form.disposition} onChange={e => onDispChange(e.target.value)}>
                             <option value="">— 미정 —</option>
                             {/* G-⑤ 설정 목록 밖 값(구용어 등)은 라벨을 달아 맨 앞에 계속 노출 — 바꿔도 되돌릴 수 있다 */}
-                            {outOfListDisps.map(d => <option key={d} value={d}>{d} (설정 외)</option>)}
+                            {outOfListDisps.map(d => <option key={d} value={d}>{dispositionLabel(d)} (설정 외 · 저장값 유지)</option>)}
                             {dispList.map(d => <option key={d} value={d}>{d}</option>)}
                         </select>
                         {form.tech_flag && <p className="mt-1 text-[11px] text-violet-600">기술트랙 — 처리방안과 특채 유형은 특채판단 단계에서 확정됩니다(저장 시 미정으로 기록).</p>}
@@ -1051,7 +1052,7 @@ const NCRCreate = ({ user }) => {
                                         ['부적합수량 / 전체', `${form.qty_defect || '—'} / ${form.qty_unknown ? '파악중' : (form.qty_total || '—')}`],
                                         ['처리방안', form.tech_flag
                                             ? '기술 문의 필요 — 특채판단 단계에서 확정'
-                                            : (form.disposition || '미지정') + (form.disposition === CONCESSION && form.concession_type ? ` · ${concessionTypeLabel(form.concession_type)}` : '')],
+                                            : (dispositionLabel(form.disposition) || '미지정') + (form.disposition === CONCESSION && form.concession_type ? ` · ${concessionTypeLabel(form.concession_type)}` : '')],
                                         ['회람 대상 부서', form.tech_flag
                                             ? '응용기술팀 (단독 선행회람)'
                                             : (form.routing_depts.length

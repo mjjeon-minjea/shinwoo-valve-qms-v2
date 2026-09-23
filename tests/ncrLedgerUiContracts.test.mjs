@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { dispositionLabel } from '../src/lib/ncrFlow.js';
 
 const source = name => readFileSync(new URL(`../src/components/${name}`, import.meta.url), 'utf8');
 
@@ -36,4 +37,32 @@ test('Dashboard에서 넘긴 문서 ID는 결재함이 설정 로드 후 한 번
     assert.match(inbox, /targetReportId/);
     assert.match(inbox, /onTargetConsumed/);
     assert.match(inbox, /!settings/);
+});
+
+test('처리방안 구용어는 저장값을 건드리지 않고 정본으로 표시한다', () => {
+    for (const legacy of ['반송', '불채용', '반품']) {
+        assert.equal(dispositionLabel(legacy), '불채용(반송)');
+    }
+    assert.equal(dispositionLabel('폐기'), '폐기');
+    assert.equal(dispositionLabel(' 반송 '), ' 반송 ');
+    assert.equal(dispositionLabel(null), '');
+});
+
+test('작성·상세·대장·인쇄는 처리방안 표시 정본 함수를 공유한다', () => {
+    const create = source('NCRCreate.jsx');
+    const detail = source('NCRDetail.jsx');
+    const ledger = source('NCRLedger.jsx');
+    const print = source('NCRPrint.jsx');
+    assert.match(create, /setDispList\([\s\S]{0,160}map\(dispositionLabel\)/);
+    assert.match(detail, /dispositionLabel\(report\.disposition\)/);
+    assert.match(detail, /dispositionLabel\(report\.judge_plan\.disp\)/);
+    assert.match(detail, /dispositionLabel\(req\.to\)/);
+    assert.match(detail, /dispositionLabel\(q\.to\)/);
+    assert.match(detail, /\['수락', '거절', '반송'\]/);
+    assert.match(detail, /act\('요청 반송'/);
+    assert.match(ledger, /const dispCell = \(r\) => dispositionLabel\(r\.disposition\)/);
+    assert.match(print, /const dispoText = dispositionLabel\(/);
+    assert.match(print, /const judgePendingText[\s\S]{0,160}dispositionLabel\(judge\.disp\)/);
+    assert.match(print, /처분방안 변경 요청 → \{dispositionLabel\(r\.disp_req\.to\)\}/);
+    assert.match(print, /이전 변경 요청 → \{dispositionLabel\(q\.to\)\}/);
 });

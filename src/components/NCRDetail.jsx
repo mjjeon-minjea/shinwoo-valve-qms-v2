@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, CheckCircle2, XCircle, Printer, Undo2, Stamp, FlaskConical, Users, ClipboardCheck, Ban, Coins, Plus, Trash2, File as FileIcon } from 'lucide-react';
 import { api } from '../lib/api';
-import { activeReviewDepartments, concessionTypeLabel, isLegacyFlow, isNewFlow, reopenLatestDispositionRequests, reviewDepartmentOptions, startNextReviewRound, statusLabel } from '../lib/ncrFlow';
+import { activeReviewDepartments, concessionTypeLabel, dispositionLabel, isLegacyFlow, isNewFlow, reopenLatestDispositionRequests, reviewDepartmentOptions, startNextReviewRound, statusLabel } from '../lib/ncrFlow';
 import { roleOf, canApprove, techApprovalDecision } from '../lib/ncrRoles';
 /* v10.2 H-③ 처리확인 증빙 첨부 — 작성화면과 「같은 규칙」(1280px 축소 · 비이미지 5MB)을 쓰려고
    lib/attach.jsx의 공용 함수를 그대로 가져다 쓴다(NCRCreate에 있던 것을 lib로 옮긴 것). */
@@ -82,7 +82,7 @@ export const fetchNcrSettings = async () => {
             allow_deputy: by.approval?.allow_deputy === true,
             routing: by.routing || { default_depts: ['생산부'], reply_hours: 24 },
             codes: by.codes?.map || {},
-            dispositions: by.dispositions?.list || ['재작업', '폐기', '불채용(반송)', '특채(Concession)'],
+            dispositions: [...new Set((by.dispositions?.list || ['재작업', '폐기', '불채용(반송)', '특채(Concession)']).map(dispositionLabel))],
             concession_types: by.dispositions?.concession_types || ['현상태 사용', '수리', '재등급 부여', '관련부품 수정']
         };
     } catch {
@@ -130,7 +130,7 @@ export const myTurnV101 = (user, r, settings) => {
    ''는 거짓값이라 최종반려해도 원복이 안 되고 요청만 다시 열려 상태가 어긋났다.
    개발웹 25건 중 미정 문서가 11건이라 실제로 자주 닿는 경로다. */
 const hasDispChange = (r) => r?.disposition_prev !== null && r?.disposition_prev !== undefined;
-const dispPrevLabel = (r) => r?.disposition_prev || '미정';
+const dispPrevLabel = (r) => dispositionLabel(r?.disposition_prev) || '미정';
 const QA_REMAND = '[품질 반송]';
 const remandLabel = (note) => String(note || '').startsWith(QA_REMAND) ? '품질 반송' : '부서장 재검토 지시';
 const remandBody = (note) => String(note || '').replace(QA_REMAND, '').trim();
@@ -703,7 +703,7 @@ const NCRDetail = ({ report, user, onClose, onChanged, readOnly = false, canProc
        「특채 근거 불충분」으로 반려해도 처리방안은 특채인 채로 남고 요청은 수락 처리된 상태라
        담당이 되돌릴 수단이 없었다. 특채인 채로 재상신하는 것 말고는 길이 없다.
        그래서 반려 시 ①변경된 처분방안을 원래 값으로 되돌리고 ②판단이 끝난 요청을 다시 미해결로 열어
-       담당이 처음부터 다시 판단하게 한다. 폐기↔불채용 변경(B-20)에도 같은 규칙이 적용된다. */
+       담당이 처음부터 다시 판단하게 한다. 폐기↔불채용(반송) 변경(B-20)에도 같은 규칙이 적용된다. */
     const doFinalReject = () => {
         const g = qaGate();
         if (!g.ok) return setErr(g.msg);
@@ -730,7 +730,7 @@ const NCRDetail = ({ report, user, onClose, onChanged, readOnly = false, canProc
             }
         });
         if (reopened) patch.reviews = rv;
-        const tag = patch.disposition ? ` (처리방안 ${report.disposition} → ${patch.disposition} 원복)` : '';
+        const tag = patch.disposition ? ` (처리방안 ${dispositionLabel(report.disposition)} → ${dispositionLabel(patch.disposition)} 원복)` : '';
         act('최종반려', patch, `${comment}${tag}${dTag(g.deputy)}`);
     };
     const doCloseSubmit = () => {
@@ -974,7 +974,7 @@ const NCRDetail = ({ report, user, onClose, onChanged, readOnly = false, canProc
                             <option value="">— 선택 —</option>
                             {dispTargets.map(d => <option key={d} value={d}>{d}</option>)}
                         </select>
-                        <p className="text-[11px] text-amber-700">현재 <b>{report.disposition || '미정'}</b> → 변경 요청. 위 검토 의견이 변경 사유로 함께 전달됩니다.</p>
+                        <p className="text-[11px] text-amber-700">현재 <b>{dispositionLabel(report.disposition) || '미정'}</b> → 변경 요청. 위 검토 의견이 변경 사유로 함께 전달됩니다.</p>
                         {dispReqTo === CONCESSION && <p className="text-[11px] font-semibold text-violet-700">특채 요청입니다 — 특채 유형은 품질보증부가 수락하면서 정합니다. 요청 사유(불량 정도·사용 가능 판단 근거)를 검토 의견에 구체적으로 적어 주십시오.</p>}
                         {/* ── 09-02 특채 요청서(933-16, 첨부#5) — 특채 요청이면 서명본 첨부 필수(차장 확정).
                             H-③ 처리확인 증빙(#4) 칸과 같은 UI·같은 저장소(ncr_attachments, category 5). ── */}
@@ -1038,7 +1038,7 @@ const NCRDetail = ({ report, user, onClose, onChanged, readOnly = false, canProc
             {pendingDispReqs.map(({ dept, req }) => (
                 <div key={dept} className="rounded-lg border border-amber-300 bg-amber-50 p-3 space-y-1.5">
                     <div className="text-sm font-bold text-amber-800">⚠ 처분방안 변경 요청 — {dept} {req.by}</div>
-                    <div className="text-sm font-semibold text-slate-700">{report.disposition || '—'}&nbsp; → &nbsp;{req.to}</div>
+                    <div className="text-sm font-semibold text-slate-700">{dispositionLabel(report.disposition) || '—'}&nbsp; → &nbsp;{dispositionLabel(req.to)}</div>
                     <div className="text-sm text-slate-600">&ldquo;{req.note}&rdquo;</div>
                     <div className="flex gap-5 text-sm pt-0.5">
                         {['수락', '거절', '반송'].map(v => (
@@ -1128,7 +1128,7 @@ const NCRDetail = ({ report, user, onClose, onChanged, readOnly = false, canProc
                         <div className="col-span-2"><div className="text-xs text-slate-400 mb-0.5">품명</div><div className="font-medium text-slate-700">{report.item_name}{report.item_code ? <span className="ml-1 text-[10px] font-mono text-slate-400">{report.item_code}</span> : null}</div></div>
                         <div><div className="text-xs text-slate-400 mb-0.5">수량 (부적합/전체)</div><div className="font-medium"><span className="text-red-600 font-bold">{report.qty_defect}</span> / {report.qty_unknown ? '파악중' : report.qty_total}</div></div>
                         <div><div className="text-xs text-slate-400 mb-0.5">부적합 코드</div><div className="font-medium text-slate-700">{report.code ? `${report.code} — ${settings?.codes?.[report.code] || ''}` : '—'}</div></div>
-                        <div><div className="text-xs text-slate-400 mb-0.5">처리방안</div><div className="font-medium text-slate-700">{report.disposition || '— 미정 —'}{report.concession_type ? ` (${concessionTypeLabel(report.concession_type)})` : ''}{hasDispChange(report) ? <span className="ml-1 text-[11px] font-normal text-slate-400">({dispPrevLabel(report)}에서 변경)</span> : null}</div></div>
+                        <div><div className="text-xs text-slate-400 mb-0.5">처리방안</div><div className="font-medium text-slate-700">{dispositionLabel(report.disposition) || '— 미정 —'}{report.concession_type ? ` (${concessionTypeLabel(report.concession_type)})` : ''}{hasDispChange(report) ? <span className="ml-1 text-[11px] font-normal text-slate-400">({dispPrevLabel(report)}에서 변경)</span> : null}</div></div>
                         {/* 933-07 Recommended by — 회람 부서가 처리방안을 문의할 상대 */}
                         <div><div className="text-xs text-slate-400 mb-0.5">처리방안 마련자</div><div className="font-medium text-slate-700">{report.disposition_by || '— 미지정 —'}<span className="ml-1 text-[11px] font-normal text-slate-400">(품질보증부)</span></div></div>
                         <div><div className="text-xs text-slate-400 mb-0.5">작성자</div><div className="font-medium text-slate-700">{report.author_name} ({report.author_company})</div></div>
@@ -1147,7 +1147,7 @@ const NCRDetail = ({ report, user, onClose, onChanged, readOnly = false, canProc
                     {newFlow && report.judge_plan && report.status === '특채승인 대기' && (
                         <div className="text-sm px-4 py-3 rounded-lg bg-amber-50 border border-amber-200">
                             <div className="text-xs font-bold text-amber-700 mb-1">특채 판단 상신 내용</div>
-                            <div className="text-slate-700">{report.judge_plan.kind === 'special' ? `특채(Concession)로 진행${report.judge_plan.conc ? ` — ${concessionTypeLabel(report.judge_plan.conc)}` : ''}` : `일반 처리로 전환 — ${report.judge_plan.disp}`} · 본회람: {(report.judge_plan.depts || []).join('·')}</div>
+                            <div className="text-slate-700">{report.judge_plan.kind === 'special' ? `특채(Concession)로 진행${report.judge_plan.conc ? ` — ${concessionTypeLabel(report.judge_plan.conc)}` : ''}` : `일반 처리로 전환 — ${dispositionLabel(report.judge_plan.disp)}`} · 본회람: {(report.judge_plan.depts || []).join('·')}</div>
                             <div className="text-slate-600 mt-1">&ldquo;{report.judge_plan.note}&rdquo;</div>
                         </div>
                     )}
@@ -1189,7 +1189,7 @@ const NCRDetail = ({ report, user, onClose, onChanged, readOnly = false, canProc
                                                             {Array.isArray(rv.disp_req_prev) && rv.disp_req_prev.length > 0 && (
                                                                 <span className="block mt-1 text-[11px] text-slate-500">
                                                                     <span className="inline-block px-1.5 py-0.5 rounded bg-slate-50 border border-slate-200 font-bold mr-1">이전 요청 {rv.disp_req_prev.length}건</span>
-                                                                    {rv.disp_req_prev.map((q, i) => <span key={i} className="mr-2">→ {q.to || ''} ({q.resolved || '미판정'}{q.resolved_by ? ` · ${q.resolved_by}` : ''}{q.resolved_at ? ` · ${String(q.resolved_at).replace('T', ' ').slice(0, 16)}` : ''})</span>)}
+                                                                    {rv.disp_req_prev.map((q, i) => <span key={i} className="mr-2">→ {dispositionLabel(q.to)} ({q.resolved || '미판정'}{q.resolved_by ? ` · ${q.resolved_by}` : ''}{q.resolved_at ? ` · ${String(q.resolved_at).replace('T', ' ').slice(0, 16)}` : ''})</span>)}
                                                                 </span>
                                                             )}
                                                             {/* B-21 — 부서가 올린 품질비용을 부서장이 보고 결재할 수 있게 표시 */}
@@ -1536,7 +1536,7 @@ const NCRDetail = ({ report, user, onClose, onChanged, readOnly = false, canProc
                                             <option value="">— 선택 —</option>
                                             {(settings?.concession_types || ['현상태 사용', '수리', '재등급 부여', '관련부품 수정']).map(c => <option key={c} value={c}>{concessionTypeLabel(c)}</option>)}
                                         </select>
-                                        {report.disposition && <p className="mt-1 text-[11px] text-slate-500">처리방안: <b className="text-amber-700">{report.disposition}</b> (그대로 유지됩니다)</p>}
+                                        {report.disposition && <p className="mt-1 text-[11px] text-slate-500">처리방안: <b className="text-amber-700">{dispositionLabel(report.disposition)}</b> (그대로 유지됩니다)</p>}
                                     </div>
                                 )}
                                 {mode === 'lg_approve' && (
@@ -1544,7 +1544,7 @@ const NCRDetail = ({ report, user, onClose, onChanged, readOnly = false, canProc
                                         <label className="block text-xs font-semibold text-slate-600 mb-1.5">처리방안 확정 *</label>
                                         <select value={dispo} onChange={e => setDispo(e.target.value)} className={inputCls}>
                                             <option value="">— 선택 —</option>
-                                            {(report.disposition && !DISPS_LEGACY.includes(report.disposition) ? [report.disposition, ...DISPS_LEGACY] : DISPS_LEGACY).map(d => <option key={d} value={d}>{d}</option>)}
+                                            {(report.disposition && !DISPS_LEGACY.includes(report.disposition) ? [report.disposition, ...DISPS_LEGACY] : DISPS_LEGACY).map(d => <option key={d} value={d}>{dispositionLabel(d)}</option>)}
                                         </select>
                                     </div>
                                 )}
