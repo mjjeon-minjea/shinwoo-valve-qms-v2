@@ -30,7 +30,7 @@ const NCRLedger = ({ user, onProcess }) => {
        저장값(처리중·종합검토)도 같이 넣어 둔다 — 구 용어를 쓰던 사람도 그대로 찾을 수 있게(둘 다 통과). */
     const matchesQuery = r => !q.trim() ||
         [r.ncr_no, r.item_name, r.supplier, r.defect_desc, r.author_name, statusLabel(r.status), r.status]
-            .join(' ').toLowerCase().includes(q.toLowerCase());
+            .join(' ').toLowerCase().includes(q.trim().toLowerCase());
     const allFiltered = rows.filter(matchesQuery);
     const tabRows = tab === 'mine'
         ? rows.filter(r => !isNcrFinished(r) && isNcrRelatedToUser(user, r))
@@ -123,7 +123,7 @@ const NCRLedger = ({ user, onProcess }) => {
                                 <td className="px-4 py-3 text-slate-600">{r.supplier}</td>
                                 <td className="px-4 py-3 text-slate-800 max-w-[16rem] truncate">{r.item_name}</td>
                                 <td className="px-4 py-3"><span className="text-red-600 font-semibold">{r.qty_defect}</span><span className="text-slate-400"> / {r.qty_total == null ? '파악중' : r.qty_total}</span></td>
-                                <td className="px-4 py-3 text-slate-600">{dispCell(r) || '—'}{r.concession_type ? <span className="text-amber-700"> ({concessionTypeLabel(r.concession_type)})</span> : null}</td>
+                                <td className="px-4 py-3 text-slate-600">{dispCell(r) || '—'}{r.concession_type ? <span className="text-amber-700"> ({r.concession_type})</span> : null}</td>
                                 <td className="px-4 py-3 text-[11px] text-slate-400">{dispChgCell(r) || '—'}</td>
                                 <td className="px-4 py-3 text-slate-600">{statusLabel(r.status)}{(() => { try { return myTurnV101 && myTurnV101(user, r, settings) ? <span className="ml-1.5 px-1.5 py-0.5 text-[10px] font-bold rounded bg-red-500 text-white">내 차례</span> : null; } catch { return null; } })()}</td>
                                 <td className="px-4 py-3 text-slate-600">{r.author_name}</td>

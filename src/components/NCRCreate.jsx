@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { FileText, Save, Send, AlertTriangle, ChevronDown, ChevronRight, Plus, Trash2, ImagePlus, File as FileIcon, FilePlus2, RotateCcw, Info, Users } from 'lucide-react';
 import { api, supabase } from '../lib/api';
 import { isNcrRouteStaff } from '../lib/ncrRoles';
-import { concessionTypeLabel, dispositionLabel } from '../lib/ncrFlow';
+import { dispositionLabel } from '../lib/ncrFlow';
 import { isNcrAttachmentRestoreReady } from '../lib/ncrAttachmentRestore';
 /* v10.2 H-① 캡처 붙여넣기 복원 — 축소·용량제한·붙여넣기 규칙은 lib/attach.jsx 한 곳에만 둔다(중복 정의 금지).
    결재화면(NCRDetail 처리확인 증빙)이 같은 함수를 쓰므로 이 파일에 다시 정의하지 않는다. */
@@ -165,8 +165,10 @@ const SearchPick = ({ value, onText, onPick, table, placeholder, inputCls, badge
 };
 
 /* v10.1 폼 초기값 — 신규 필드: code · tech_flag · routing_depts */
+/* 070 N9 — 수량은 0 이상 정수 1~9자리만(차장 결정 D9·D10). parseInt가 2.5→2·20자리 반올림으로 조용히 바꿔 저장하던 것을 입력에서 막는다 */
+const QTY_RE = /^\d{1,9}$/;
 const blankForm = () => ({
-    occur_date: new Date().toISOString().split('T')[0],
+    occur_date: new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' }),   // 070 ④ 서울 날짜(UTC로 자르면 00~09시에 전날)
     supplier: '', supplier_code: '', item_name: '', item_code: '', item_cls: '', drawing_no: '',
     qty_total: '', qty_unknown: false, qty_defect: '',
     defect_desc: '', disposition: '', dept: '',
@@ -265,7 +267,9 @@ const NCRCreate = ({ user }) => {
                 .filter(m => m && m[1] === yy)
                 .map(m => parseInt(m[2], 10));
             const next = (seqs.length ? Math.max(...seqs) : 0) + 1;
-            setNextNo(`NCR ${yy}-${String(next).padStart(3, '0')}`);
+            const no = `NCR ${yy}-${String(next).padStart(3, '0')}`;
+            setNextNo(no);
+            return no;   // 070 ② 저장 직전 재계산(submit)도 이 값을 쓴다 — 조회 실패면 undefined
         } catch { setNextNo(`NCR ${yy}-001`); }
     };
 
@@ -407,7 +411,7 @@ const NCRCreate = ({ user }) => {
                 }
             }
             setForm({
-                occur_date: r.occur_date || new Date().toISOString().split('T')[0],
+                occur_date: r.occur_date || new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' }),
                 supplier: r.supplier || '', supplier_code: r.supplier_code || '', item_name: r.item_name || '', item_code: r.item_code || '', item_cls: r.item_cls || '', drawing_no: r.drawing_no || '',
                 qty_total: r.qty_total == null ? '' : String(r.qty_total),
                 qty_unknown: !!r.qty_unknown,
@@ -459,13 +463,14 @@ const NCRCreate = ({ user }) => {
     };
 
     /* v9.3 수량 가드: 파악중이면 전체수량 비활성 / 확정이면 전체 필수 + 부적합 ≤ 전체 */
+    /* 070 N9 — parseInt 대신 입력 글자를 QTY_RE로 그대로 검사한다(2.5·1e3·20자리가 통과해 다른 값으로 저장되던 것) */
     const qtyError = (() => {
-        const d = parseInt(form.qty_defect, 10);
+        const d = Number(form.qty_defect);
         if (form.qty_defect === '' ) return null;
-        if (isNaN(d) || d < 0) return '부적합 수량은 0 이상의 숫자여야 합니다.';
+        if (!QTY_RE.test(form.qty_defect)) return '부적합 수량은 0 이상의 정수(최대 9자리)로 입력하세요.';
         if (!form.qty_unknown && form.qty_total !== '') {
-            const t = parseInt(form.qty_total, 10);
-            if (isNaN(t) || t < 0) return '전체 수량은 0 이상의 숫자여야 합니다.';
+            const t = Number(form.qty_total);
+            if (!QTY_RE.test(form.qty_total)) return '전체 수량은 0 이상의 정수(최대 9자리)로 입력하세요.';
             if (d > t) return '부적합 수량이 전체 수량보다 클 수 없습니다.';
         }
         return null;
@@ -523,8 +528,10 @@ const NCRCreate = ({ user }) => {
         if (vErr) { setMsg({ t: 'err', s: vErr }); return; }
         const issuing = status !== '작성중';
         setSaving(true);
-        const docNo = editDoc ? editDoc.ncr_no : nextNo;
         try {
+            /* 070 ② 새 문서 번호는 폼을 연 때가 아니라 저장 직전에 다시 센다. 조회 실패면 저장하지 않는다(대체값 NCR yy-001 저장 차단) */
+            const docNo = editDoc ? editDoc.ncr_no : await loadNextNo();
+            if (!editDoc && !docNo) throw new Error('NCR 번호를 받지 못했습니다 — 잠시 후 다시 저장해 주세요.');
             /* ── 첨부 업로드는 문서 저장보다 먼저 한다 ──────────────────────────
                실측 결함(예림 050 V-4 · 2026-08-30): 종전 순서는 「문서 저장 → 첨부 업로드」였다.
                그래서 사진 업로드가 실패해도 문서 상태는 이미 다음 단계(발행승인 대기)로 넘어가 있었다.
@@ -572,8 +579,8 @@ const NCRCreate = ({ user }) => {
             const body = {
                 ncr_no: docNo, status,
                 ...formCols,
-                qty_total: form.qty_unknown ? null : parseInt(form.qty_total, 10),
-                qty_defect: parseInt(form.qty_defect, 10),
+                qty_total: form.qty_unknown ? null : Number(form.qty_total),
+                qty_defect: Number(form.qty_defect),
                 /* v9.3 규칙: 기술트랙이면 처리방안은 특채판단 단계에서 확정 → 저장 시 초기화 */
                 disposition: form.tech_flag ? '' : form.disposition,
                 concession_type: form.tech_flag ? '' : (form.disposition === CONCESSION ? form.concession_type : ''),
@@ -689,7 +696,9 @@ const NCRCreate = ({ user }) => {
             loadNextNo();
             loadDrafts();
         } catch (e) {
-            setMsg({ t: 'err', s: '저장 실패: ' + (e.message || e) });
+            /* 070 ② 같은 번호가 먼저 저장돼 DB 유일 인덱스가 막은 경우 — 다시 누르면 저장 직전에 새 번호를 센다 */
+            if (e?.code === '23505' && /ncr_no/.test(e.message || '')) setMsg({ t: 'err', s: '번호가 겹쳤습니다. [저장]을 다시 누르면 새 번호로 저장됩니다.' });
+            else setMsg({ t: 'err', s: '저장 실패: ' + (e.message || e) });
         } finally { setSaving(false); }
     };
 
@@ -963,7 +972,7 @@ const NCRCreate = ({ user }) => {
                                     <Plus className="w-3.5 h-3.5" /> 쌍 추가 (정상·불량)
                                 </button>
                                 <p className="text-[11px] text-slate-400">정상 사진은 비교 자료가 있을 때만 첨부하세요. 불량 사진만으로도 등록할 수 있습니다.</p>
-                                <p className="text-[11px] text-slate-400">쌍 단위 관리 — 인쇄 시 1쪽에 2쌍(사진 4장)씩 출력됩니다.</p>
+                                <p className="text-[11px] text-slate-400">쌍 단위 관리 — 인쇄 시 1쪽에 3쌍(사진 6장)씩 출력됩니다.</p>
                             </div>
                         )}
                     </div>
@@ -1052,7 +1061,7 @@ const NCRCreate = ({ user }) => {
                                         ['부적합수량 / 전체', `${form.qty_defect || '—'} / ${form.qty_unknown ? '파악중' : (form.qty_total || '—')}`],
                                         ['처리방안', form.tech_flag
                                             ? '기술 문의 필요 — 특채판단 단계에서 확정'
-                                            : (dispositionLabel(form.disposition) || '미지정') + (form.disposition === CONCESSION && form.concession_type ? ` · ${concessionTypeLabel(form.concession_type)}` : '')],
+                                            : (dispositionLabel(form.disposition) || '미지정') + (form.disposition === CONCESSION && form.concession_type ? ` · ${form.concession_type}` : '')],
                                         ['회람 대상 부서', form.tech_flag
                                             ? '응용기술팀 (단독 선행회람)'
                                             : (form.routing_depts.length

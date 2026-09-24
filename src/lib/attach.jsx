@@ -71,8 +71,8 @@ const dataUrlBytes = (d) => {
     return { bytes: u, mime };
 };
 
-/* 파일명에 경로·특수문자가 섞이면 저장 경로가 깨진다. 한글은 살리고 나머지는 밑줄로 바꾼다. */
-const safeName = (n) => String(n || 'file').normalize('NFC').replace(/[^\w.\-가-힣]+/g, '_').slice(-60);
+/* 저장 경로는 영문·숫자·_.- 만 — Supabase 저장소는 한글 경로를 400(Invalid key)으로 거부한다(070 ①). 원래 이름은 name 칸에 그대로 남는다. */
+const safeName = (n) => String(n || 'file').normalize('NFC').replace(/[^\w.-]+/g, '_').slice(-60);
 
 /* 첨부 1건을 버킷에 올리고 저장 경로를 돌려준다.
    실패하면 예외를 던진다 — 호출부는 이 예외를 잡아 저장·상신 자체를 막아야 한다.

@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, CheckCircle2, XCircle, Printer, Undo2, Stamp, FlaskConical, Users, ClipboardCheck, Ban, Coins, Plus, Trash2, File as FileIcon } from 'lucide-react';
-import { api } from '../lib/api';
+import { api, supabase } from '../lib/api';
 import { activeReviewDepartments, concessionTypeLabel, dispositionLabel, isLegacyFlow, isNewFlow, reopenLatestDispositionRequests, reviewDepartmentOptions, startNextReviewRound, statusLabel } from '../lib/ncrFlow';
 import { roleOf, canApprove, techApprovalDecision } from '../lib/ncrRoles';
 /* v10.2 H-③ 처리확인 증빙 첨부 — 작성화면과 「같은 규칙」(1280px 축소 · 비이미지 5MB)을 쓰려고
    lib/attach.jsx의 공용 함수를 그대로 가져다 쓴다(NCRCreate에 있던 것을 lib로 옮긴 것). */
 import { ATT_CAT, processAnyFile, isImageAtt, useCapturePaste, PasteZone, attUrl, uploadAtt, withAttUrls } from '../lib/attach.jsx';
-import NCRPrint from './NCRPrint';
+import NCRPrint, { fmtDT } from './NCRPrint';
 
 /* v10.2 G-⑦ — 흐름 세대 판정은 lib/ncrFlow.js 한 곳에만 있다(중복 정의 금지).
    기존 호출부 관례(NCRInbox·NCRLedger·Dashboard가 './NCRDetail'에서 가져오는 형태)를 위해 여기서 re-export한다. */
@@ -262,7 +262,7 @@ const NCRDetail = ({ report, user, onClose, onChanged, readOnly = false, canProc
     const [dispReqTo, setDispReqTo] = useState('');         // 변경 목표 처리방안
     const [dispDecisions, setDispDecisions] = useState({}); // 종합검토: { [부서]: '수락'|'거절'|'반송' }
     const [concPick, setConcPick] = useState('');          // 특채 수락 시 특채 유형
-    const [reqDecision, setReqDecision] = useState('tech'); // 특채요청 부서장 5갈래
+    const [reqDecision, setReqDecision] = useState(''); // 특채요청 부서장 5갈래 — 070 ⑦ 미리 선택 없음(고르지 않으면 확정 불가)
     /* B-21 품질비용 2단 산출 */
     const [deptCostOn, setDeptCostOn] = useState(false);                       // 회람 담당: 품질비용 있음 체크
     const [deptCosts, setDeptCosts] = useState([{ label: '', amount: '' }]);   // 회람 담당 입력 항목
@@ -307,13 +307,21 @@ const NCRDetail = ({ report, user, onClose, onChanged, readOnly = false, canProc
     /* 09-03 057 E-10 — 빠른 2회 클릭이면 두 번째 호출이 첫 렌더보다 먼저 들어와 이력이 2행 생겼다(스테이징 재현).
        saving(state)은 다음 렌더에야 버튼을 잠그므로, 렌더와 무관한 동기 ref로 진입 자체를 먼저 막는다.
        성공하면 onClose로 창이 닫히므로 잠금을 풀지 않고, 실패했을 때만 풀어 재시도를 허용한다. */
+    /* 070 N1 — 창을 연 뒤 다른 사람이 먼저 상태를 바꿨으면(동시 조작) 저장하지 않고 이 안내를 띄운다 */
+    const STALE_MSG = '다른 사람이 먼저 처리해 문서 상태가 바뀌었습니다. 창을 닫고 새로고침한 뒤 다시 확인하세요.';
     const actLock = useRef(false);
     const act = async (action, patch, cmt, extra, pre) => {
         if (actLock.current) return;
         actLock.current = true;
         setSaving(true); setErr(null);
         try {
-            if (pre) await pre();
+            if (pre) {
+                /* 070 N1 — 첨부 업로드·행 저장(pre) 전에 상태를 한 번 다시 읽는다. 이미 바뀌었으면 아무것도 쓰지 않고 멈춘다(남는 몇 ms 창은 수용) */
+                const { data: cur, error: curErr } = await supabase.from('ncr_reports').select('status').eq('id', report.id).single();
+                if (curErr) throw curErr;
+                if (cur?.status !== (patch?.expectedStatus || report.status)) throw new Error(STALE_MSG);
+                await pre();
+            }
             /* 09-03 058-B — reviews는 부서별 칸(jsonb 최상위 키)이다. 창을 연 시점의 전체 객체를 PATCH하면
                그 사이 다른 부서가 저장한 칸을 덮어쓴다(057 B-01 실측). 그래서 「내가 바꾼 칸」만 골라
                나머지 열과 함께 DB 함수(ncr_patch_report) 한 번으로 원자 갱신한다.
@@ -331,10 +339,13 @@ const NCRDetail = ({ report, user, onClose, onChanged, readOnly = false, canProc
                     p_reviews: changed && Object.keys(changed).length ? changed : null,
                     p_cols: Object.keys(cols).length ? cols : null,
                     p_status_if_all_done: statusIfAllDone || null,
-                    p_expected_status: expectedStatus || null
+                    p_expected_status: expectedStatus || report.status   // 070 N1 기대 상태를 안 넘긴 호출은 창을 열 때 본 상태로 확인
                 });
             } else if (Object.keys(patch0).length) {
-                await api.fetch(`/ncr_reports/${report.id}`, { method: 'PATCH', body: patch0 });
+                /* 070 N1 — 상태가 창을 열 때 그대로일 때만 바꾼다(조건 id+status). 0행이면 그 사이 다른 사람이 먼저 처리한 것 */
+                const { data: hit, error: upErr } = await supabase.from('ncr_reports').update(patch0).eq('id', report.id).eq('status', report.status).select('id');
+                if (upErr) throw upErr;
+                if (!hit?.length) throw new Error(STALE_MSG);
             }
             for (const x of (extra || [])) {
                 await api.fetch('/ncr_approvals', {
@@ -347,7 +358,7 @@ const NCRDetail = ({ report, user, onClose, onChanged, readOnly = false, canProc
                 body: { report_id: report.id, action, actor_name: user?.name || '', actor_company: user?.company || '', comment: cmt || '', at: nowIso() }
             });
             onChanged?.(); onClose?.();
-        } catch (e) { setErr('처리 실패: ' + (e.message || e)); setSaving(false); actLock.current = false; }
+        } catch (e) { const m = String(e?.message || e); setErr(m === STALE_MSG || m.startsWith('ncr_patch_report: expected status') ? STALE_MSG : '처리 실패: ' + m); setSaving(false); actLock.current = false; }
     };
 
     /* ── B-20/B-21 파생값 ── */
@@ -610,6 +621,7 @@ const NCRDetail = ({ report, user, onClose, onChanged, readOnly = false, canProc
     const doSpecialRequestDecision = () => {
         const g = qaGate();
         if (!g.ok) return setErr(g.msg);
+        if (!reqDecision) return setErr('5갈래 중 하나를 고르세요.');   // 070 ⑦
         const requests = pendingDispReqs.filter(({ req }) => req.to === CONCESSION && req.qa_review?.concession_type);
         if (!requests.length) return setErr('담당자가 상신한 특채요청 검토값을 찾을 수 없습니다.');
         const types = [...new Set(requests.map(({ req }) => req.qa_review.concession_type))];
@@ -945,7 +957,7 @@ const NCRDetail = ({ report, user, onClose, onChanged, readOnly = false, canProc
             setReqAtts([]); setReqErr(null); pz.setHover(null); pz.pin(null);
         }
         if (m === 'qaSubmit') { setDispDecisions({}); setConcPick(provisionalConc); setStage1Items(seedStage1()); setZeroWhy(report.cost_stage1?.zero_why || ''); }
-        if (m === 'requestDecision') setReqDecision('tech');
+        if (m === 'requestDecision') setReqDecision('');
         /* H-③: 패널을 열 때 증빙 담아둔 것도 비운다 — 직전에 열었다 닫은 문서의 사진이 남아 잘못 올라가는 것 방지 */
         if (m === 'close') { setS1Edits({}); setCostItems([{ label: '', amount: '' }]); setZeroWhy(''); setClosedAtts([]); setAttErr(null); pz.setHover(null); pz.pin(null); }
     };
@@ -1128,7 +1140,7 @@ const NCRDetail = ({ report, user, onClose, onChanged, readOnly = false, canProc
                         <div className="col-span-2"><div className="text-xs text-slate-400 mb-0.5">품명</div><div className="font-medium text-slate-700">{report.item_name}{report.item_code ? <span className="ml-1 text-[10px] font-mono text-slate-400">{report.item_code}</span> : null}</div></div>
                         <div><div className="text-xs text-slate-400 mb-0.5">수량 (부적합/전체)</div><div className="font-medium"><span className="text-red-600 font-bold">{report.qty_defect}</span> / {report.qty_unknown ? '파악중' : report.qty_total}</div></div>
                         <div><div className="text-xs text-slate-400 mb-0.5">부적합 코드</div><div className="font-medium text-slate-700">{report.code ? `${report.code} — ${settings?.codes?.[report.code] || ''}` : '—'}</div></div>
-                        <div><div className="text-xs text-slate-400 mb-0.5">처리방안</div><div className="font-medium text-slate-700">{dispositionLabel(report.disposition) || '— 미정 —'}{report.concession_type ? ` (${concessionTypeLabel(report.concession_type)})` : ''}{hasDispChange(report) ? <span className="ml-1 text-[11px] font-normal text-slate-400">({dispPrevLabel(report)}에서 변경)</span> : null}</div></div>
+                        <div><div className="text-xs text-slate-400 mb-0.5">처리방안</div><div className="font-medium text-slate-700">{dispositionLabel(report.disposition) || '— 미정 —'}{report.concession_type ? ` (${report.concession_type})` : ''}{hasDispChange(report) ? <span className="ml-1 text-[11px] font-normal text-slate-400">({dispPrevLabel(report)}에서 변경)</span> : null}</div></div>
                         {/* 933-07 Recommended by — 회람 부서가 처리방안을 문의할 상대 */}
                         <div><div className="text-xs text-slate-400 mb-0.5">처리방안 마련자</div><div className="font-medium text-slate-700">{report.disposition_by || '— 미지정 —'}<span className="ml-1 text-[11px] font-normal text-slate-400">(품질보증부)</span></div></div>
                         <div><div className="text-xs text-slate-400 mb-0.5">작성자</div><div className="font-medium text-slate-700">{report.author_name} ({report.author_company})</div></div>
@@ -1147,7 +1159,7 @@ const NCRDetail = ({ report, user, onClose, onChanged, readOnly = false, canProc
                     {newFlow && report.judge_plan && report.status === '특채승인 대기' && (
                         <div className="text-sm px-4 py-3 rounded-lg bg-amber-50 border border-amber-200">
                             <div className="text-xs font-bold text-amber-700 mb-1">특채 판단 상신 내용</div>
-                            <div className="text-slate-700">{report.judge_plan.kind === 'special' ? `특채(Concession)로 진행${report.judge_plan.conc ? ` — ${concessionTypeLabel(report.judge_plan.conc)}` : ''}` : `일반 처리로 전환 — ${dispositionLabel(report.judge_plan.disp)}`} · 본회람: {(report.judge_plan.depts || []).join('·')}</div>
+                            <div className="text-slate-700">{report.judge_plan.kind === 'special' ? `특채(Concession)로 진행${report.judge_plan.conc ? ` — ${report.judge_plan.conc}` : ''}` : `일반 처리로 전환 — ${dispositionLabel(report.judge_plan.disp)}`} · 본회람: {(report.judge_plan.depts || []).join('·')}</div>
                             <div className="text-slate-600 mt-1">&ldquo;{report.judge_plan.note}&rdquo;</div>
                         </div>
                     )}
@@ -1189,7 +1201,7 @@ const NCRDetail = ({ report, user, onClose, onChanged, readOnly = false, canProc
                                                             {Array.isArray(rv.disp_req_prev) && rv.disp_req_prev.length > 0 && (
                                                                 <span className="block mt-1 text-[11px] text-slate-500">
                                                                     <span className="inline-block px-1.5 py-0.5 rounded bg-slate-50 border border-slate-200 font-bold mr-1">이전 요청 {rv.disp_req_prev.length}건</span>
-                                                                    {rv.disp_req_prev.map((q, i) => <span key={i} className="mr-2">→ {dispositionLabel(q.to)} ({q.resolved || '미판정'}{q.resolved_by ? ` · ${q.resolved_by}` : ''}{q.resolved_at ? ` · ${String(q.resolved_at).replace('T', ' ').slice(0, 16)}` : ''})</span>)}
+                                                                    {rv.disp_req_prev.map((q, i) => <span key={i} className="mr-2">→ {dispositionLabel(q.to)} ({q.resolved || '미판정'}{q.resolved_by ? ` · ${q.resolved_by}` : ''}{q.resolved_at ? ` · ${fmtDT(q.resolved_at)}` : ''})</span>)}
                                                                 </span>
                                                             )}
                                                             {/* B-21 — 부서가 올린 품질비용을 부서장이 보고 결재할 수 있게 표시 */}
@@ -1291,7 +1303,7 @@ const NCRDetail = ({ report, user, onClose, onChanged, readOnly = false, canProc
                                         <span className={`absolute -left-[5px] mt-1.5 w-2.5 h-2.5 rounded-full ${ACTION_DOT[h.action] || 'bg-slate-400'}`} />
                                         <div className="text-sm"><b className="text-slate-700">{h.action}</b> <span className="text-slate-500">{h.actor_name} ({h.actor_company})</span></div>
                                         {h.comment && <div className="text-xs text-slate-600 mt-0.5">“{h.comment}”</div>}
-                                        <div className="text-xs text-slate-400 mt-0.5">{(h.at || '').replace('T', ' ').slice(0, 16)}</div>
+                                        <div className="text-xs text-slate-400 mt-0.5">{fmtDT(h.at)}</div>
                                     </li>
                                 ))}
                             </ol>
@@ -1521,7 +1533,7 @@ const NCRDetail = ({ report, user, onClose, onChanged, readOnly = false, canProc
                             <div className="text-xs text-slate-600 space-y-0.5">
                                 <div>구분: <b>{report.void_req?.kind || '—'}</b></div>
                                 <div>사유: {report.void_req?.note || '—'}</div>
-                                <div className="text-slate-400">상신: {report.void_req?.by} ({report.void_req?.company}) · {(report.void_req?.at || '').replace('T', ' ').slice(0, 16)}</div>
+                                <div className="text-slate-400">상신: {report.void_req?.by} ({report.void_req?.company}) · {fmtDT(report.void_req?.at)}</div>
                             </div>
                         </Panel> :
                         mode === 'voidNo' ? <Panel {...panelBase} title="무효 반려 — 작성중으로 되돌립니다" onSubmit={doVoidReject} submitLabel="반려 확정" color="bg-red-600 hover:bg-red-700" needComment /> :

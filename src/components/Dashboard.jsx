@@ -604,6 +604,7 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
     const [activeTab, setActiveTab] = useState(getInitialTab); // Default to home (or current hash)
     const [ncrInboxTarget, setNcrInboxTarget] = useState(null);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    useEffect(() => { setIsMenuOpen(false); }, [activeTab]);   // 070 N6 폰에서 메뉴를 고르면 닫힘(데스크톱 aside는 늘 lg:block이라 영향 없음)
     const [mainExpanded, setMainExpanded] = useState(true);
     const [inboundExpanded, setInboundExpanded] = useState(true);
     const [processExpanded, setProcessExpanded] = useState(true);

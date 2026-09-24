@@ -159,7 +159,7 @@ const fmtDate = (iso) => {
     const s = iso || ''; if (!s) return '';
     return s.length <= 10 ? s.slice(0, 10) : (kstStr(s).slice(0, 10) || s.slice(0, 10));
 };
-const fmtDT = (iso) => {
+export const fmtDT = (iso) => {   // 070 ③ 상세 화면도 같은 서울 시각 표시를 쓴다
     const s = iso || ''; if (!s) return '';
     return s.length <= 10 ? s : (kstStr(s).slice(0, 16) || `${s.slice(0, 10)} ${s.slice(11, 16)}`);
 };
@@ -253,11 +253,11 @@ const NCRPrint = ({ report, history, attachments, onClose }) => {
     const isSpecial = judge?.kind === 'special' || /특채/.test(report.disposition || '');
     const dispoText = dispositionLabel(judgePending ? report.disposition : (judge?.disp || report.disposition));
     /* v10.2 특채 하위유형 병기 — 절차서 5.3.4 */
-    const concText = concessionTypeLabel((judgePending ? (report.concession_type || '') : (judge?.conc || report.concession_type)) || '');
+    const concText = (judgePending ? (report.concession_type || '') : (judge?.conc || report.concession_type)) || '';   // 070 ⑥ 앞에 「특채(Concession) — 」가 붙으므로 원래 값
     const dispoFull = dispoText ? (concText ? `${dispoText} — ${concText}` : dispoText) : '';
     /* 승인 전 상신 내용은 「(상신 · 승인 전)」으로 따로 보여준다 — 숨기지 않되 확정과 섞지 않는다 */
     const judgePendingText = judgePending && judge?.disp
-        ? `${dispositionLabel(judge.disp)}${judge.conc ? ` — ${concessionTypeLabel(judge.conc)}` : ''}` : '';
+        ? `${dispositionLabel(judge.disp)}${judge.conc ? ` — ${judge.conc}` : ''}` : '';
 
     /* ── 7-2. 결재란 5칸 데이터 ── */
     const aIssue = lastOf(hist, '발행승인');
