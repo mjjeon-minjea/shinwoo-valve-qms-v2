@@ -56,7 +56,7 @@ const ProcessHistoryModal = ({ isOpen, onClose, onSave, editingItem }) => {
             });
         } else {
             setForm({
-                inspectionDate: new Date().toISOString().split('T')[0],
+                inspectionDate: new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' }),
                 modelCategory: '', modelName: '', workplaceFull: '', itemName: '',
                 plannedQuantity: '', inspectedQuantity: '', failedQuantity: '', passedQuantity: '',
                 resolution: '', isResolutionEntered: '해당없음'

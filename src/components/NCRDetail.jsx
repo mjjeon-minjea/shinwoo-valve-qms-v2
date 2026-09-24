@@ -1129,7 +1129,7 @@ const NCRDetail = ({ report, user, onClose, onChanged, readOnly = false, canProc
                     {newFlow && report.status === '무효' && (
                         <div className="text-sm px-4 py-2.5 rounded-lg bg-slate-100 text-slate-600 border border-slate-300">
                             즉시종결(무효) — {report.void_note || '사유 미기재'} · 넘버링 유지
-                            <span className="block text-[11px] text-slate-500">통계에서 자동으로 빠지지는 않습니다 — 집계할 때 부적합 대장(CSV)의 「상태」 열에서 <b>무효</b>를 직접 걸러내십시오.</span>
+                            <span className="block text-[11px] text-slate-500">통계에서 자동으로 빠지지는 않습니다 — 집계할 때 부적합 대장(엑셀)의 「상태」 열에서 <b>무효</b>를 직접 걸러내십시오.</span>
                         </div>
                     )}
 
@@ -1526,7 +1526,7 @@ const NCRDetail = ({ report, user, onClose, onChanged, readOnly = false, canProc
                                     {['중복 발행', '오기재 · 착오 발행', '부적합 아님으로 판명', '기타'].map(k => <option key={k}>{k}</option>)}
                                 </select>
                                 {/* G-⑧ — 「통계에서만 제외됩니다」는 사실이 아니었다(자동 제외 코드 없음). 실제 절차대로 적는다. */}
-                                <p className="text-[11px] text-slate-400">넘버링은 유지됩니다. 통계는 자동으로 제외되지 않으므로 집계 시 부적합 대장(CSV)의 「상태」 열에서 무효를 걸러내야 합니다. 승인 후에는 되돌릴 수 없습니다.</p>
+                                <p className="text-[11px] text-slate-400">넘버링은 유지됩니다. 통계는 자동으로 제외되지 않으므로 집계 시 부적합 대장(엑셀)의 「상태」 열에서 무효를 걸러내야 합니다. 승인 후에는 되돌릴 수 없습니다.</p>
                             </div>
                         </Panel> :
                         mode === 'voidOk' ? <Panel {...panelBase} title="무효 승인 — 되돌릴 수 없습니다" onSubmit={doVoidApprove} submitLabel="무효 승인 확정" color="bg-slate-800 hover:bg-slate-900">

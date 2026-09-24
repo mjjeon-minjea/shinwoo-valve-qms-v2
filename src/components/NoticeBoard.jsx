@@ -72,7 +72,7 @@ const NoticeBoard = () => {
 
     const handleSave = async (e) => {
         e.preventDefault();
-        const date = new Date().toISOString().split('T')[0];
+        const date = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' });
         
         // 작성자 단일화 적용
         const unifiedAuthor = getUnifiedAuthor(formData.author);

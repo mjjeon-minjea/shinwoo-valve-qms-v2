@@ -31,7 +31,7 @@ const Chatbot = () => {
                 id: sessionId,
                 userId: 'guest',
                 userName: 'Guest User',
-                date: new Date().toISOString().split('T')[0],
+                date: new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' }),
                 status: 'Open',
                 messages: newMessages
             };

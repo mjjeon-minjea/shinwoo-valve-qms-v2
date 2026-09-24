@@ -143,7 +143,7 @@ const NCRInbox = ({ user, targetReportId, onTargetConsumed }) => {
             <p className="mt-3 text-xs text-slate-400">행을 클릭하면 상세·결재 모달이 열립니다. 반려 문서는 작성자의 [내 차례]에 표시됩니다.</p>
             {/* G-⑧ — 무효는 시스템이 자동으로 빼주지 않는다. 어디서 걸러야 하는지를 숫자 옆에 적어 둔다. */}
             {tab === 'done' && voidCount > 0 && (
-                <p className="mt-1 text-xs text-slate-400">완료 {groups.done.length}건에는 <b className="text-slate-500">무효 {voidCount}건</b>이 포함돼 있습니다 — 통계 집계 시에는 부적합 대장(CSV)의 「상태」 열에서 무효를 제외하십시오.</p>
+                <p className="mt-1 text-xs text-slate-400">완료 {groups.done.length}건에는 <b className="text-slate-500">무효 {voidCount}건</b>이 포함돼 있습니다 — 통계 집계 시에는 부적합 대장(엑셀)의 「상태」 열에서 무효를 제외하십시오.</p>
             )}
 
             {selected && (

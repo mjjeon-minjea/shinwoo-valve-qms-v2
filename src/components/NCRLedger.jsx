@@ -4,8 +4,9 @@ import { api } from '../lib/api';
 import NCRDetail, { fetchNcrSettings, myTurnV101 } from './NCRDetail';
 import { concessionTypeLabel, dispositionLabel, statusLabel } from '../lib/ncrFlow';
 import { isNcrFinished, isNcrRelatedToUser } from '../lib/ncrRoles';
+import * as XLSX from 'xlsx';
 
-/* 부적합 대장 (FORM 933-08) — 탭 조회·검색·전수 CSV·열람 전용 상세. */
+/* 부적합 대장 (FORM 933-08) — 탭 조회·검색·전수 엑셀·열람 전용 상세. */
 const NCRLedger = ({ user, onProcess }) => {
     const [rows, setRows] = useState([]);
     const [q, setQ] = useState('');
@@ -62,19 +63,18 @@ const NCRLedger = ({ user, onProcess }) => {
         return [total, s1, total - s1];
     };
 
-    const csv = () => {
+    /* 071 — 차장 요청(9/25): CSV 대신 엑셀(.xlsx). 범위는 CSV와 같음 = 탭과 상관없이 검색 결과 전체(066 결정). 수량·비용은 숫자 칸, 빈 값은 빈 칸. */
+    const excel = () => {
         const head = ['NCR번호', '발생일', '업체', '품명', '도면번호', '전체수량', '부적합수량', '부적합내용', '처리방안', '처리방안변경', '특채유형', '상태', '작성자', '품질비용', '처리방안비용', '추가비용'];
-        const lines = allFiltered.map(r => [
+        const data = allFiltered.map(r => [
             r.ncr_no, r.occur_date, r.supplier, r.item_name, r.drawing_no || '',
             r.qty_total == null ? '파악중' : r.qty_total, r.qty_defect,
-            (r.defect_desc || '').replace(/[\r\n,]/g, ' '), dispCell(r), dispChgCell(r), concessionTypeLabel(r.concession_type), statusLabel(r.status), r.author_name,
+            r.defect_desc || '', dispCell(r), dispChgCell(r), concessionTypeLabel(r.concession_type), statusLabel(r.status), r.author_name,
             ...costCells(r)
-        ].map(v => { const t = String(v ?? ''); return /[",\r\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; }).join(','));
-        const blob = new Blob(['﻿' + [head.join(','), ...lines].join('\n')], { type: 'text/csv;charset=utf-8' });
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = `부적합대장_933-08_${new Date().toISOString().split('T')[0]}.csv`;
-        a.click();
+        ].map(v => (v === '' ? null : v)));
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([head, ...data]), '부적합대장');
+        XLSX.writeFile(wb, `부적합대장_933-08_${new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' })}.xlsx`);
     };
 
     return (
@@ -83,8 +83,8 @@ const NCRLedger = ({ user, onProcess }) => {
                 <h1 className="text-2xl font-bold text-slate-800 flex items-center">
                     <BookOpen className="mr-2 h-6 w-6 text-blue-600" /> 부적합 대장 <span className="ml-2 text-sm font-normal text-slate-400">FORM 933-08</span>
                 </h1>
-                <button onClick={csv} className="px-4 py-2 text-sm font-semibold rounded-lg bg-slate-700 text-white hover:bg-slate-800 flex items-center">
-                    <Download className="w-4 h-4 mr-1.5" /> CSV 다운로드
+                <button onClick={excel} className="px-4 py-2 text-sm font-semibold rounded-lg bg-slate-700 text-white hover:bg-slate-800 flex items-center">
+                    <Download className="w-4 h-4 mr-1.5" /> 엑셀 다운로드
                 </button>
             </div>
 

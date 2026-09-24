@@ -404,7 +404,7 @@ const Popup = ({ onClose }) => {
 
     const handleClose = () => {
         if (dontShowToday) {
-            const today = new Date().toISOString().split('T')[0];
+            const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' });
             localStorage.setItem(`hidePopup_${today}`, 'true');
         }
         onClose();
@@ -670,7 +670,7 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
 
     useEffect(() => {
         const checkPopup = async () => {
-            const today = new Date().toISOString().split('T')[0];
+            const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' });
             const hidePopup = localStorage.getItem(`hidePopup_${today}`);
 
             if (!hidePopup) {

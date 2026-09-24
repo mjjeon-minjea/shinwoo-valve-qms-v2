@@ -493,6 +493,10 @@ const NCRCreate = ({ user }) => {
     const validationError = (status) => {
         const issuing = status !== '작성중';
         if (!form.supplier.trim() || !form.item_name.trim()) return '업체와 품명은 필수입니다.';
+        /* 071 — 발생일은 달력에 있는 YYYY-MM-DD · 2000-01-01 ~ 오늘(서울)만. 비었거나 미래·아주 옛 날짜(2027·1900)·5자리 연도·없는 날(02-31)이 그대로 저장되던 것(069 극단값 시험) */
+        const todayKst = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' });
+        const occurMs = Date.parse(form.occur_date);   // 없는 날(2026-02-31)은 다음 달로 넘어가거나 NaN → 되돌린 글자가 달라짐(UTC 자정끼리 비교라 시간대 영향 없음)
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(form.occur_date) || Number.isNaN(occurMs) || new Date(occurMs).toISOString().slice(0, 10) !== form.occur_date || form.occur_date < '2000-01-01' || form.occur_date > todayKst) return '발생일을 확인하세요 (2000-01-01 ~ 오늘).';
         if (form.qty_defect === '') return '부적합 수량은 필수입니다.';
         if (!form.qty_unknown && form.qty_total === '') return '전체 수량을 입력하거나 [파악중]을 체크하세요.';
         if (qtyError) return qtyError;

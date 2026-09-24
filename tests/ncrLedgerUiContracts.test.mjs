@@ -23,10 +23,12 @@ test('대장 상세은 readOnly이며 실제 내 차례에만 결재함 이동�
     assert.match(detail, /readOnly\s*\?/);
 });
 
-test('대장 CSV는 선택 탭이 아니라 전체 검색 결과를 사용한다', () => {
+test('대장 엑셀은 선택 탭이 아니라 전체 검색 결과를 사용한다', () => {
     const ledger = source('NCRLedger.jsx');
     assert.match(ledger, /const allFiltered\s*=/);
-    assert.match(ledger, /const lines = allFiltered\.map/);
+    assert.match(ledger, /const data = allFiltered\.map/);
+    assert.match(ledger, /XLSX\.writeFile\(/);
+    assert.doesNotMatch(ledger, /text\/csv/);
 });
 
 test('Dashboard에서 넘긴 문서 ID는 결재함이 설정 로드 후 한 번 소비한다', () => {
