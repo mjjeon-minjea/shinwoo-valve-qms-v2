@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, CheckCircle2, XCircle, Printer, Undo2, Stamp, FlaskConical, Users, ClipboardCheck, Ban, Coins, Plus, Trash2, File as FileIcon } from 'lucide-react';
 import { api, supabase } from '../lib/api';
-import { activeReviewDepartments, concessionTypeLabel, dispositionLabel, isLegacyFlow, isNewFlow, reopenLatestDispositionRequests, reviewDepartmentOptions, startNextReviewRound, statusLabel } from '../lib/ncrFlow';
+import { activeReviewDepartments, concessionTypeLabel, dispositionLabel, isLegacyFlow, isNewFlow, recallReviews, reopenLatestDispositionRequests, reviewDepartmentOptions, startNextReviewRound, statusLabel } from '../lib/ncrFlow';
 import { roleOf, canApprove, techApprovalDecision } from '../lib/ncrRoles';
 /* v10.2 H-③ 처리확인 증빙 첨부 — 작성화면과 「같은 규칙」(1280px 축소 · 비이미지 5MB)을 쓰려고
    lib/attach.jsx의 공용 함수를 그대로 가져다 쓴다(NCRCreate에 있던 것을 lib로 옮긴 것). */
@@ -325,9 +325,9 @@ const NCRDetail = ({ report, user, onClose, onChanged, readOnly = false, canProc
             /* 09-03 058-B — reviews는 부서별 칸(jsonb 최상위 키)이다. 창을 연 시점의 전체 객체를 PATCH하면
                그 사이 다른 부서가 저장한 칸을 덮어쓴다(057 B-01 실측). 그래서 「내가 바꾼 칸」만 골라
                나머지 열과 함께 DB 함수(ncr_patch_report) 한 번으로 원자 갱신한다.
-               칸을 없애는 처리(회수의 reviews:{})는 병합으로 표현이 안 되므로 종전 PATCH 그대로. */
-            const { statusIfAllDone, expectedStatus, ...patch0 } = patch || {};
-            const mergeableReviews = patch0.reviews && Object.keys(patch0.reviews).length
+               열을 통째로 바꾸는 처리(회수 — 073부터 회람 지정만 남긴 새 객체, replaceReviews로 표시)는 병합으로 표현이 안 되므로 종전 PATCH 그대로. */
+            const { statusIfAllDone, expectedStatus, replaceReviews, ...patch0 } = patch || {};
+            const mergeableReviews = !replaceReviews && patch0.reviews && Object.keys(patch0.reviews).length
                 && Object.keys(reviews).every(k => k in patch0.reviews);
             if (expectedStatus || mergeableReviews) {
                 const changed = patch0.reviews ? Object.fromEntries(Object.entries(patch0.reviews)
@@ -820,7 +820,10 @@ const NCRDetail = ({ report, user, onClose, onChanged, readOnly = false, canProc
         act('무효반려', { status: '작성중', void_req: null }, `${comment}${dTag(g.deputy)}`);
     };
     /* v10.2 D-06 — 회수 시 이전 회차 회람 기록도 초기화(재발행 시 오염 방지) */
-    const doWithdraw = () => act('회수', { status: '작성중', tech_reply: null, judge_plan: null, reviews: {} }, comment || '회수');
+    /* 073 — 회람 부서 지정(대상·제외)은 남긴다 → 이어쓰기가 그대로 복원(기본 3부서로 덮이던 것 · 069 W3-D3). 회신·결재 기록은 D-06대로 비움.
+       담당자 칸은 마지막 기록(회신했으면 회신자) — 처음 지정자는 따로 보관하지 않음.
+       replaceReviews: 병합(ncr_patch_report)이 아니라 종전처럼 열 전체 PATCH — 그 함수는 judge_plan 열을 받지 않는다 */
+    const doWithdraw = () => act('회수', { status: '작성중', tech_reply: null, judge_plan: null, reviews: recallReviews(report), replaceReviews: true }, comment || '회수');
     /* v10.2 D-08 — 무효 2단 결재: 품질담당 상신 → 품질부서장 승인.
        절차서 5.5.1(품질보증부서장 승인으로 완결) 정신 적용. 무효는 되돌릴 수 없고 통계에서 제외되므로
        상신자·승인자·구분·사유를 모두 실명으로 남긴다. */

@@ -259,6 +259,8 @@ const AppContent = () => {
                 {/* 042 P8 — 구 「종합분석현황」 주소는 새 대시보드로 넘긴다.
                     히스토리에 남기지 않는다(replace) — 뒤로가기로 없어진 화면에 다시 들어가면 안 된다. */}
                 <Route path="/inspection-analysis" element={<Navigate to="/#inbound_overview" replace />} />
+                {/* 073 — 없는 주소(예: /abc)는 첫 화면으로. 흰 화면 방지 · 해시 탭(#ncr_ledger 등)은 "/" 안에서 처리 */}
+                <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
         </div>
     );

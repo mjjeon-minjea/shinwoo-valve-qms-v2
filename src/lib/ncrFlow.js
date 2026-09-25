@@ -161,3 +161,18 @@ export const activeReviewDepartments = (reviews, options) => (options || [])
 
 /* 저장값은 유지하고 사용자에게 보이는 특채 하위유형만 구분한다. */
 export const concessionTypeLabel = (value) => value === '수리' ? '특채-수리' : (value || '');
+
+/* 073 — 회수: 회람 부서 지정(대상·제외)은 남기고 회신·결재 기록은 비운다.
+   작성 화면 임시저장(buildReviews)과 같은 모양이라 이어쓰기가 부서 지정을 그대로 복원한다(기본 3부서로 덮지 않음 — 069 W3-D3).
+   담당자 칸은 그 부서의 마지막 기록 — 회신이 있었으면 회신자(회신 때 덮어씀). 처음 지정자는 따로 보관하지 않음 · 이어쓰기에서 확인·변경.
+   기술트랙은 본회람을 특채판단 때 정하므로 빈 객체(작성 화면 buildReviews와 같음). */
+export const recallReviews = (report) => (report?.tech_flag ? {} : Object.fromEntries(
+    Object.entries(report?.reviews || {}).map(([dept, row]) => [dept, {
+        state: row?.state === 'skip' ? 'skip' : 'wait',
+        staff_email: row?.staff_email || null,
+        staff_name: row?.staff_name || null,
+        opinion: null, staff_cmt: '', staff_at: null,
+        head_name: null, head_cmt: '', head_at: null,
+        deputy: false, remand_note: ''
+    }])
+));

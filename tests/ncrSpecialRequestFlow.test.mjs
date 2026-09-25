@@ -8,6 +8,7 @@ import {
     activeReviewDepartments,
     latestSpecialRequestApprovalCycle,
     reviewDepartmentOptions,
+    recallReviews,
     reopenLatestDispositionRequests,
     startNextReviewRound
 } from '../src/lib/ncrFlow.js';
@@ -141,4 +142,25 @@ test('결재 이력 로드 전에는 빈 이력으로 인쇄를 열지 않는다
     assert.match(source, /const \[history, setHistory\] = useState\(null\)/);
     const printButton = source.slice(source.indexOf('setShowPrint(true)') - 100, source.indexOf('setShowPrint(true)') + 500);
     assert.match(printButton, /disabled=\{history === null\}/);
+});
+
+test('회수는 회람 부서 지정(대상·제외)은 남기고 회신·결재 기록은 비운다 — 담당자 칸은 마지막 기록(073)', () => {
+    /* 생산관리부: 처음 지정 A → 같은 부서 B가 회신하면 NCRDetail 회신이 담당자 칸을 B로 덮어씀 → 회수 뒤에도 B(마지막 기록) */
+    const reviews = { ...firstRound(), 생산관리부: { state: 'staffDone', staff_email: 'pm-b@example.test', staff_name: '생산관리B', opinion: 'approve', staff_cmt: '회신' } };
+    delete reviews.응용기술팀;
+    const r = recallReviews({ tech_flag: false, reviews });
+    assert.deepEqual(Object.keys(r).sort(), ['생산관리부', '생산부', '자재부']);
+    assert.deepEqual([r.생산부.state, r.생산부.staff_email, r.생산부.staff_name], ['wait', 'staff@example.test', '생산담당']);
+    assert.deepEqual([r.생산부.opinion, r.생산부.staff_cmt, r.생산부.head_name, r.생산부.head_at, r.생산부.disp_req], [null, '', null, null, undefined]);
+    assert.deepEqual([r.생산관리부.state, r.생산관리부.staff_email, r.생산관리부.staff_name, r.생산관리부.opinion], ['wait', 'pm-b@example.test', '생산관리B', null]);
+    assert.equal(r.자재부.state, 'skip');
+    assert.deepEqual(recallReviews({ tech_flag: true, reviews: firstRound() }), {});
+    assert.deepEqual(recallReviews({ reviews: null }), {});
+    const source = readFileSync(new URL('../src/components/NCRDetail.jsx', import.meta.url), 'utf8');
+    assert.match(source, /reviews: recallReviews\(report\), replaceReviews: true \}/);
+    assert.match(source, /const \{ statusIfAllDone, expectedStatus, replaceReviews, \.\.\.patch0 \} = patch \|\| \{\};/);
+    assert.match(source, /const mergeableReviews = !replaceReviews && patch0\.reviews/);
+    assert.doesNotMatch(source, /'회수', \{[^}]*reviews: \{\}/);
+    const create = readFileSync(new URL('../src/components/NCRCreate.jsx', import.meta.url), 'utf8');
+    assert.match(create, /\.filter\(\(\[, v\]\) => v && v\.state !== 'skip'\)/);   // 이어쓰기는 skip 아닌 행을 회람 지정으로 복원
 });
