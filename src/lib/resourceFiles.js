@@ -90,6 +90,9 @@ export const validateResourceFile = (file) => {
     if (!MIME_BY_EXTENSION[extension]) {
         throw new ResourceFilesError('허용되지 않는 파일 확장자입니다.', 'RESOURCE_FILE_EXTENSION');
     }
+    if (file.size === 0) {
+        throw new ResourceFilesError('빈 파일은 올릴 수 없습니다.', 'RESOURCE_FILE_EMPTY');
+    }
     if (!Number.isFinite(file.size) || file.size < 0 || file.size > MAX_RESOURCE_FILE_SIZE) {
         throw new ResourceFilesError('파일은 20 MiB 이하만 등록할 수 있습니다.', 'RESOURCE_FILE_SIZE');
     }
@@ -283,6 +286,16 @@ export const createResourceFiles = ({
         }
     };
 
+    const restore = async ({ id, isAdmin }) => {
+        if (!isAdmin) throw new ResourceFilesError('관리자만 자료를 되살릴 수 있습니다.', 'RESOURCE_ADMIN_REQUIRED');
+        if (!clean(id)) throw new ResourceFilesError('자료 ID가 없습니다.', 'RESOURCE_INVALID_ID');
+        try {
+            return await (await getApiClient()).rpc('resource_restore', { p_id: id });
+        } catch (error) {
+            throw new ResourceFilesError('자료 되살리기에 실패했습니다.', 'RESOURCE_RESTORE_FAILED');
+        }
+    };
+
     const createDownload = async ({ id, isAdmin = false }) => {
         try {
             const response = await (await getApiClient()).fetch(`/resources?id=eq.${encodeURIComponent(id)}`);
@@ -298,14 +311,15 @@ export const createResourceFiles = ({
             if (error || !data?.signedUrl) {
                 throw new ResourceFilesError('다운로드 주소를 만들지 못했습니다.', 'RESOURCE_SIGN_FAILED');
             }
-            return data.signedUrl;
+            // storage-js 는 이름을 encodeURI 로 붙여 & # + 가 날것으로 남는다 → download= 뒤를 encodeURIComponent 한 이름으로 바꿔 끼운다
+            return data.signedUrl.replace(/&download=.*/s, `&download=${encodeURIComponent(row.original_name)}`);
         } catch (error) {
             if (error instanceof ResourceFilesError) throw error;
             throw new ResourceFilesError('다운로드 주소를 만들지 못했습니다.', 'RESOURCE_SIGN_FAILED');
         }
     };
 
-    return { listCurrent, listHistory, publish, softDelete, createDownload };
+    return { listCurrent, listHistory, publish, softDelete, restore, createDownload };
 };
 
 const resourceFiles = createResourceFiles();
@@ -314,3 +328,4 @@ export const listResourceHistory = resourceFiles.listHistory;
 export const publishResourceRevision = resourceFiles.publish;
 export const softDeleteResource = resourceFiles.softDelete;
 export const createResourceDownload = resourceFiles.createDownload;
+export const restoreResource = resourceFiles.restore;

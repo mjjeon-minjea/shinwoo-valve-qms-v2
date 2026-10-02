@@ -571,12 +571,12 @@ const Home = ({ setActiveTab }) => {
                                 ) : resources.length === 0 ? (
                                     <tr><td colSpan="5" className="py-10 text-center text-slate-400 text-xs">등록된 자료가 없습니다.</td></tr>
                                 ) : (
-                                    resources.map((resource) => (
+                                    resources.map((resource, index) => (
                                         <tr key={resource.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => setActiveTab('resources')}>
-                                            <td className="px-4 py-3 text-xs text-slate-500 text-center">{resource.id}</td>
+                                            <td className="px-4 py-3 text-xs text-slate-500 text-center">{resources.length - index}</td>
                                             <td className="px-4 py-3 text-center whitespace-nowrap">
                                                 <span className="px-2 py-0.5 text-[10px] rounded-full font-medium bg-green-100 text-green-700">
-                                                    {resource.module_label} · {resource.category_label}
+                                                    {resource.category_label}
                                                 </span>
                                             </td>
                                             <td className="px-4 py-3 text-sm text-slate-800 line-clamp-1">{resource.title}</td>
