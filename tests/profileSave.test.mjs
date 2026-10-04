@@ -235,4 +235,5 @@ test('App 프로필+비밀번호 저장: 프로필 성공 뒤 Auth 를 바꾸고
     await (await appProfileHandler(bad))({ name: '직원', rank: '대리', password: 'x' });
     assert.equal(bad.calls.some(c => c[0] === 'update' && 'password' in c[2]), false, 'Auth 실패면 비밀번호 열도 건드리지 않는다');
     assert.match(alerts.at(-1), /비밀번호.*(실패|변경되지)/);
+    assert.doesNotMatch(alerts.at(-1), /기존 비밀번호를 계속 사용/);
 });
