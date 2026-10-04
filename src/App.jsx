@@ -110,28 +110,37 @@ const AppContent = () => {
     };
 
     const handleUpdateProfile = async (updatedData) => {
-        if (!user) return;
+        if (!user) return false;
         try {
-            // 비밀번호 변경 여부 파악
-            const isPasswordChange = updatedData.password && updatedData.password.trim() !== '';
+            // 부서·승인상태·비밀번호는 프로필 저장 payload에서 제외한다.
+            const isPasswordChange = !!updatedData.password?.trim();
+            const profilePayload = { name: updatedData.name, rank: updatedData.rank };
+            const { data, error } = await supabase.from('users').update(profilePayload).eq('auth_id', user.id).select('auth_id');
+            if (error) throw error;
+            if (data?.length !== 1) throw new Error('프로필 갱신 대상이 확인되지 않았습니다.');
 
             if (isPasswordChange) {
-                // 1. Supabase Auth 비밀번호 갱신 (로그인에 실제 사용되는 비밀번호)
-                const { error: authError } = await supabase.auth.updateUser({
-                    password: updatedData.password.trim()
-                });
-                if (authError) throw authError;
+                const newPassword = updatedData.password.trim();
+                const { error: authError } = await supabase.auth.updateUser({ password: newPassword });
+                if (authError) {
+                    alert('프로필은 저장되었지만 비밀번호 변경은 실패했습니다. 기존 비밀번호를 계속 사용하세요.\n' + authError.message);
+                    return false;
+                }
+                // 기존 로그인 이관 경로의 열도 동기화한다. 실패를 전체 성공으로 숨기지 않는다.
+                const { data: synced, error: syncError } = await supabase.from('users').update({ password: newPassword }).eq('auth_id', user.id).select('auth_id');
+                if (syncError || synced?.length !== 1) {
+                    alert('Auth 비밀번호는 변경됐으나 기존 비밀번호 열 동기화가 실패했습니다. 재저장하지 말고 관리자에게 문의하세요.');
+                    return false;
+                }
             }
-
-            // 2. users 테이블 업데이트 (이름, 부서, 직급, 비밀번호 컬럼)
-            const { error } = await supabase.from('users').update(updatedData).eq('email', user.email);
-            if (error) throw error;
 
             alert(isPasswordChange
                 ? '프로필 및 비밀번호가 수정되었습니다. 다음 로그인부터 새 비밀번호를 사용하세요.'
                 : '프로필이 수정되었습니다. (새로고침 시 반영)');
+            return true;
         } catch (err) {
             alert('수정 실패: ' + err.message);
+            return false;
         }
     };
 

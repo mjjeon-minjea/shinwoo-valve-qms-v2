@@ -7,17 +7,16 @@ const Header = ({ isLoggedIn, onLogout, currentUser, onUpdateProfile }) => {
     const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
 
-    const handleProfileSubmit = (e) => {
+    const handleProfileSubmit = async (e) => {
         e.preventDefault();
         const formData = new FormData(e.target);
+        // 부서명(company)은 서버 가드상 시스템 관리자만 바꾼다 — 본인 저장 값에 싣지 않는다
         const updatedData = {
             name: formData.get('name'),
-            company: formData.get('company'),
             rank: formData.get('rank'),
             password: formData.get('password'),
         };
-        onUpdateProfile(updatedData);
-        setIsProfileModalOpen(false);
+        if (await onUpdateProfile(updatedData)) setIsProfileModalOpen(false);
     };
     return (
         <header className="fixed w-full bg-white/80 backdrop-blur-md border-b border-slate-200 z-50">
@@ -72,8 +71,8 @@ const Header = ({ isLoggedIn, onLogout, currentUser, onUpdateProfile }) => {
                                                     <input name="name" defaultValue={currentUser?.name || ''} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 text-sm" />
                                                 </div>
                                                 <div>
-                                                    <label className="block text-xs font-medium text-slate-700 mb-1">부서명</label>
-                                                    <input name="company" defaultValue={currentUser?.company || ''} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 text-sm" />
+                                                    <label className="block text-xs font-medium text-slate-500 mb-1">부서명 (관리자만 변경)</label>
+                                                    <input value={currentUser?.company || ''} readOnly disabled className="w-full px-3 py-2 bg-slate-50 border rounded-lg text-slate-500 text-sm" />
                                                 </div>
                                                 <div>
                                                     <label className="block text-xs font-medium text-slate-700 mb-1">직급</label>
@@ -82,7 +81,7 @@ const Header = ({ isLoggedIn, onLogout, currentUser, onUpdateProfile }) => {
                                                 <div>
                                                     <label className="block text-xs font-medium text-slate-700 mb-1">비밀번호 변경</label>
                                                     <div className="relative">
-                                                        <input name="password" type={showPassword ? "text" : "password"} defaultValue={currentUser?.password || ''} className="w-full px-3 py-2 pr-10 border rounded-lg focus:ring-2 focus:ring-primary-500 text-sm" placeholder="새 비밀번호" />
+                                                        <input name="password" type={showPassword ? "text" : "password"} defaultValue="" autoComplete="new-password" className="w-full px-3 py-2 pr-10 border rounded-lg focus:ring-2 focus:ring-primary-500 text-sm" placeholder="변경할 때만 입력" />
                                                         <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 focus:outline-none">
                                                             {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                                                         </button>
