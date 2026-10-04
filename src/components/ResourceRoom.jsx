@@ -12,10 +12,10 @@ import {
 } from '../lib/resourceFiles';
 import {
     COMMON_MODULE, FIRST_NOTE, NEW_OPTION, activeTabOf, adminRows, adminSummary, buildDraft, categoryOptions, categoryTabs, docId, draftProblem,
-    fileExt, filterResources, formatSize, freshLabel, moduleOptions, revisionStatus, startCategory
+    fileExt, filterResources, formatSize, freshLabel, isLatestUnverified, latestLabel, latestNotice, moduleOptions, revisionStatus, startCategory
 } from '../lib/resourceBoard';
 
-/* 자료실 = 게시판. 직원은 구분 탭에서 보고 내려받기만 하고, 등록·새 판 올리기·숨기기·되살리기는 관리자(품질)만 한다.
+/* 자료실 = 게시판. 직원은 구분 탭에서 보고 내려받기만 하고, 등록·새 판 올리기·숨기기·되살리기는 품질보증부(Active)만 한다(isAdmin prop = canManageResources).
    지난 판과 숨긴 자료는 관리자에게만 보이는 「관리」 탭에 모았다.
    저장·권한·지난 판 보관은 lib/resourceFiles.js 가 맡고, 이 화면은 이름만 다룬다 —
    서버가 요구하는 영문 키는 lib/resourceBoard.js 가 자동으로 채우며 화면 어디에도 보이지 않는다. */
@@ -46,13 +46,14 @@ const categoryBadge = (label) => `${BADGE} ${CATEGORY_COLOR[label] || GRAY}`;
 const tabClass = (on) => `max-w-full px-4 py-3 flex items-center justify-center text-sm font-medium transition-colors border-b-2 ${on
     ? 'border-blue-600 text-blue-600 bg-blue-50' : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`;
 
-// 자료명 옆 표시: 2판 이상이면 「N판」, 등록 14일 이내면 「새 자료」(1판)·「새 판」(2판 이상)
+// 자료명 옆 표시: 2판 이상이면 「N판」, 등록 14일 이내면 「새 자료」(1판)·「새 판」(2판 이상), 원본 최신 여부 미확인이면 「최신본 미확인」
 const Marks = ({ row }) => {
     const fresh = freshLabel(row);
     return (
         <>
             {row.revision >= 2 && <span className="text-xs text-slate-500 whitespace-nowrap">{row.revision}판</span>}
             {fresh && <span className={`${BADGE} whitespace-nowrap bg-amber-100 text-amber-700`}>{fresh}</span>}
+            {isLatestUnverified(row) && <span data-testid="resource-latest-unverified" className={`${BADGE} whitespace-nowrap bg-orange-100 text-orange-700`}>최신본 미확인</span>}
         </>
     );
 };
@@ -441,7 +442,7 @@ const ResourceRoom = ({ isAdmin = false }) => {
 
             <p className="flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-700">
                 <Info className="w-4 h-4 mt-0.5 shrink-0" />
-                <span>여기 올라온 파일이 최신본입니다. 내려받아 둔 파일이나 출력물은 개정 전 것일 수 있으니, 쓰기 전에 등록일을 확인하세요.</span>
+                <span>{latestNotice(resources)}</span>
             </p>
 
             {!modalOpen && !detail && feedback}
@@ -583,7 +584,7 @@ const ResourceRoom = ({ isAdmin = false }) => {
                                     <span className="text-xs text-slate-500">{detail.module_label}</span>
                                 </div>
                                 <h2 id="resource-detail-title" className="text-xl font-bold text-slate-900 break-words">{detail.title}</h2>
-                                <p className="mt-1 text-sm text-slate-500">{detail.revision}판 · 최신본 · {formatDate(detail.created_at)} · {detail.registered_by_name}</p>
+                                <p className="mt-1 text-sm text-slate-500">{detail.revision}판 · {latestLabel(detail)} · {formatDate(detail.created_at)} · {detail.registered_by_name}</p>
                                 {detail.source_ref && <p className="mt-1 text-xs text-slate-500 break-words">원본 참조: {detail.source_ref}</p>}
                             </div>
                             <button type="button" onClick={() => setDetailId('')} aria-label="상세 닫기" className={CLOSE}><X className="w-6 h-6" /></button>

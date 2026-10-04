@@ -23,6 +23,7 @@ import Suggestions from './Suggestions';
 import PostApproval from './PostApproval';
 import ResourceRoom from './ResourceRoom';
 import { listCurrentResources } from '../lib/resourceFiles';
+import { canManageResources } from '../lib/resourceBoard';
 import WeeklyReport from './WeeklyReport';
 import WeeklyStatus from './WeeklyStatus';
 import CalendarView from './CalendarView';
@@ -700,7 +701,8 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
         switch (activeTab) {
             case 'home': return <Home setActiveTab={setActiveTab} />;
             case 'notices': return <NoticeBoard />;
-            case 'resources': return <ResourceRoom user={user} isAdmin={isAdmin} />;
+            /* 자료실 관리는 사이트 관리자(is_admin)가 아니라 품질보증부(Active) — 서버 함수·Storage 정책도 같은 조건 */
+            case 'resources': return <ResourceRoom user={user} isAdmin={canManageResources(user)} />;
             case 'inbound_overview': return <InboundOverview setActiveTab={setActiveTab} />;
             case 'inbound_suppliers': return <InboundSuppliers />;
             case 'inbound_items': return <InboundItems />;

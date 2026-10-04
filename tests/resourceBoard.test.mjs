@@ -254,3 +254,98 @@ test('되살리기: 관리자가 아니면 거부하고, 관리자는 서버 함
     await assert.rejects(files.restore({ id: 'r1', isAdmin: true }), error => error.code === 'RESOURCE_RESTORE_FAILED' && error.message === '자료 되살리기에 실패했습니다.');
     assert.equal(typeof restoreResource, 'function'); // 화면이 쓰는 이름으로 내보냈다
 });
+
+// --- 2026-10-04 자료실 관리 권한 = 품질보증부(Active) · 최신본 미확인 표시 (스테이징 후보) ---
+import { readFileSync } from 'node:fs';
+import * as board from '../src/lib/resourceBoard.js';
+
+const source = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
+
+test('자료실 관리 권한: 품질보증부 Active 만 — 사이트 관리자(is_admin)라도 타부서면 보기·현재본만', () => {
+    const can = board.canManageResources;
+    assert.equal(typeof can, 'function');
+    assert.equal(can({ company: '품질보증부', status: 'Active', role: 'employee', is_admin: false }), true); // 품질보증부 사원
+    assert.equal(can({ company: ' 품질보증부 ', status: 'Active' }), true); // 앞뒤 빈칸은 같은 부서
+    assert.equal(can({ company: '품질보증부', status: 'Pending' }), false); // 승인 전
+    assert.equal(can({ company: '품질보증부', status: 'active' }), false); // 서버와 같이 'Active' 정확 일치
+    assert.equal(can({ company: '생산부', status: 'Active', is_admin: true, isAdmin: true }), false); // 타부서 사이트 관리자
+    assert.equal(can({ company: '품질보증팀', status: 'Active' }), false);
+    for (const user of [null, undefined, {}, { company: null, status: 'Active' }]) assert.equal(can(user), false);
+});
+
+test('Dashboard: 자료실만 canManageResources 로 바꾸고 회원관리·홈페이지 설정·게시 승인은 is_admin 그대로', () => {
+    const dashboard = source('src/components/Dashboard.jsx');
+    assert.match(dashboard, /case 'resources': return <ResourceRoom user=\{user\} isAdmin=\{canManageResources\(user\)\} \/>;/);
+    assert.match(dashboard, /import \{ canManageResources \} from '\.\.\/lib\/resourceBoard';/);
+    assert.match(dashboard, /case 'post_approval': return isAdmin \?/);
+    assert.match(dashboard, /case 'members': return isAdmin \?/);
+    assert.match(dashboard, /case 'settings_home': return isAdmin \?/);
+    assert.match(dashboard, /\['post_approval', 'members', 'settings_home'\]\.includes\(activeTab\) && !isAdmin/);
+});
+
+test('최신본 미확인: 표시가 있는 행만 골라 「최신본」이라고 단정하지 않는다 — 다른 현행 자료는 그대로', () => {
+    assert.equal(board.LATEST_UNVERIFIED, '최신본 미확인');
+    const flagged = row({ revision_note: '스테이징 최초 등록 · 원본 R4 · 기준일 2024-05-03(파일 수정일, 확인 필요) · 최신본 미확인' });
+    const byDescription = row({ revision_note: '최초 등록', description: '최신본 미확인 · 절차서 QAP-420-01 개정 R4' });
+    assert.equal(board.isLatestUnverified(flagged), true);
+    assert.equal(board.isLatestUnverified(byDescription), true);
+    assert.equal(board.isLatestUnverified(row()), false);
+    assert.equal(board.isLatestUnverified(manual), false);
+    assert.equal(board.isLatestUnverified(null), false);
+    // 상세 머리글의 판 상태
+    assert.equal(board.latestLabel(flagged), '최신본 미확인');
+    assert.equal(board.latestLabel(row()), '최신본');
+    // 맨 위 안내: 미확인 행이 없으면 원래 문구 그대로, 있으면 그 행만 예외로 알린다
+    const plain = board.latestNotice([row(), manual]);
+    assert.equal(plain, '여기 올라온 파일이 최신본입니다. 내려받아 둔 파일이나 출력물은 개정 전 것일 수 있으니, 쓰기 전에 등록일을 확인하세요.');
+    const mixed = board.latestNotice([row(), flagged]);
+    assert.notEqual(mixed, plain);
+    assert.match(mixed, /「최신본 미확인」/);
+    assert.doesNotMatch(mixed, /^여기 올라온 파일이 최신본입니다/);
+    assert.equal(board.latestNotice([]), plain);
+});
+
+test('ResourceRoom: 미확인 행은 목록 표시·상세 머리글에서 「최신본 미확인」, 맨 위 안내는 latestNotice', () => {
+    const room = source('src/components/ResourceRoom.jsx');
+    assert.match(room, /isLatestUnverified\(row\)/); // 목록의 자료명 옆 표시
+    assert.match(room, /latestLabel\(detail\)/); // 상세 머리글
+    assert.match(room, /latestNotice\(resources\)/); // 맨 위 안내
+    assert.doesNotMatch(room, /\{detail\.revision\}판 · 최신본 · /); // 단정하던 머리글 제거
+});
+
+test('스테이징 SQL: 한 트랜잭션 · 스테이징 신원/원문 해시 사전 확인 · 함수 3개와 Storage·resources 정책만 품질보증부 판정으로', () => {
+    const sql = source('sql/20261004_resource_room_department_access_staging.sql');
+    const body = sql.replace(/\/\*[\s\S]*?\*\//g, '').replace(/--[^\n]*/g, ''); // 주석(되돌림 원문 포함) 제외한 실행부
+    assert.equal((body.match(/^\s*begin\s*;/gim) || []).length, 1);
+    assert.equal((body.match(/^\s*commit\s*;/gim) || []).length, 1);
+    assert.match(body, /7623125441096521075/); // 스테이징 system_identifier
+    assert.doesNotMatch(body, /zuahpjdsypovxdplxryw/); // 메인 참조 없음
+    for (const hash of ['ccd916796d6691b60303fead5f610435', 'cf4ff96b7a02c1c3134dc15a210d5537', 'a75ddc446dc01ba2987fafa340e65736', '93381178e874703961a67505d8447eda']) {
+        assert.match(body, new RegExp(hash)); // 원문 해시가 다르면 중단
+    }
+    for (const name of ['resource_publish_revision', 'resource_soft_delete', 'resource_restore']) {
+        const fn = new RegExp(`create or replace function public\\.${name}\\([\\s\\S]*?\\$function\\$;`, 'i').exec(body)?.[0] || '';
+        assert.ok(fn, name);
+        assert.doesNotMatch(fn, /is_admin/, name); // 사이트 관리자 축으로 판정하지 않는다
+        assert.match(fn, /u\.status = 'Active'/, name);
+        assert.match(fn, /btrim\(coalesce\(u\.company, ''\)\) = '품질보증부'/, name);
+        assert.match(fn, /set search_path to 'pg_catalog', 'public'/i, name);
+        assert.match(fn, /security definer/i, name);
+    }
+    // 회원 보호 트리거: 비관리자 자기 company/status 변경 거부를 더하고 기존 신원·마지막 관리자 보호는 그대로
+    const guard = /create or replace function public\.guard_users_admin\(\)[\s\S]*?\$function\$;/i.exec(body)?.[0] || '';
+    assert.match(guard, /new\.company\s+is distinct from old\.company/);
+    assert.match(guard, /new\.status\s+is distinct from old\.status/);
+    assert.match(guard, /마지막 시스템 관리자는 해제할 수 없습니다/);
+    assert.match(guard, /회원 등록 권한이 없습니다 \(가입 규격 위반\)/);
+    // 정책: 바꾸는 이름은 이것뿐
+    const touched = [...body.matchAll(/(?:alter|create|drop) policy (?:if exists )?"?([\w ]+?)"? on ([\w.]+)/gi)].map(m => `${m[2]}:${m[1]}`);
+    assert.deepEqual([...new Set(touched)].sort(), [
+        'public.resources:Enable ALL for authenticated users',
+        'public.resources:resources_select_current_or_quality',
+        'storage.objects:qms_files_authenticated_insert',
+        'storage.objects:qms_files_authenticated_read'
+    ]);
+    assert.match(body, /split_part\(name, '\/', 1\) <> 'resources'/); // resources 밖(NCR 첨부 등) 경로는 그대로 허용
+    assert.doesNotMatch(body, /grant |revoke /i); // EXECUTE ACL 은 create or replace 로 보존(바꾸지 않음)
+});

@@ -165,6 +165,25 @@ export const freshLabel = (row, now = Date.now()) => {
     return Number(row.revision) >= 2 ? '새 판' : '새 자료';
 };
 
+/**
+ * 자료실 관리(등록·새 판·숨기기·되살리기·관리 탭) 권한 = 품질보증부 + 승인(Active).
+ * 사이트 관리자(is_admin)와는 따로 본다 — 타부서 사이트 관리자는 자료실에서 보기·현재본 다운로드만.
+ * 화면 표시용일 뿐이고, 실제 권한은 서버 함수·Storage 정책이 같은 조건으로 다시 판정한다.
+ */
+export const QUALITY_DEPARTMENT = '품질보증부';
+export const canManageResources = (user) => user?.status === 'Active' && clean(user?.company) === QUALITY_DEPARTMENT;
+
+/** 원본이 최신 개정본인지 아직 확인되지 않은 자료(등록 때 바뀐 점·내용에 이 표시를 붙였다). */
+export const LATEST_UNVERIFIED = '최신본 미확인';
+export const isLatestUnverified = (row) => !!row && [row.revision_note, row.description].some(text => String(text ?? '').includes(LATEST_UNVERIFIED));
+/** 상세 머리글의 판 상태: 미확인 자료는 「최신본」이라고 단정하지 않는다. */
+export const latestLabel = (row) => (isLatestUnverified(row) ? LATEST_UNVERIFIED : '최신본');
+const LATEST_NOTICE = '여기 올라온 파일이 최신본입니다. 내려받아 둔 파일이나 출력물은 개정 전 것일 수 있으니, 쓰기 전에 등록일을 확인하세요.';
+/** 맨 위 안내: 미확인 자료가 없으면 원래 문구, 있으면 그 자료만 예외로 알린다. */
+export const latestNotice = (rows) => ((rows || []).some(isLatestUnverified)
+    ? '여기 올라온 파일은 자료실에 등록된 가장 새 판입니다. 「최신본 미확인」 표시가 붙은 자료는 원본이 최신 개정본인지 아직 확인되지 않았으니, 쓰기 전에 품질보증부에 확인하세요. 내려받아 둔 파일이나 출력물은 개정 전 것일 수 있습니다.'
+    : LATEST_NOTICE);
+
 export const fileExt = (name) => (/\.([^.\s]+)$/.exec(clean(name))?.[1] || '파일').toUpperCase();
 
 export const formatSize = (bytes) => {
