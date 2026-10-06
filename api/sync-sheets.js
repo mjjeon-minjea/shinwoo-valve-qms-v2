@@ -294,6 +294,7 @@ export default async function handler(req, res) {
   console.log(`[Sync Engine] Starting Google Sheets Synchronization... (via ${auth.via})`);
   const logs = [];
   let syncLogId = null;
+  let measLogId = null;
   // 042 P8d — 측정값 덩이 결과. 대장 결과와 섞이지 않게 따로 담는다.
   let measResult = null;
 
@@ -365,6 +366,8 @@ export default async function handler(req, res) {
     }
 
     // MAIN source decision is unresolved: never use this gate as approval to switch env/source.
+    // Hold the measurement source lock from observation through syncMeasurements' final decision.
+    measLogId = await createSyncLog({status:'running',sheet_url:buildMeasurementCsvUrl(sheetUrl),sheet_gid:MEAS_SHEET_GID,processed_rows:0}, log);
     const measurementCsv = await prepareMeasurementSnapshot(sheetUrl);
     const ledgerPlan = planLedgerSync(rows.map((row,index)=>buildLedgerRecord(row,index)), await loadLedgerSnapshot(), sheetUrl);
     const termMap = buildNormalizedTermMap(rows);
@@ -450,7 +453,7 @@ export default async function handler(req, res) {
 
     // 두 DB 요청은 atomic하지 않다. 측정값 부분실패는 전체 성공으로 응답하지 않는다.
     try {
-      measResult = await syncMeasurements(sheetUrl, log, measurementCsv);
+      measResult = await syncMeasurements(sheetUrl, log, measurementCsv, measLogId);
     } catch (measFatal) {
       // syncMeasurements 는 자기 오류를 스스로 다 잡는다. 여기 오면 그 바깥의 사고다.
       log(`[measurements][ERROR] 예상 밖 오류: ${measFatal.message} (대장 결과에는 영향 없음)`);
@@ -476,6 +479,10 @@ export default async function handler(req, res) {
     log(`[ERROR] Sync aborted: ${error.message}`);
 
     const blocked = error.code === 'SYNC_ALREADY_RUNNING';
+    // Preflight/ledger failure: close only our measurement lock; unknown writes retain both locks.
+    await finalizeSyncLog(measLogId, error.code === 'WRITE_UNVERIFIED' ? {error_message:error.message} : {
+      status:'failed',finished_at:new Date().toISOString(),error_message:error.message,upsert_count:0
+    }, log);
     /* (r11) 대장도 **미확인이면 이 줄을 닫지 않는다**(응답 status ≠ DB status).
        error_message 한 칸만 고쳐 다음 판이 자동으로 건너뛰게 한다(예림 5차 ⑴·⑶). */
     await finalizeSyncLog(syncLogId, error.code === 'WRITE_UNVERIFIED' ? {
@@ -1760,7 +1767,7 @@ async function countMeasurementRows(batchId = null) {
    이미 성공으로 기록돼 있어야 하기 때문이다(설계안 §7 「한 판에 두 표」).
    기록은 sync_logs 에 **자기 줄을 따로** 남긴다 — 열을 새로 더하지 않고
    (sheet_gid = 40080222 로 구분) 대장 줄과 건수가 섞이지 않게 한다. */
-async function syncMeasurements(ledgerSheetUrl, log, preparedCsv) {
+async function syncMeasurements(ledgerSheetUrl, log, preparedCsv, measLogId) {
   const result = {
     status: 'failed',
     gid: MEAS_SHEET_GID,
@@ -1803,59 +1810,16 @@ async function syncMeasurements(ledgerSheetUrl, log, preparedCsv) {
     syncLogId: null,
     error: null
   };
-  let measLogId = null;
-
   try {
     const url = buildMeasurementCsvUrl(ledgerSheetUrl);
     if (!url) throw new Error('측정값 CSV 주소를 만들 수 없다(대장 주소가 URL 형태가 아니다). GOOGLE_SHEETS_MEAS_CSV_URL 을 지정할 것.');
     result.sheetUrl = url;
 
-    /* 기록 줄을 **시트를 받기 전에** 연다. 시트 접근 자체가 실패했을 때
-       (403·404·로그인 리다이렉트) sync_logs 에 아무 흔적도 안 남으면 아무도
-       고장을 눈치채지 못한다 — 그게 지금 210행이 밀린 사고의 본질이다.
-
-       ── (r10) 이 INSERT 가 **잠금 그 자체**다 ────────────────────────────
-       sql/08 의 부분 유일 인덱스가 같은 gid 의 두 번째 running 을 거절한다.
-       판정은 createSyncLog() 안에 한 곳만 있고(대장과 공용), 여기서는 그 결과를
-       받아 **측정값 경로에 맞는 마무리**만 한다.
-
-       **인덱스가 아직 없어도 그대로 돈다.** 거절이 안 나면 예전처럼 진행할 뿐이다
-       — 다만 그것은 **호환성**이지 보호가 아니다. 인덱스가 붙기 전 구간에는 보호가
-       없다. 그래서 전환은 **크론 중지·수동/API 호출 통제를 맨 앞에** 두고
-       06 → 07 → 코드 배포·READY → 08 검증을 끝낸 뒤 크론을 재개한다.
-       **공백이 없는 이유는 그 사이 아무도 돌지 않기 때문**이다 — 앞 판의
-       「코드 먼저라 공백 없음」 설명은 철회한다(예림 6차 지적으로 정정). */
-    try {
-      measLogId = await createSyncLog({
-        status: 'running',
-        sheet_url: url,
-        sheet_gid: MEAS_SHEET_GID,
-        processed_rows: 0
-      }, log);
-    } catch (startError) {
-      if (startError.code !== 'SYNC_ALREADY_RUNNING') throw startError;
-      /* ── 이미 열린 판이 있다 → **건너뛴다. 잠금은 절대 자동으로 풀지 않는다.**
-         「15분을 넘겼으면 죽은 판」은 추측이고, 틀리면 **아직 살아 있는 판의 잠금을
-         풀어** 두 판이 다시 함께 쓴다(예림 4차 ⑴). 오래됐다는 사실만으로 끝났다고
-         확정할 수 없으므로 **닫는 코드를 지웠다.** 대신 누가 언제부터 열어 두었는지만
-         남긴다 — 푸는 것은 **사람**이 한다(sql/08 머리말 ③). */
-      const open = await supabase
-        .from('sync_logs')
-        .select('id, started_at')
-        .eq('sheet_gid', MEAS_SHEET_GID)
-        .eq('status', 'running')
-        .order('started_at', { ascending: true })
-        .limit(1);
-      const o = (open.data && open.data[0]) || null;
-      result.status = 'skipped';
-      result.error = `측정값 경로 건너뜀 : 이전 판이 **아직 열려 있다**(sync_logs.id=${o ? o.id : '(조회 실패)'} · 시작 ${o ? new Date(o.started_at).toISOString() : '(조회 실패)'}). 잠금은 자동으로 풀지 않는다 — 그 판이 끝났는지 확인한 뒤 사람이 그 행을 닫아야 다음 판이 진행된다. 이번 판은 측정값 표를 한 줄도 건드리지 않았다(대장 동기화는 정상 처리됐다).`;
-      log(`[measurements] ${result.error}`);
-      return result;
-    }
+    // The handler acquired this running guard before reading preparedCsv; never reacquire after prefetch.
+    if (!measLogId || typeof preparedCsv !== 'string') throw new Error('측정값 잠금/snapshot 인계 누락: HOLD');
     result.syncLogId = measLogId;
 
-    log(`[measurements] Fetching measurement sheet CSV (gid=${MEAS_SHEET_GID})...`);
-    const csvData = preparedCsv ?? await prepareMeasurementSnapshot(ledgerSheetUrl);
+    const csvData = preparedCsv;
     log(`[measurements] CSV load success. Byte size: ${csvData.length}`);
 
     const rows = parseMeasurementCSV(csvData);

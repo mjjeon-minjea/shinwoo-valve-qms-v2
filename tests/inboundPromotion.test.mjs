@@ -79,3 +79,85 @@ test('local source-namespace candidate preserves legacy IDs, full hash separates
     assert.notEqual(f.planLedgerSync([incoming],[],ledgerUrl,'source')[0].id,planned[0].id);
     assert.throws(()=>f.planLedgerSync([{...incoming,inspectionQuantity:7}],[...db.values()],newUrl,'source'),/HOLD/);
 });
+
+// Full handler + deterministic running-UNIQUE adapter. Not actual DB concurrency.
+function concurrentSyncFixture({delayLedgerFinalize=false,measurementError=null,measurementMissing=false,ledgerError=null}={}) {
+    const db={sync_logs:[],inspections:[],inspection_measurements:[],defect_category_map:[]};
+    const state={value:'10',reverse:false,measurementReads:0,lockedReads:0};let nlog=0,nmeasurement=0;
+    let resume,signalDelayed;const gate=new Promise(r=>{resume=r;});const delayed=new Promise(r=>{signalDelayed=r;});
+    const client={auth:{getUser:async()=>({data:{user:{id:'offline-actor'}}})},from:table=>{
+        const q={filters:[],verb:'select',payload:null,start:0,end:Infinity,
+            eq(k,v){this.filters.push(r=>r[k]===v);return this;},gt(k,v){this.filters.push(r=>r[k]>v);return this;},in(k,values){this.filters.push(r=>values.includes(r[k]));return this;},
+            order(){return this;},limit(n){this.end=n-1;return this;},range(a,b){this.start=a;this.end=b;return this;},select(){return this;},
+            insert(p){this.verb='insert';this.payload=p;return this;},update(p){this.verb='update';this.payload=p;return this;},upsert(p){this.verb='upsert';this.payload=p;return this;},
+            single(){return this.run(true);},then(resolve,reject){return this.run(false).then(resolve,reject);},async run(single){
+                const rows=db[table];let hits=rows.filter(r=>this.filters.every(f=>f(r)));
+                if(this.verb==='insert') {
+                    if(table==='sync_logs'&&rows.some(r=>r.sheet_gid===this.payload.sheet_gid&&r.status==='running')) return {error:{code:'23505',message:'sync_logs_one_running_per_gid'},data:null};
+                    const row={...this.payload,id:`log${++nlog}`,started_at:new Date().toISOString()};rows.push(row);hits=[row];
+                } else if(this.verb==='update') {
+                    for(const row of hits) Object.assign(row,this.payload);
+                    if(delayLedgerFinalize&&table==='sync_logs'&&this.payload.status==='success'&&hits[0]?.sheet_gid==='0') {delayLedgerFinalize=false;signalDelayed();await gate;}
+                } else if(this.verb==='upsert') {
+                    if(table==='inspection_measurements'&&measurementError) return {error:measurementError,data:null};
+                    if(table==='inspections'&&ledgerError) return {error:ledgerError,data:null};
+                    for(const p of Array.isArray(this.payload)?this.payload:[this.payload]) {
+                        let row=rows.find(r=>table==='inspection_measurements'?r.ri_no===p.ri_no&&r.seq===p.seq:r.id===p.id);
+                        if(row) Object.assign(row,p);
+                        else rows.push({...p,...(table==='inspection_measurements'?{id:`m${++nmeasurement}`,missing_since:null,missing_seen:0,missing_confirmed_at:null,review_reason:null,assignee:'Synthetic owner'}:{})});
+                    }
+                }
+                const data=hits.slice(this.start,this.end+1).map(r=>({...r}));return {data:single?data[0]:data,count:hits.length,error:null};
+            }};return q;
+    }};
+    const fetch=async url=>{
+        if(!String(url).includes('gid=40080222')) return {ok:true,status:200,text:async()=>csv(rawRow('2026-07-14'))};
+        state.measurementReads++;if(db.sync_logs.some(r=>r.sheet_gid==='40080222'&&r.status==='running'))state.lockedReads++;
+        return {ok:!measurementMissing,status:measurementMissing?400:200,text:async()=>{
+            const records=Array.from({length:800},(_,i)=>`RI-260714-1,P,Synthetic,point${i},수치,10,1,-1,${state.value}`);
+            return ',품번,제품명,검사포인트,측정유형,기준치수,공차상,공차하,X1\n'+(state.reverse?records.reverse():records).join('\n');
+        }};
+    };
+    const text=source('api/sync-sheets.js').replace(/^import .*;$/gm,'').replace('export default','').replaceAll('export ','');
+    const handler=new Function('dotenv','fetch','createClient','createHash','process',`${text};return handler;`)({config(){}},fetch,()=>client,createHash,
+        {env:{VITE_SUPABASE_URL:'https://offline.invalid',VITE_SUPABASE_ANON_KEY:'public-placeholder',SUPABASE_SERVICE_ROLE_KEY:'synthetic-noncredential',GOOGLE_SHEETS_CSV_URL:ledgerUrl}});
+    return {db,state,delayed,resume,async request(){const res={statusCode:0,setHeader(){},status(n){this.statusCode=n;return this;},json(v){this.body=v;return this;}};await handler({method:'POST',headers:{authorization:'Bearer offline-fixture'}},res);return res;}};
+}
+test('two handlers: delayed ledger finalize cannot let a newer snapshot be overwritten by old 800 rows',async()=>{
+    const f=concurrentSyncFixture({delayLedgerFinalize:true});const a=f.request();
+    try {
+        await f.delayed;f.state.value='11';const b=await f.request();
+        assert.equal(b.statusCode,200);assert.equal(b.body.skipped,true);assert.equal(b.body.reason,'SYNC_ALREADY_RUNNING');
+        assert.equal(f.state.measurementReads,1);assert.equal(f.state.lockedReads,1);assert.equal(f.db.inspection_measurements.length,0);
+        assert.equal(f.db.sync_logs.filter(r=>r.sheet_gid==='40080222'&&r.status==='running').length,1);
+    } finally {f.resume();await a;}
+    const keys=f.db.inspection_measurements.map(r=>[r.id,r.seq,r.inspect_point]);
+    assert.equal(f.db.inspection_measurements.length,800);assert.ok(f.db.inspection_measurements.every(r=>r.x1==='10'));
+    f.state.reverse=true;
+    for(let i=0;i<2;i++) {
+        const latest=await f.request();assert.equal(latest.statusCode,200);assert.equal(latest.body.measurements.status,'success');
+        assert.equal(latest.body.measurements.seqInherited,800);assert.equal(latest.body.measurements.seqNew,0);
+        assert.equal(f.db.inspection_measurements.length,800);assert.ok(f.db.inspection_measurements.every(r=>r.x1==='11'&&r.assignee==='Synthetic owner'));
+        assert.deepEqual(f.db.inspection_measurements.map(r=>[r.id,r.seq,r.inspect_point]),keys);
+    }
+    assert.equal(f.state.measurementReads,f.state.lockedReads);assert.equal(f.db.sync_logs.filter(r=>r.status==='running').length,0);
+});
+test('measurement definite failure closes its lock; unknown write retains it and next handler skips before observation',async()=>{
+    for(const code of ['42501','08007','40003']) {
+        const f=concurrentSyncFixture({measurementError:{code,message:'offline injected error'}});const failed=await f.request();
+        assert.equal(failed.statusCode,503);assert.equal(failed.body.success,false);assert.equal(f.db.inspection_measurements.length,0);
+        const log=f.db.sync_logs.find(r=>r.sheet_gid==='40080222');assert.equal(log.status,code==='42501'?'failed':'running');
+        assert.equal(f.state.measurementReads,1);assert.equal(f.state.lockedReads,1);
+        if(code!=='42501') {const retry=await f.request();assert.equal(retry.body.skipped,true);assert.equal(f.state.measurementReads,1);}
+    }
+});
+test('preflight source/definite ledger failure releases owned guards; uncertain ledger write retains both',async()=>{
+    for(const options of [{measurementMissing:true},{ledgerError:{code:'42501',message:'offline denied'}},{ledgerError:{code:'08007',message:'offline completion unknown'}}]) {
+        const f=concurrentSyncFixture(options);assert.equal((await f.request()).statusCode,500);
+        assert.equal(f.db.inspections.length,0);assert.equal(f.db.inspection_measurements.length,0);
+        assert.equal(f.state.measurementReads,1);assert.equal(f.state.lockedReads,1);
+        assert.equal(f.db.sync_logs.length,2);
+        assert.ok(f.db.sync_logs.every(r=>r.status===(options.ledgerError?.code==='08007'?'running':'failed')));
+        if(options.ledgerError?.code==='08007') {assert.equal((await f.request()).body.skipped,true);assert.equal(f.state.measurementReads,1);}
+    }
+});

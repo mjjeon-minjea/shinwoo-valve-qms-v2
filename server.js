@@ -47,7 +47,7 @@ server.use(jsonServer.bodyParser);
 // =====================================================
 server.use((req, res, next) => {
     if ((req.method === 'POST' || req.method === 'PATCH' || req.method === 'PUT') && 
-        (req.path === '/dev_notes' || req.path.startsWith('/dev_notes/'))) {
+        /^\/dev_notes(\/|$)/i.test(req.path)) {
         
         // 💡 반려(rejected) 상태의 패치노트는 필수 품질 검증 키워드 검사 제외
 
@@ -203,26 +203,31 @@ server.post('/api/sync-sheets', async (req, res) => {
 
 // raw json-server의 신원 변경/비공개 노트 우회는 router 전에 거부한다.
 export async function localIdentityBoundary(req, res, next) {
-    if (['/', '/db'].includes(req.path)) return res.status(403).json({ error: 'raw DB 조회 금지' });
-    if (!/^\/(users|dev_notes)(\/|$)/.test(req.path)) return next();
+    let parts;
+    try { parts = req.path.replace(/\/+$/, '').split('/').map(decodeURIComponent); }
+    catch { return res.status(400).json({ error: '잘못된 경로' }); }
+    const collection = (parts[1] || '').toLowerCase();
+    if (!collection || collection === 'db') return res.status(403).json({ error: 'raw DB 조회 금지' });
+    // No caller needs raw relations; nested rewrites/expansions bypass per-table ACLs.
+    if (parts.length > 3 || ['_expand', '_embed'].some(k => k in (req.query || {}))) return res.status(403).json({ error: 'raw 관계 조회/쓰기 금지' });
+    if (!['users', 'dev_notes'].includes(collection)) return next();
     try {
         const { verifiedProfile } = await import('./api/admin-update-member.js');
         const actor = await verifiedProfile(req);
         if (!actor) return res.status(401).json({ error: 'Active 세션 필요' });
-        if (/^\/users(\/|$)/.test(req.path)) {
+        const id = parts[2];
+        if (collection === 'users') {
             if (req.method !== 'GET') return res.status(403).json({ error: '검증된 프로필/관리 API만 사용' });
             if (Object.keys(req.query || {}).some(k => !['id', 'email', 'auth_id'].includes(k))) return res.status(400).json({ error: '지원하지 않는 조회 조건' });
             const safe = ['id', 'email', 'auth_id', 'name', 'company', 'role', 'rank', 'date', 'status', 'created_at', 'is_admin', 'weekly_review_enabled', 'legacy_post_manager'];
             let rows = router.db.get('users').value() || [];
-            rows = rows.filter(row => (!req.params?.id || String(row.id) === req.params.id) && Object.entries(req.query || {}).every(([k,v]) => String(row[k]) === String(v)));
-            const id = req.path.split('/')[2];
+            rows = rows.filter(row => Object.entries(req.query || {}).every(([k,v]) => String(row[k]) === String(v)));
             if (id) rows = rows.filter(row => String(row.id) === id);
             const projected = rows.map(row => Object.fromEntries(safe.filter(k => k in row).map(k => [k, row[k]])));
             return res.json(id ? projected[0] || null : projected);
         }
         if (actor.legacy_post_manager === true) return next();
         if (req.method !== 'GET') return res.status(403).json({ error: '기존 게시 관리자 전용' });
-        const id = req.path.split('/')[2];
         const rows = (router.db.get('dev_notes').value() || []).filter(row => row.status === 'published' && (!id || String(row.id) === id));
         return res.json(id ? rows[0] || null : rows);
     } catch { return res.status(503).json({ error: '권한 조회 실패: HOLD' }); }

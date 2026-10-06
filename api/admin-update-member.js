@@ -50,7 +50,8 @@ export default async function handler(req, res) {
         if (keys.length) {
             const result = await cas(updates, row);
             if (result.error) {
-                if (!/^([0-9A-Z]{5}|PGRST\d+)$/.test(result.error.code || '')) return hold();
+                // Same conservative rejection classes as sync-sheets; format alone proves no outcome.
+                if (!/^(22|23|42)[0-9A-Z]{3}$/.test(result.error.code || '')) return hold();
                 return res.status(409).json({ error: 'DB 확정 거부: 변경 없음' });
             }
             if (result.data?.length !== 1 || !keys.every(k => result.data[0][k] === updates[k])) return hold();
