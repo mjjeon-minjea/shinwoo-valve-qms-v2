@@ -1,19 +1,20 @@
 -- QMS MAIN candidate. Protected bindings / old API closure required.
 BEGIN;
 SET LOCAL lock_timeout='5s';
-LOCK TABLE public.users,public.resources,public.weekly_reports,public.inspections,public.sync_logs IN SHARE ROW EXCLUSIVE MODE;
+LOCK TABLE public.users,public.resources,public.weekly_reports,public.inspections,public.sync_logs,public.notices,public.settings IN SHARE ROW EXCLUSIVE MODE;
 DO $$ DECLARE actual text; expected jsonb; BEGIN
  IF session_user NOT IN ('postgres','supabase_admin') OR coalesce(auth.role(),'')<>'' THEN RAISE EXCEPTION 'trusted maintenance SQL only'; END IF;
  IF current_setting('qms.target_ref',true) IS DISTINCT FROM 'zuahpjdsypovxdplxryw' OR current_setting('qms.old_api_closed',true) IS DISTINCT FROM 'true' OR current_setting('qms.writer_quiescent',true) IS DISTINCT FROM 'true' THEN RAISE EXCEPTION 'binding/closure/writer receipts required'; END IF;
  IF current_setting('qms.expected_system_identifier',true) IS NULL OR (SELECT system_identifier::text FROM pg_control_system()) IS DISTINCT FROM current_setting('qms.expected_system_identifier') THEN RAISE EXCEPTION 'database identity mismatch'; END IF;
- SELECT md5(string_agg(table_name||':'||column_name||':'||udt_name,'|' ORDER BY table_name COLLATE "C",column_name COLLATE "C")) INTO actual FROM information_schema.columns WHERE table_schema='public' AND table_name IN ('users','resources','weekly_reports','inspections','sync_logs');
- IF actual IS DISTINCT FROM '372a1c54969c53513eaa5f1c312c94cf' THEN RAISE EXCEPTION 'MAIN schema fingerprint drift'; END IF;
+ SELECT md5(string_agg(table_name||':'||column_name||':'||udt_name,'|' ORDER BY table_name COLLATE "C",column_name COLLATE "C")) INTO actual FROM information_schema.columns WHERE table_schema='public' AND table_name IN ('users','resources','weekly_reports','inspections','sync_logs','notices','settings');
+ IF actual IS DISTINCT FROM 'a3526954181f455d8c3aa1f222a94837' THEN RAISE EXCEPTION 'MAIN schema fingerprint drift'; END IF;
  expected := current_setting('qms.expected_existing_bindings')::jsonb;
  IF EXISTS(SELECT 1 FROM jsonb_array_elements(expected) x WHERE NOT EXISTS(SELECT 1 FROM auth.users a WHERE a.id::text=x->>'auth_id' AND a.email=x->>'email')) OR (SELECT count(*) FROM public.weekly_reports)<>73 OR NOT EXISTS(SELECT 1 FROM pg_constraint WHERE conname='process_inspections_inspector_id_fkey' AND confrelid='public.users'::regclass) THEN RAISE EXCEPTION 'canonical Auth/history/FK baseline drift'; END IF;
  IF jsonb_array_length(expected)<>6 OR (SELECT count(*) FROM public.users)<>6 OR (SELECT count(DISTINCT x->>'id') FROM jsonb_array_elements(expected) x)<>6 OR EXISTS(SELECT 1 FROM jsonb_array_elements(expected) x WHERE NOT EXISTS(SELECT 1 FROM public.users u WHERE u.id=x->>'id' AND u.email=x->>'email' AND u.auth_id=x->>'auth_id' AND u.role IS NOT DISTINCT FROM x->>'role' AND u.status IS NOT DISTINCT FROM x->>'status')) THEN RAISE EXCEPTION 'existing six binding drift'; END IF;
  IF EXISTS(SELECT 1 FROM public.resources) OR EXISTS(SELECT 1 FROM storage.objects WHERE bucket_id='qms-files') OR EXISTS(SELECT 1 FROM storage.buckets WHERE id='qms-files') THEN RAISE EXCEPTION 'resource/bucket baseline drift'; END IF;
  IF (SELECT count(*) FROM public.users WHERE role='manager')<>1 OR NOT EXISTS(SELECT 1 FROM public.users WHERE id=current_setting('qms.admin_pk') AND auth_id=current_setting('qms.admin_auth') AND role='manager' AND status='Active') OR NOT EXISTS(SELECT 1 FROM public.users WHERE id=current_setting('qms.qa_pk') AND auth_id=current_setting('qms.qa_auth') AND status='Active' AND company='품질보증부') THEN RAISE EXCEPTION 'approved capability binding mismatch'; END IF;
  IF EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='storage' AND tablename='objects') THEN RAISE EXCEPTION 'storage policy baseline drift'; END IF;
+ IF (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename IN ('notices','settings'))<>2 OR EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename IN ('notices','settings') AND (policyname<>'Enable ALL for authenticated users' OR cmd<>'ALL' OR roles<>ARRAY['authenticated']::name[] OR qual IS DISTINCT FROM 'true' OR with_check IS NOT NULL)) THEN RAISE EXCEPTION 'notice/settings policy baseline drift'; END IF;
 END $$;
 
 LOCK TABLE public.users IN SHARE ROW EXCLUSIVE MODE;
@@ -129,6 +130,13 @@ ALTER POLICY devnotes_update_policy ON public.dev_notes TO authenticated
  USING(public.qms_legacy_post_manager()) WITH CHECK(public.qms_legacy_post_manager());
 ALTER POLICY devnotes_select_policy ON public.dev_notes TO authenticated
  USING(status='published' OR public.qms_legacy_post_manager());
+-- Fixed notice/settings writes belong to the sole site admin, not rank/role.
+DROP POLICY "Enable ALL for authenticated users" ON public.notices;
+CREATE POLICY qms_notices_read ON public.notices FOR SELECT TO authenticated USING(true);
+CREATE POLICY qms_notices_admin ON public.notices TO authenticated USING(public.qms_site_admin()) WITH CHECK(public.qms_site_admin());
+DROP POLICY "Enable ALL for authenticated users" ON public.settings;
+CREATE POLICY qms_settings_read ON public.settings FOR SELECT TO authenticated USING(true);
+CREATE POLICY qms_settings_admin ON public.settings TO authenticated USING(public.qms_site_admin()) WITH CHECK(public.qms_site_admin());
 
 LOCK TABLE public.resources IN SHARE ROW EXCLUSIVE MODE;
 DO $$ BEGIN IF EXISTS(SELECT 1 FROM public.resources) THEN RAISE EXCEPTION 'MAIN resources baseline drift: preserve and map legacy rows'; END IF; END $$;
