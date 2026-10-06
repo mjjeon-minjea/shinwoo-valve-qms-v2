@@ -16,6 +16,9 @@ DO $$ BEGIN
 END $$;
 CREATE OR REPLACE FUNCTION public.qms_transition_guard() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $$
 BEGIN
+ IF TG_TABLE_SCHEMA='storage' THEN
+  IF NOT (coalesce(NEW.bucket_id,OLD.bucket_id)='qms-files' AND split_part(coalesce(NEW.name,OLD.name),'/',1)='resources') THEN RETURN coalesce(NEW,OLD); END IF;
+ END IF;
  IF coalesce(auth.role(),'')='' AND session_user IN ('postgres','supabase_admin') THEN RETURN coalesce(NEW,OLD); END IF;
  RAISE EXCEPTION 'QMS maintenance: writes paused';
 END $$;
@@ -27,6 +30,9 @@ DO $$ BEGIN
   END IF;
   IF NOT EXISTS(SELECT 1 FROM pg_trigger WHERE tgrelid='public.resources'::regclass AND tgname='qms_resources_transition') THEN
    CREATE TRIGGER qms_resources_transition BEFORE INSERT OR UPDATE OR DELETE ON public.resources FOR EACH ROW EXECUTE FUNCTION public.qms_transition_guard();
+  END IF;
+  IF NOT EXISTS(SELECT 1 FROM pg_trigger WHERE tgrelid='storage.objects'::regclass AND tgname='qms_storage_transition') THEN
+   CREATE TRIGGER qms_storage_transition BEFORE INSERT OR UPDATE OR DELETE ON storage.objects FOR EACH ROW EXECUTE FUNCTION public.qms_transition_guard();
   END IF;
   IF to_regclass('public.inspection_measurements') IS NOT NULL AND NOT EXISTS(SELECT 1 FROM pg_trigger WHERE tgrelid=to_regclass('public.inspection_measurements') AND tgname='qms_measurements_transition') THEN
    CREATE TRIGGER qms_measurements_transition BEFORE INSERT OR UPDATE OR DELETE ON public.inspection_measurements FOR EACH ROW EXECUTE FUNCTION public.qms_transition_guard();

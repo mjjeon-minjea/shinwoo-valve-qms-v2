@@ -498,4 +498,5 @@ END $$;
 NOTIFY pgrst,'reload schema';
 DROP TRIGGER IF EXISTS qms_users_transition ON public.users;
 DROP TRIGGER IF EXISTS qms_resources_transition ON public.resources;
+DROP TRIGGER IF EXISTS qms_storage_transition ON storage.objects;
 COMMIT;
