@@ -29,21 +29,24 @@ const PasswordChangeModal = ({ onComplete }) => {
         e.preventDefault();
         if (!allValid) return;
 
-        // 1. Auth 서버 업데이트
-        const { data: authData, error: authError } = await supabase.auth.updateUser({ password: newPassword });
+        try {
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        if (userError || !user?.email) throw new Error('유효한 세션이 없습니다.');
+        const { error: verifyError } = await supabase.auth.signInWithPassword({ email: user.email, password: oldPassword });
+        if (verifyError) throw new Error('현재 비밀번호 재인증에 실패했습니다.');
+        const { error: authError } = await supabase.auth.updateUser({ password: newPassword });
         if (authError) { 
             alert('오류: ' + authError.message); 
             return; 
         }
 
-        // 2. 관리자 로그아웃 전 DB 이중 동기화 (console 로그 제거)
-        if (!authError) {
-            await supabase.from('users').update({ password: newPassword }).eq('email', authData.user.email);
-        }
 
         // 3. 완료
         alert("비밀번호가 안전하게 변경되었습니다. 다시 로그인해 주십시오.");
-        onComplete();
+        await onComplete();
+        } catch {
+            alert('비밀번호 변경 실패 또는 결과 불명확. 재시도 전 로그인 상태를 확인하세요.');
+        }
     };
 
     return (

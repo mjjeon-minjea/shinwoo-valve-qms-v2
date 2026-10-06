@@ -17,6 +17,13 @@ const compareVersions = (a, b) => {
 };
 
 const PostApproval = ({ user }) => {
+    const canManagePosts = user?.status === 'Active' && user?.legacy_post_manager === true;
+    const localFetch = async (url, options = {}) => {
+        if (!canManagePosts) throw new Error('기존 게시 관리자 전용');
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) throw new Error('유효한 세션 필요');
+        return fetch(url, { ...options, headers: { ...options.headers, Authorization: `Bearer ${session.access_token}` } });
+    };
     const [drafts, setDrafts] = useState([]);
     const [published, setPublished] = useState([]);
     const [viewMode, setViewMode] = useState('pending');
@@ -26,11 +33,12 @@ const PostApproval = ({ user }) => {
     const [approvalDate, setApprovalDate] = useState('');
 
     const loadData = async () => {
+        if (!canManagePosts) return;
         try {
             let data;
             // ✅ 하이브리드 로직: 실서버(Vercel)는 Supabase에서, 로컬(개발환경)은 db.json에서
             if (import.meta.env.DEV) {
-                const res = await fetch(`${LOCAL_API_URL}/dev_notes`);
+                const res = await localFetch(`${LOCAL_API_URL}/dev_notes`);
                 if (!res.ok) throw new Error('네트워크 응답이 올바르지 않습니다.');
                 data = await res.json();
             } else {
@@ -51,7 +59,7 @@ const PostApproval = ({ user }) => {
 
     // ✅ 차장님 승인 → 로컬 DB 상태 변경 (수동 날짜 모달 적용 버전)
     const handleExecuteApprove = async (note, customDate) => {
-        if (!import.meta.env.DEV) {
+        if (!canManagePosts || !import.meta.env.DEV) {
             alert('승인 및 시스템 관리 권한은 로컬 인트라넷(localhost) 환경에서만 수행 가능합니다.');
             return;
         }
@@ -74,7 +82,7 @@ const PostApproval = ({ user }) => {
 
         setLoading(true);
         try {
-            const res = await fetch(`${LOCAL_API_URL}/dev_notes/${note.id}`, {
+            const res = await localFetch(`${LOCAL_API_URL}/dev_notes/${note.id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -97,7 +105,7 @@ const PostApproval = ({ user }) => {
 
     // ✅ 실서버(Supabase)로 데이터 전송 (Sync to Cloud)
     const handleCloudSync = async (note) => {
-        if (!import.meta.env.DEV) {
+        if (!canManagePosts || !import.meta.env.DEV) {
             alert('클라우드 자동 동기화는 로컬 인트라넷(localhost) 시스템 서버에서만 실행 가능합니다.');
             return;
         }
@@ -121,7 +129,7 @@ const PostApproval = ({ user }) => {
             if (syncErr) throw syncErr;
 
             // 3. 로컬 DB에 동기화 완료 상태 업데이트
-            const res = await fetch(`${LOCAL_API_URL}/dev_notes/${note.id}`, {
+            const res = await localFetch(`${LOCAL_API_URL}/dev_notes/${note.id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ is_synced: true })
@@ -141,7 +149,7 @@ const PostApproval = ({ user }) => {
 
     // ✅ 미배포 승인 노지 일괄 배포 (Bulk Sync)
     const handleBulkCloudSync = async () => {
-        if (!import.meta.env.DEV) {
+        if (!canManagePosts || !import.meta.env.DEV) {
             alert('클라우드 자동 동기화는 로컬 인트라넷(localhost) 시스템 서버에서만 실행 가능합니다.');
             return;
         }
@@ -170,11 +178,12 @@ const PostApproval = ({ user }) => {
                 if (syncErr) throw syncErr;
 
                 // 로컬 DB 갱신
-                await fetch(`${LOCAL_API_URL}/dev_notes/${note.id}`, {
+                const localResult = await localFetch(`${LOCAL_API_URL}/dev_notes/${note.id}`, {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ is_synced: true })
                 });
+                if (!localResult.ok) throw new Error('로컬 동기화 결과 불명확');
                 successCount++;
             }
             alert(`🚀 일괄 배포 완료! 총 ${pending.length}개 중 ${successCount}개 배포에 성공했습니다.`);
@@ -187,12 +196,13 @@ const PostApproval = ({ user }) => {
     };
 
     const handleReject = async (id) => {
+        if (!canManagePosts || !import.meta.env.DEV) return;
         const reason = window.prompt('반려 사유를 입력하세요:');
         if (!reason) return;
         setLoading(true);
         try {
             const target = [...drafts, ...published].find(d => d.id === id);
-            const res = await fetch(`${LOCAL_API_URL}/dev_notes/${id}`, {
+            const res = await localFetch(`${LOCAL_API_URL}/dev_notes/${id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

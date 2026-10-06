@@ -52,7 +52,11 @@ module.exports = {
         type: 'root',
         pattern: 'src/*.jsx'
       },
-      { type: 'config', pattern: '**/src/config/**' }
+      { type: 'config', pattern: '**/src/config/**' },
+      /* 042 P8 — 인수검사 화면 4장이 공통 CSS 한 장을 직접 import 한다
+         (src/styles/inbound.css). 이 자리가 없으면 boundaries/no-unknown 이
+         '모르는 것을 들여온다'며 error 를 내고, lint-staged 가 커밋을 막는다. */
+      { type: 'styles', pattern: '**/src/styles/**' }
     ]
   },
   plugins: ['react-refresh', 'boundaries'],
@@ -71,7 +75,7 @@ module.exports = {
         rules: [
           {
             from: 'components',
-            allow: ['lib', 'contexts', 'data', 'components', 'assets', 'config']
+            allow: ['lib', 'contexts', 'data', 'components', 'assets', 'config', 'styles']
           },
           {
             from: 'contexts',

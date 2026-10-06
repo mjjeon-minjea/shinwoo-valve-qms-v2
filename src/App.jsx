@@ -3,10 +3,9 @@ import Header from './components/Header';
 import Hero from './components/Hero';
 import Dashboard from './components/Dashboard';
 import Chatbot from './components/Chatbot';
-import { supabase } from './lib/api';
+import { supabase, USER_PUBLIC_COLUMNS } from './lib/api';
 
-import { Routes, Route, useNavigate } from 'react-router-dom';
-import InspectionAnalysisDashboard from './components/InspectionAnalysisDashboard';
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import QualificationExam from './components/QualificationExam';
 import PasswordChangeModal from './components/PasswordChangeModal';
 
@@ -14,7 +13,7 @@ import { UserProvider, useUser } from './contexts/UserContext';
 
 // AppContent uses the UserContext to manage UI state
 const AppContent = () => {
-    const { user, login, logout, signup, loading: authLoading, migrateUser } = useUser();
+    const { user, login, logout, signup, loading: authLoading } = useUser();
     const navigate = useNavigate();
     
     // 🚨 Session Storage 연동: F5 새로고침 우회 원천 차단
@@ -25,15 +24,13 @@ const AppContent = () => {
     // User management state for Dashboard admin view
     const [users, setUsers] = useState([]);
 
-    // Migration state
-    const [migrationState, setMigrationState] = useState(null);
 
     // Login attempts state
     const [loginAttempts, setLoginAttempts] = useState(0);
 
     const fetchAllUsers = async () => {
         try {
-            const { data, error } = await supabase.from('users').select('*').order('id', { ascending: true });
+            const { data, error } = await supabase.from('users').select(USER_PUBLIC_COLUMNS).order('id', { ascending: true });
             if (!error && data) {
                 setUsers(data);
             }
@@ -65,18 +62,8 @@ const AppContent = () => {
                 setForcePasswordChange(true);
             }
         } catch (err) {
-            if (err.code === 'MIGRATION_REQUIRED') {
-                setMigrationState({ email: err.legacyEmail });
-            } else {
-                setLoginAttempts(prev => prev + 1);
-                const remaining = Math.max(0, 4 - loginAttempts);
-                
-                if (remaining === 0) {
-                    alert('비밀번호를 5회 잘못 입력하셨습니다.\n보안 조치로 인해 로그인이 일시 차단됩니다. 관리자에게 문의해주세요.');
-                } else {
-                    alert(`로그인 실패: ${err.message || '이메일 또는 비밀번호가 올바르지 않습니다.'}\n\n⚠️ 주의: 앞으로 ${remaining}회 더 실패 시 계정이 차단됩니다.`);
-                }
-            }
+            setLoginAttempts(prev => prev + 1);
+            alert('로그인 실패: ' + (err.message || '인증에 실패했습니다.'));
         }
     };
 
@@ -106,66 +93,45 @@ const AppContent = () => {
     };
 
     const handleUpdateProfile = async (updatedData) => {
-        if (!user) return;
+        if (!user) return false;
         try {
-            // 비밀번호 변경 여부 파악
-            const isPasswordChange = updatedData.password && updatedData.password.trim() !== '';
+            // 부서·승인상태·비밀번호는 프로필 저장 payload에서 제외한다.
+            const isPasswordChange = !!updatedData.password?.trim();
+            const profilePayload = { name: updatedData.name, rank: updatedData.rank };
+            const { data, error } = await supabase.from('users').update(profilePayload).eq('auth_id', user.id).select('auth_id');
+            if (error) throw error;
+            if (data?.length !== 1) throw new Error('프로필 갱신 대상이 확인되지 않았습니다.');
 
             if (isPasswordChange) {
-                // 1. Supabase Auth 비밀번호 갱신 (로그인에 실제 사용되는 비밀번호)
-                const { error: authError } = await supabase.auth.updateUser({
-                    password: updatedData.password.trim()
-                });
-                if (authError) throw authError;
+                const newPassword = updatedData.password.trim();
+                const { error: authError } = await supabase.auth.updateUser({ password: newPassword });
+                if (authError) {
+                    alert('프로필은 저장됐지만 비밀번호 변경은 실패했습니다. 이전 시도에서 비밀번호가 이미 바뀌었을 수 있으니 로그인 상태를 확인하고, 불확실하면 관리자에게 문의하세요.\n' + authError.message);
+                    return false;
+                }
             }
-
-            // 2. users 테이블 업데이트 (이름, 부서, 직급, 비밀번호 컬럼)
-            const { error } = await supabase.from('users').update(updatedData).eq('email', user.email);
-            if (error) throw error;
 
             alert(isPasswordChange
                 ? '프로필 및 비밀번호가 수정되었습니다. 다음 로그인부터 새 비밀번호를 사용하세요.'
                 : '프로필이 수정되었습니다. (새로고침 시 반영)');
+            return true;
         } catch (err) {
             alert('수정 실패: ' + err.message);
+            return false;
         }
     };
 
     // Dashboard User Control Functions
-    const handleAddMember = async (newUser) => {
-        const memberData = {
-            ...newUser,
-            date: new Date().toISOString().split('T')[0],
-            status: 'Active'
-        };
-        try {
-            const { error } = await supabase.from('users').insert([memberData]);
-            if (error) throw error;
-            await fetchAllUsers(); 
-        } catch (error) {
-            alert('회원 추가 실패: ' + error.message);
-        }
-    };
-
-    const handleDeleteUser = async (id) => {
-        if (window.confirm('정말 이 회원을 삭제하시겠습니까?')) {
-            try {
-                const { error } = await supabase.from('users').delete().eq('id', id);
-                if (error) throw error;
-                await fetchAllUsers(); 
-            } catch (error) {
-                alert('삭제 실패: ' + error.message);
-            }
-        }
-    };
+    const handleAddMember = async () => { alert('보호된 Auth 연결 이관으로만 등록합니다.'); return false; };
+    const handleDeleteUser = async () => { alert('기존 업무 참조 보존: 삭제 불가'); return false; };
 
     const handleEditUser = async (updatedUser) => {
         try {
             // 비밀번호 변경 여부 파악 (빈 문자열이 아니면 변경 대상)
             const isPasswordChange = updatedUser.password && updatedUser.password.trim() !== '';
 
-            if (isPasswordChange) {
-                // 1. 현재 관리자의 세션 토큰 취득
+            {
+                // 빈 비밀번호도 같은 검증 API로 처리한다.
                 const { data: { session } } = await supabase.auth.getSession();
                 if (!session) throw new Error("유효한 세션이 없습니다.");
                 
@@ -178,8 +144,7 @@ const AppContent = () => {
                     },
                     body: JSON.stringify({
                         auth_id: updatedUser.auth_id,
-                        email: updatedUser.email,
-                        password: updatedUser.password.trim(),
+                        ...(isPasswordChange ? { password: updatedUser.password.trim() } : {}),
                         name: updatedUser.name,
                         role: updatedUser.role,
                         rank: updatedUser.rank,
@@ -192,18 +157,14 @@ const AppContent = () => {
                 if (!response.ok) {
                     throw new Error(responseData.error || 'Serverless API 요청 중 오류가 발생했습니다.');
                 }
-            } else {
-                // 비밀번호 변경이 없는 일반 정보 수정은 기존처럼 DB만 직접 업데이트
-                // eslint-disable-next-line no-unused-vars
-                const { id, auth_id, password, ...updatePayload } = updatedUser;
-                const { error } = await supabase.from('users').update(updatePayload).eq('id', id);
-                if (error) throw error;
             }
 
             await fetchAllUsers();
             alert('회원 정보가 성공적으로 수정되었습니다.');
+            return true;
         } catch (error) {
             alert('수정 실패: ' + error.message);
+            return false;
         }
     };
 
@@ -239,9 +200,7 @@ const AppContent = () => {
                                 <Hero 
                                     onLogin={handleLogin} 
                                     onSignup={handleSignup} 
-                                    migrationState={migrationState}
-                                    onMigrate={migrateUser}
-                                    onCancelMigration={() => setMigrationState(null)}
+
                                 />
                             )}
                             <Chatbot />
@@ -251,14 +210,11 @@ const AppContent = () => {
                         </footer>
                     </>
                 } />
-                <Route path="/inspection-analysis" element={
-                     <>
-                        <Header isLoggedIn={!!user} onLogout={handleLogout} currentUser={user} onUpdateProfile={handleUpdateProfile} />
-                        <div className="p-8 bg-slate-50 min-h-screen">
-                            <InspectionAnalysisDashboard />
-                        </div>
-                     </>
-                } />
+                {/* 042 P8 — 구 「종합분석현황」 주소는 새 대시보드로 넘긴다.
+                    히스토리에 남기지 않는다(replace) — 뒤로가기로 없어진 화면에 다시 들어가면 안 된다. */}
+                <Route path="/inspection-analysis" element={<Navigate to="/#inbound_overview" replace />} />
+                {/* 073 — 없는 주소(예: /abc)는 첫 화면으로. 흰 화면 방지 · 해시 탭(#ncr_ledger 등)은 "/" 안에서 처리 */}
+                <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
         </div>
     );

@@ -4,6 +4,7 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 export const LOCAL_API_URL = import.meta.env.VITE_LOCAL_API_URL || 'http://localhost:3001';
+export const USER_PUBLIC_COLUMNS = 'id,email,name,company,role,rank,date,status,created_at,auth_id,is_admin,weekly_review_enabled,legacy_post_manager';
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
     auth: {
@@ -12,11 +13,32 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
 });
 
 export const api = {
+    /* 09-03 058-B — PostgREST RPC. 서버 함수가 한 트랜잭션으로 처리해야 하는 것(reviews 부서 칸 병합 + 타열)에 쓴다 */
+    rpc: async (fn, args) => {
+        console.log(`[Supabase API] RPC ${fn}`);
+        const { data, error } = await supabase.rpc(fn, args);
+        if (error) throw error;
+        return data;
+    },
     fetch: async (url, options = {}) => {
         // URL 파싱: '/table_name' 또는 '/table_name/id' 형식
+        /* v10.2 (260829) — 물음표 뒤의 조건을 버리지 않고 서버로 넘긴다.
+           그 전에는 조건이 무시돼 표 전체를 받아온 뒤 화면에서 걸렀다. 첨부처럼 큰 열이 있는 표는
+           상세 화면을 한 번 열 때마다 모든 문서의 첨부를 통째로 내려받게 되어 감당이 안 된다. */
         const endpoint = url.split('?')[0];
+        const queryString = url.includes('?') ? url.slice(url.indexOf('?') + 1) : '';
         const pathParts = endpoint.split('/').filter(p => p !== '');
         const table = pathParts[0]; // e.g., 'process_inspections'
+        const projection = table === 'users' ? USER_PUBLIC_COLUMNS : '*';
+        if (table === 'users') {
+            const allowed = new Set(USER_PUBLIC_COLUMNS.split(','));
+            for (const [column] of new URLSearchParams(queryString)) {
+                if (!allowed.has(column)) throw new Error('지원하지 않는 직원 조회 조건입니다.');
+            }
+            if (options.method && options.method !== 'GET') {
+                throw new Error('직원 변경은 검증된 프로필/관리 경로만 사용하세요.');
+            }
+        }
 
         console.log(`[Supabase API] ${options.method || 'GET'} ${table}`);
 
@@ -35,7 +57,7 @@ export const api = {
             const { data, error } = await supabase
                 .from(table)
                 .upsert(requestBody, { onConflict: 'id', ignoreDuplicates: false })
-                .select();
+                .select(projection);
             if (error) {
                 alert(`[Supabase Error] Code: ${error.code}\nMessage: ${error.message}\nDetails: ${error.details || 'N/A'}`);
                 console.error('[Supabase Error]', error);
@@ -56,7 +78,7 @@ export const api = {
             const updateData = { ...requestBody };
             delete updateData.id;
 
-            const { data, error } = await supabase.from(table).update(updateData).eq('id', id).select();
+            const { data, error } = await supabase.from(table).update(updateData).eq('id', id).select(projection);
             if (error) throw error;
             return {
                 ok: true,
@@ -92,11 +114,21 @@ export const api = {
             console.log(`[Supabase API] Fetching ALL pages for ${table}...`);
             
             while (hasMore && allData.length < 20000) { // 안전을 위해 최대 20,000건으로 제한
-                const { data, error } = await supabase
+                let q = supabase
                     .from(table)
-                    .select('*')
+                    .select(projection)
                     .order('id', { ascending: false })
                     .range(from, from + step - 1);
+                if (pathParts[1]) q = q.eq('id', pathParts[1]);
+                if (queryString) {
+                    for (const [col, expr] of new URLSearchParams(queryString)) {
+                        if (['select', 'order', 'limit', 'offset', 'on_conflict'].includes(col)) continue;
+                        const m = /^(eq|neq|gt|gte|lt|lte|like|ilike|is)\.(.*)$/.exec(expr);
+                        if (!m) continue;
+                        q = q[m[1]](col, m[2] === 'null' ? null : m[2]);
+                    }
+                }
+                const { data, error } = await q;
                 
                 if (error) throw error;
                 
@@ -113,6 +145,7 @@ export const api = {
             
             return {
                 ok: true,
+                truncated: hasMore && allData.length >= 20000,
                 json: async () => allData
             };
         }

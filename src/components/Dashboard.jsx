@@ -10,7 +10,7 @@ import {
     Settings, CheckCircle, HelpCircle, ChevronRight, ChevronDown,
     MoreHorizontal, User, RefreshCw, MessageSquare,
     Plus, Trash2, Edit, X, Upload, FileText, LayoutDashboard, Search,
-    Monitor, Save, Filter
+    Monitor, Save, Filter, Menu
 } from 'lucide-react';
 import Chatbot from './Chatbot';
 import UserManagement from './UserManagement';
@@ -22,20 +22,22 @@ import DevNotes from './DevNotes';
 import Suggestions from './Suggestions';
 import PostApproval from './PostApproval';
 import ResourceRoom from './ResourceRoom';
+import { listCurrentResources } from '../lib/resourceFiles';
+import { canManageResources } from '../lib/resourceBoard';
 import WeeklyReport from './WeeklyReport';
 import WeeklyStatus from './WeeklyStatus';
 import CalendarView from './CalendarView';
 import { api } from '../lib/api';
-import NonConformanceStatus from './NonConformanceStatus';
-import InspectionAnalysisDashboard from './InspectionAnalysisDashboard';
 import ProcessInspectionDashboard from './ProcessInspectionDashboard';
 import ProcessHistory from './ProcessHistory';
 import ProcessAnalysis from './ProcessAnalysis';
 import WorkplaceAnalysis from './WorkplaceAnalysis';
 import EquipmentAnalysis from './EquipmentAnalysis';
 import ModelCategoryAnalysis from './ModelCategoryAnalysis';
-import InboundAnalysis from './InboundAnalysis';
-import InboundHistory from './InboundHistory';
+import InboundOverview from './InboundOverview';
+import InboundSuppliers from './InboundSuppliers';
+import InboundItems from './InboundItems';
+import InboundRecords from './InboundRecords';
 // --- Helper Functions ---
 
 // Helper: Convert Excel Serial Date to YYYY-MM-DD
@@ -446,25 +448,38 @@ const Popup = ({ onClose }) => {
 const Home = ({ setActiveTab }) => {
     const [notices, setNotices] = useState([]);
     const [resources, setResources] = useState([]);
+    const [resourceError, setResourceError] = useState('');
 
     useEffect(() => {
-        const fetchData = async () => {
+        /* v10.2 (260829 실측) — 두 조회를 Promise.all 한 덩어리로 묶으면, 한쪽 표가 없을 때
+           (스테이징에 resources 표 미생성 → PostgREST 404) 나머지 한쪽까지 통째로 사라진다.
+           재현 결과: 자료실 표가 없다는 이유만으로 공지사항 목록도 함께 비었다.
+           두 목록은 서로 관계가 없으므로 표마다 따로 읽고, 실패한 쪽만 빈 채로 둔다. */
+        const load = async (path, set) => {
             try {
-                const [noticeRes, resourceRes] = await Promise.all([
-                    api.fetch('/notices'),
-                    api.fetch('/resources')
-                ]);
-                if (noticeRes.ok) {
-                    const data = await noticeRes.json();
-                    setNotices(data.sort((a, b) => b.id - a.id).slice(0, 5));
-                }
-                if (resourceRes.ok) {
-                    const data = await resourceRes.json();
-                    setResources(data.sort((a, b) => b.id - a.id).slice(0, 5));
-                }
+                const res = await api.fetch(path);
+                if (!res.ok) return;
+                const data = await res.json();
+                set((data || []).sort((a, b) => b.id - a.id).slice(0, 5));
             } catch (error) {
-                console.error('Failed to fetch summary data', error);
+                console.warn(`[홈] ${path} 조회 실패 — 이 목록만 비웁니다.`, error);
             }
+        };
+        const loadResources = async () => {
+            try {
+                setResources(await listCurrentResources());
+                setResourceError('');
+            } catch (error) {
+                console.warn('[홈] 자료실 조회 실패', error);
+                setResources([]);
+                setResourceError('자료실을 불러오지 못했습니다 · 다시 시도');
+            }
+        };
+        const fetchData = async () => {
+            await Promise.allSettled([
+                load('/notices', setNotices),
+                loadResources()
+            ]);
         };
         fetchData();
     }, []);
@@ -548,20 +563,22 @@ const Home = ({ setActiveTab }) => {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
-                                {resources.length === 0 ? (
+                                {resourceError ? (
+                                    <tr><td colSpan="5" className="py-10 text-center text-red-600 text-xs"><button type="button" onClick={() => setActiveTab('resources')} className="underline">{resourceError}</button></td></tr>
+                                ) : resources.length === 0 ? (
                                     <tr><td colSpan="5" className="py-10 text-center text-slate-400 text-xs">등록된 자료가 없습니다.</td></tr>
                                 ) : (
-                                    resources.map((resource) => (
+                                    resources.map((resource, index) => (
                                         <tr key={resource.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => setActiveTab('resources')}>
-                                            <td className="px-4 py-3 text-xs text-slate-500 text-center">{resource.id}</td>
+                                            <td className="px-4 py-3 text-xs text-slate-500 text-center">{resources.length - index}</td>
                                             <td className="px-4 py-3 text-center whitespace-nowrap">
-                                                <span className={`px-2 py-0.5 text-[10px] rounded-full font-medium ${resource.type === '매뉴얼' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'}`}>
-                                                    {resource.type}
+                                                <span className="px-2 py-0.5 text-[10px] rounded-full font-medium bg-green-100 text-green-700">
+                                                    {resource.category_label}
                                                 </span>
                                             </td>
                                             <td className="px-4 py-3 text-sm text-slate-800 line-clamp-1">{resource.title}</td>
-                                            <td className="px-4 py-3 text-xs text-slate-500 text-center">{resource.author}</td>
-                                            <td className="px-4 py-3 text-xs text-slate-400 text-center whitespace-nowrap">{resource.date}</td>
+                                            <td className="px-4 py-3 text-xs text-slate-500 text-center">{resource.registered_by_name}</td>
+                                            <td className="px-4 py-3 text-xs text-slate-400 text-center whitespace-nowrap">{resource.created_at ? new Date(resource.created_at).toLocaleDateString('ko-KR') : '-'}</td>
                                         </tr>
                                     ))
                                 )}
@@ -575,6 +592,7 @@ const Home = ({ setActiveTab }) => {
 };
 
 const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAddMember, onRefresh }) => {
+    const canManagePosts = user?.status === 'Active' && user?.legacy_post_manager === true;
     // eslint-disable-next-line no-unused-vars
     const navigate = useNavigate();
     const getInitialTab = () => {
@@ -582,21 +600,23 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
         return hash ? hash : 'home';
     };
     const [activeTab, setActiveTab] = useState(getInitialTab); // Default to home (or current hash)
-    // eslint-disable-next-line no-unused-vars
-    const [isMenuOpen, setIsMenuOpen] = useState(true);
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
+    useEffect(() => { setIsMenuOpen(false); }, [activeTab]);   // 070 N6 폰에서 메뉴를 고르면 닫힘(데스크톱 aside는 늘 lg:block이라 영향 없음)
     const [mainExpanded, setMainExpanded] = useState(true);
     const [inboundExpanded, setInboundExpanded] = useState(true);
     const [processExpanded, setProcessExpanded] = useState(true);
     const [adminExpanded, setAdminExpanded] = useState(true);
     const [showPopup, setShowPopup] = useState(false);
 
+
     // [QA 적용본] 이탈 방지용 깃발 및 히스토리 제어 로직 
     const isPopStateRef = useRef(false);
 
     useEffect(() => {
         // [이중 잠금] 관리자도 아닌데 강제 상태 변조 시 홈으로 튕겨냄
-        if (activeTab === 'post_approval' && !isAdmin) {
-            console.warn("Unauthorized access to post_approval blocked.");
+        // v10.2(260830) — members·settings_home도 같은 잠금. 주소창 #members 직접 진입이 뚫려 있었다.
+        if ((['members', 'settings_home'].includes(activeTab) && !isAdmin) || (activeTab === 'post_approval' && !canManagePosts)) {
+            console.warn(`Unauthorized access to ${activeTab} blocked.`);
             setActiveTab('home');
             return;
         }
@@ -621,7 +641,7 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
 
         window.addEventListener('popstate', handlePopState);
         return () => window.removeEventListener('popstate', handlePopState);
-    }, [activeTab, isAdmin]);
+    }, [activeTab, isAdmin, canManagePosts]);
 
     useEffect(() => {
         const checkPopup = async () => {
@@ -650,11 +670,15 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
         switch (activeTab) {
             case 'home': return <Home setActiveTab={setActiveTab} />;
             case 'notices': return <NoticeBoard />;
-            case 'resources': return <ResourceRoom />;
-            case 'inbound_analysis': return <InboundAnalysis />;
-            case 'inspection_analysis': return <InspectionAnalysisDashboard />;
-            case 'inbound_status': return <NonConformanceStatus />;
-            case 'inbound_history': return <InboundHistory />;
+            case 'resources': return <ResourceRoom user={user} isAdmin={canManageResources(user)} />;
+            case 'inbound_analysis':
+            case 'inspection_analysis':
+            case 'inbound_overview': return <InboundOverview setActiveTab={setActiveTab} />;
+            case 'inbound_suppliers': return <InboundSuppliers />;
+            case 'inbound_items': return <InboundItems />;
+            case 'inbound_history':
+            case 'inbound_records': return <InboundRecords />;
+            case 'inbound_status': return <InboundItems initialTab="ncr" />;
             case 'process':
             case 'process_dashboard': return <ProcessInspectionDashboard user={user} isAdmin={isAdmin} />;
             case 'process_by_process': return <ProcessAnalysis />;
@@ -665,20 +689,30 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
             case 'final': return <PlaceholderView title="최종검사 현황" icon={CheckCircle} />;
             case 'dev_notes': return <DevNotes user={user} />;
             case 'suggestions': return <Suggestions user={user} />;
-            case 'post_approval': return isAdmin ? <PostApproval user={user} /> : null;
-            case 'members': return <UserManagement members={members} onDeleteMember={onDeleteMember} onEditMember={onEditMember} onAddMember={onAddMember} onRefresh={onRefresh} />;
-            case 'settings_home': return <HomepageSettings />;
+            case 'post_approval': return canManagePosts ? <PostApproval user={user} /> : null;
+            // v10.2(260830) — useEffect 잠금은 첫 렌더 뒤에 돌므로 한 프레임 마운트가 샌다. post_approval과 같은 2중 방어.
+            case 'members': return isAdmin ? <UserManagement members={members} onDeleteMember={onDeleteMember} onEditMember={onEditMember} onAddMember={onAddMember} onRefresh={onRefresh} /> : null;
+            case 'settings_home': return isAdmin ? <HomepageSettings /> : null;
             case 'weekly_report': return <WeeklyReport user={user} />;
             case 'weekly_status': return <WeeklyStatus />;
             case 'schedule': return <CalendarView user={user} />;
-            default: return <InboundAnalysis />;
+            default: return <InboundOverview setActiveTab={setActiveTab} />;
         }
     };
 
     return (
         <div className="flex min-h-[calc(100vh-64px)] bg-slate-50 pt-16">
+            <button
+                type="button"
+                aria-label={isMenuOpen ? '메뉴 닫기' : '메뉴 열기'}
+                aria-expanded={isMenuOpen}
+                onClick={() => setIsMenuOpen(!isMenuOpen)}
+                className="fixed left-4 top-20 z-50 rounded-lg bg-slate-800 p-2 text-white shadow lg:hidden focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            >
+                {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </button>
             {/* Sidebar (Dark-Grey Premium Banner) */}
-            <aside className="w-64 bg-[#1e293b] border-r border-[#0f172a]/20 fixed h-full z-40 hidden lg:block overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
+            <aside className={`w-64 bg-[#1e293b] border-r border-[#0f172a]/20 fixed h-full z-40 ${isMenuOpen ? 'block lg:block' : 'hidden lg:block'} overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']`}>
                 <div className="p-6">
                     <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">
                         Dashboards
@@ -687,7 +721,7 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
                         {/* Main Screen Group */}
                         <div>
                             <button
-                                onClick={() => { setActiveTab('home'); setMainExpanded(!mainExpanded); }}
+                                onClick={() => { setActiveTab('home'); setMainExpanded(!mainExpanded); setIsMenuOpen(false); }}
                                 className={`w-full flex items-center justify-between px-3 py-2.5 text-sm font-semibold rounded-lg transition-all ${['home', 'notices', 'resources', 'dev_notes', 'suggestions'].includes(activeTab)
                                     ? 'bg-slate-800 text-white border-l-4 border-blue-500'
                                     : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'
@@ -703,7 +737,7 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
                             {mainExpanded && (
                                 <div className="mt-1.5 space-y-1.5 pl-6 border-l border-slate-700/50 ml-5">
                                     <button
-                                        onClick={() => setActiveTab('home')}
+                                        onClick={() => { setActiveTab('home'); setIsMenuOpen(false); }}
                                         className={`w-full flex items-center px-3 py-2 text-xs font-medium rounded-md transition-all ${activeTab === 'home' ? 'text-blue-400 font-bold bg-slate-800/40' : 'text-slate-400 hover:text-white'}`}
                                     >
                                         대시보드 홈
@@ -740,40 +774,40 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
                         <div>
                             <button
                                 onClick={() => setInboundExpanded(!inboundExpanded)}
-                                className={`w-full flex items-center justify-between px-3 py-2.5 text-sm font-semibold rounded-lg transition-all ${activeTab.includes('inbound') || activeTab === 'inspection_analysis' ? 'bg-slate-800 text-white border-l-4 border-blue-500' : 'text-slate-300 hover:bg-slate-800/60'}`}
+                                className={`w-full flex items-center justify-between px-3 py-2.5 text-sm font-semibold rounded-lg transition-all ${activeTab.startsWith('inbound') ? 'bg-slate-800 text-white border-l-4 border-blue-500' : 'text-slate-300 hover:bg-slate-800/60'}`}
                             >
                                 <div className="flex items-center">
-                                    <ClipboardCheck className={`mr-3 h-5 w-5 ${activeTab.includes('inbound') || activeTab === 'inspection_analysis' ? 'text-blue-400' : 'text-slate-400'}`} />
+                                    <ClipboardCheck className={`mr-3 h-5 w-5 ${activeTab.startsWith('inbound') ? 'text-blue-400' : 'text-slate-400'}`} />
                                     인수검사
                                 </div>
-                                <ChevronDown className={`w-4 h-4 transition-transform ${inboundExpanded ? 'transform rotate-180' : ''} ${activeTab.includes('inbound') ? 'text-white' : 'text-slate-400'}`} />
+                                <ChevronDown className={`w-4 h-4 transition-transform ${inboundExpanded ? 'transform rotate-180' : ''} ${activeTab.startsWith('inbound') ? 'text-white' : 'text-slate-400'}`} />
                             </button>
 
                             {inboundExpanded && (
                                 <div className="mt-1.5 space-y-1.5 pl-6 border-l border-slate-700/50 ml-5">
                                     <button
-                                        onClick={() => setActiveTab('inbound_analysis')}
-                                        className={`w-full flex items-center px-3 py-2 text-xs font-medium rounded-md transition-all ${activeTab === 'inbound_analysis' ? 'text-blue-400 font-bold bg-slate-800/40' : 'text-slate-400 hover:text-white'}`}
+                                        onClick={() => setActiveTab('inbound_overview')}
+                                        className={`w-full flex items-center px-3 py-2 text-xs font-medium rounded-md transition-all ${activeTab === 'inbound_overview' ? 'text-blue-400 font-bold bg-slate-800/40' : 'text-slate-400 hover:text-white'}`}
                                     >
                                         대시보드
                                     </button>
                                     <button
-                                        onClick={() => setActiveTab('inspection_analysis')}
-                                        className={`w-full flex items-center px-3 py-2 text-xs font-medium rounded-md transition-all ${activeTab === 'inspection_analysis' ? 'text-blue-400 font-bold bg-slate-800/40' : 'text-slate-400 hover:text-white'}`}
+                                        onClick={() => setActiveTab('inbound_suppliers')}
+                                        className={`w-full flex items-center px-3 py-2 text-xs font-medium rounded-md transition-all ${activeTab === 'inbound_suppliers' ? 'text-blue-400 font-bold bg-slate-800/40' : 'text-slate-400 hover:text-white'}`}
                                     >
-                                        종합분석현황
+                                        협력업체
                                     </button>
                                     <button
-                                        onClick={() => setActiveTab('inbound_status')}
-                                        className={`w-full flex items-center px-3 py-2 text-xs font-medium rounded-md transition-all ${activeTab === 'inbound_status' ? 'text-blue-400 font-bold bg-slate-800/40' : 'text-slate-400 hover:text-white'}`}
+                                        onClick={() => setActiveTab('inbound_items')}
+                                        className={`w-full flex items-center px-3 py-2 text-xs font-medium rounded-md transition-all ${(activeTab === 'inbound_items' || activeTab === 'inbound_status') ? 'text-blue-400 font-bold bg-slate-800/40' : 'text-slate-400 hover:text-white'}`}
                                     >
-                                        부적합 현황 조회
+                                        품목·부적합 관리
                                     </button>
                                     <button
-                                        onClick={() => setActiveTab('inbound_history')}
-                                        className={`w-full flex items-center px-3 py-2 text-xs font-medium rounded-md transition-all ${activeTab === 'inbound_history' ? 'text-blue-400 font-bold bg-slate-800/40' : 'text-slate-400 hover:text-white'}`}
+                                        onClick={() => setActiveTab('inbound_records')}
+                                        className={`w-full flex items-center px-3 py-2 text-xs font-medium rounded-md transition-all ${activeTab === 'inbound_records' ? 'text-blue-400 font-bold bg-slate-800/40' : 'text-slate-400 hover:text-white'}`}
                                     >
-                                        이력 조회 및 등록
+                                        기록·기준
                                     </button>
                                 </div>
                             )}
@@ -866,6 +900,7 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
                                 {adminExpanded && (
                                     <div className="mt-1.5 space-y-1.5 pl-6 border-l border-slate-700/50 ml-5">
                                         <button
+                                            disabled={!canManagePosts}
                                             onClick={() => setActiveTab('post_approval')}
                                             className={`w-full flex items-center px-3 py-2 text-xs font-medium rounded-md transition-all ${activeTab === 'post_approval' ? 'text-blue-400 font-bold bg-slate-800/40' : 'text-slate-400 hover:text-white'}`}
                                         >
@@ -947,7 +982,7 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
             </aside>
 
             {/* Main Content Area */}
-            <main className="flex-1 lg:ml-64 p-8 relative">
+            <main className="flex-1 min-w-0 lg:ml-64 p-8 relative">
                 {renderContent()}
                 <Chatbot />
             </main>

@@ -40,7 +40,9 @@ const DevNotes = ({ user }) => {
             let data;
             // ✅ 하이브리드 로직: 실서버(Vercel)는 Supabase에서, 로컬(개발환경)은 db.json에서
             if (import.meta.env.DEV) {
-                const res = await fetch(`${LOCAL_API_URL}/dev_notes`);
+                const { data: { session } } = await supabase.auth.getSession();
+                if (!session) throw new Error('유효한 세션 필요');
+                const res = await fetch(`${LOCAL_API_URL}/dev_notes`, { headers: { Authorization: `Bearer ${session.access_token}` } });
                 if (!res.ok) throw new Error('네트워크 응답이 올바르지 않습니다.');
                 data = await res.json();
             } else {

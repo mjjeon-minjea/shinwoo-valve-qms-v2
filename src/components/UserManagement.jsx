@@ -35,21 +35,19 @@ const UserManagement = ({ members, onDeleteMember, onEditMember, onAddMember, on
         setOpenDropdownId(null);
     };
 
-    const handleSaveEdit = (e) => {
+    const handleSaveEdit = async (e) => {
         e.preventDefault();
         const formData = new FormData(e.target);
         const updatedData = {
-            ...editingUser,
+            auth_id: editingUser.auth_id,
             name: formData.get('name'),
             company: formData.get('company'),
             rank: formData.get('rank'),
             role: formData.get('role'),
-            email: formData.get('email'),
             password: formData.get('password'),
             status: formData.get('status'),
         };
-        onEditMember(updatedData);
-        setIsEditModalOpen(false);
+        if (await onEditMember(updatedData)) setIsEditModalOpen(false);
     };
 
     return (
@@ -69,6 +67,7 @@ const UserManagement = ({ members, onDeleteMember, onEditMember, onAddMember, on
                     <p className="text-slate-500 text-sm mt-1">등록된 회원 목록 및 상태 관리</p>
                 </div>
                 <button
+                    disabled title="보호된 Auth 연결 이관으로만 등록"
                     onClick={() => setIsAddModalOpen(true)}
                     className="flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors shadow-sm"
                 >
@@ -127,7 +126,7 @@ const UserManagement = ({ members, onDeleteMember, onEditMember, onAddMember, on
                                     <div className="text-sm text-slate-500">{member.email}</div>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap">
-                                    <div className="text-sm text-slate-500">{member.password}</div>
+                                    <div className="text-sm text-slate-400">Auth 전용</div>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap">
                                     <div className="text-sm text-slate-500">{member.date}</div>
@@ -158,6 +157,7 @@ const UserManagement = ({ members, onDeleteMember, onEditMember, onAddMember, on
                                                     정보 수정
                                                 </button>
                                                 <button
+                                                    disabled title="기존 업무 참조 보존"
                                                     onClick={() => onDeleteMember(member.id)}
                                                     className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
                                                 >
@@ -197,15 +197,23 @@ const UserManagement = ({ members, onDeleteMember, onEditMember, onAddMember, on
                                     <option value="employee">작성</option>
                                     <option value="manager">작성+검토</option>
                                     <option value="director">작성+검토+승인</option>
+                                    {editingUser.role === 'admin' && <option value="admin">최고 관리자 (통합 승인)</option>}
                                 </select>
                             </div>
                             <div>
+                                <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                                    <input type="checkbox" checked={editingUser.is_admin === true} disabled readOnly className="w-4 h-4 rounded border-slate-300" />
+                                    시스템 관리자 (회원·게시물·홈페이지 관리)
+                                </label>
+                                <p className="text-xs text-slate-500 mt-1">※ 업무 결재 권한과 무관합니다. 결재는 위 「권한」으로만 판정됩니다.</p>
+                            </div>
+                            <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1">이메일</label>
-                                <input name="email" defaultValue={editingUser.email} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500" />
+                                <input value={editingUser.email || ''} readOnly disabled className="w-full px-3 py-2 border rounded-lg" />
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1">비밀번호 (초기화)</label>
-                                <input name="password" minLength="6" defaultValue={editingUser.password} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500" placeholder="6자리 이상 입력 (예: 123456)" />
+                                <input name="password" type="password" minLength="6" defaultValue="" autoComplete="new-password" className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500" placeholder="명시적으로 변경할 때만 입력" />
                                 <p className="text-xs text-slate-500 mt-1">※ 기존 회원이 로그인하지 못할 때 6자리 이상 임시 비밀번호로 설정해주세요.</p>
                             </div>
                             <div>

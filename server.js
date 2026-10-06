@@ -50,7 +50,7 @@ server.use((req, res, next) => {
         (req.path === '/dev_notes' || req.path.startsWith('/dev_notes/'))) {
         
         // 💡 반려(rejected) 상태의 패치노트는 필수 품질 검증 키워드 검사 제외
-        console.log('[DNAS 디버그] req.body:', req.body);
+
         if (req.body && req.body.status === 'rejected') {
             return next();
         }
@@ -180,101 +180,11 @@ server.delete('/process_inspections', (req, res) => {
 // =====================================================
 // [P3] 관리자 전용 비밀번호/정보 변경 API
 // POST /api/admin-update-member
-// 호출자의 JWT 검증 → rank='차장' 확인 → Supabase Admin으로 passwd 강제 갱신
+// 검증된 단일 사이트 관리자; serverless와 같은 handler/maintenance barrier.
 // =====================================================
 server.post('/api/admin-update-member', async (req, res) => {
-    const { createClient } = await import('@supabase/supabase-js');
-
-    const supabaseUrl = process.env.VITE_SUPABASE_URL;
-    const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY;
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-    if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceKey) {
-        return res.status(500).json({ error: '서버 환경변수 누락. .env.local을 확인하십시오.' });
-    }
-
-    // 1. Authorization 헤더에서 JWT 추출
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return res.status(401).json({ error: '인증 토큰이 없습니다.' });
-    }
-    const token = authHeader.split(' ')[1];
-
-    // 2. 일반 클라이언트로 JWT 해독하여 요청자 식별
-    const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey);
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
-        auth: { autoRefreshToken: false, persistSession: false }
-    });
-
-    try {
-        const { data: { user }, error: userError } = await supabaseAuth.auth.getUser(token);
-        if (userError || !user) {
-            return res.status(401).json({ error: '유효하지 않거나 만료된 세션입니다.' });
-        }
-
-        // 3. 요청자가 '차장' 직급인지 DB 교차 검증
-        const { data: callerData, error: callerError } = await supabaseAdmin
-            .from('users')
-            .select('rank, role')
-            .eq('auth_id', user.id)
-            .single();
-
-        if (callerError || !callerData) {
-            return res.status(403).json({ error: '권한 검증 실패: 사용자 정보를 찾을 수 없습니다.' });
-        }
-
-        if (callerData.rank !== '차장' && callerData.role !== 'director') {
-            return res.status(403).json({ error: '접근 불가: 관리자(차장급) 전용 기능입니다.' });
-        }
-
-        // 4. 업데이트 대상 데이터 수신
-        const { auth_id, password, name, role, rank, company, status } = req.body;
-
-        if (!auth_id) {
-            return res.status(400).json({ error: '대상 직원의 auth_id가 누락되었습니다.' });
-        }
-
-        // 5. Supabase Auth 비밀번호 강제 갱신 (Service Role 권한 사용)
-        const authUpdates = {};
-        if (password && password.trim()) authUpdates.password = password.trim();
-        if (name) authUpdates.user_metadata = { name };
-
-        if (Object.keys(authUpdates).length > 0) {
-            const { error: authErr } = await supabaseAdmin.auth.admin.updateUserById(auth_id, authUpdates);
-            if (authErr) {
-                console.error('[Admin Update] Auth 갱신 오류:', authErr);
-                return res.status(500).json({ error: `Auth 서버 오류: ${authErr.message}` });
-            }
-        }
-
-        // 6. public.users 정보 동기화
-        const dbPayload = {};
-        if (name !== undefined) dbPayload.name = name;
-        if (role !== undefined) dbPayload.role = role;
-        if (rank !== undefined) dbPayload.rank = rank;
-        if (company !== undefined) dbPayload.company = company;
-        if (status !== undefined) dbPayload.status = status;
-        if (password && password.trim()) dbPayload.password = password.trim(); // 레거시 컬럼 동기화
-
-        if (Object.keys(dbPayload).length > 0) {
-            const { error: dbErr } = await supabaseAdmin
-                .from('users')
-                .update(dbPayload)
-                .eq('auth_id', auth_id);
-
-            if (dbErr) {
-                console.error('[Admin Update] DB 갱신 오류:', dbErr);
-                return res.status(500).json({ error: `DB 오류: ${dbErr.message}` });
-            }
-        }
-
-        console.log(`[Admin Update] auth_id(${auth_id}) 정보/비밀번호 갱신 완료.`);
-        return res.status(200).json({ success: true, message: '직원 정보가 성공적으로 변경되었습니다.' });
-
-    } catch (err) {
-        console.error('[Admin Update] 예상치 못한 오류:', err);
-        return res.status(500).json({ error: '서버 내부 오류가 발생했습니다.' });
-    }
+    const { default: handler } = await import('./api/admin-update-member.js');
+    return handler(req, res);
 });
 
 // =====================================================
@@ -291,6 +201,33 @@ server.post('/api/sync-sheets', async (req, res) => {
     }
 });
 
+// raw json-server의 신원 변경/비공개 노트 우회는 router 전에 거부한다.
+export async function localIdentityBoundary(req, res, next) {
+    if (['/', '/db'].includes(req.path)) return res.status(403).json({ error: 'raw DB 조회 금지' });
+    if (!/^\/(users|dev_notes)(\/|$)/.test(req.path)) return next();
+    try {
+        const { verifiedProfile } = await import('./api/admin-update-member.js');
+        const actor = await verifiedProfile(req);
+        if (!actor) return res.status(401).json({ error: 'Active 세션 필요' });
+        if (/^\/users(\/|$)/.test(req.path)) {
+            if (req.method !== 'GET') return res.status(403).json({ error: '검증된 프로필/관리 API만 사용' });
+            if (Object.keys(req.query || {}).some(k => !['id', 'email', 'auth_id'].includes(k))) return res.status(400).json({ error: '지원하지 않는 조회 조건' });
+            const safe = ['id', 'email', 'auth_id', 'name', 'company', 'role', 'rank', 'date', 'status', 'created_at', 'is_admin', 'weekly_review_enabled', 'legacy_post_manager'];
+            let rows = router.db.get('users').value() || [];
+            rows = rows.filter(row => (!req.params?.id || String(row.id) === req.params.id) && Object.entries(req.query || {}).every(([k,v]) => String(row[k]) === String(v)));
+            const id = req.path.split('/')[2];
+            if (id) rows = rows.filter(row => String(row.id) === id);
+            const projected = rows.map(row => Object.fromEntries(safe.filter(k => k in row).map(k => [k, row[k]])));
+            return res.json(id ? projected[0] || null : projected);
+        }
+        if (actor.legacy_post_manager === true) return next();
+        if (req.method !== 'GET') return res.status(403).json({ error: '기존 게시 관리자 전용' });
+        const id = req.path.split('/')[2];
+        const rows = (router.db.get('dev_notes').value() || []).filter(row => row.status === 'published' && (!id || String(row.id) === id));
+        return res.json(id ? rows[0] || null : rows);
+    } catch { return res.status(503).json({ error: '권한 조회 실패: HOLD' }); }
+}
+server.use(localIdentityBoundary);
 server.use(router);
 
 server.listen(PORT, '0.0.0.0', () => {

@@ -196,6 +196,8 @@ const WeeklyReport = ({ user: propUser }) => {
 
     const handleApproval = async (status, comment) => {
         if (!report || !report.id) return;
+        if (!isReviewMode || (status === 'reviewed' && !canReview) || (status === 'approved' && !canApprove)
+            || !['reviewed', 'approved'].includes(status)) return;
 
         const updatedReport = {
             ...report,
@@ -398,9 +400,9 @@ const WeeklyReport = ({ user: propUser }) => {
     const isReviewMode = report && String(report.authorId) !== String(user.id);
     const isEditable = isWeeklyReportEditable(report, user?.id);
     const isReadOnly = report && !isReviewMode && !isEditable;
-    const canReview = (user.role === 'manager' || user.role === 'admin') && report?.status === 'submitted';
+    const canReview = user.status === 'Active' && (user.role === 'manager' || user.role === 'admin' || user.weekly_review_enabled === true) && report?.status === 'submitted';
     // Allow Director to approve. Manager Self-Approval is removed.
-    const canApprove = (user.role === 'director' || user.role === 'admin') && (report?.status === 'reviewed' || report?.status === 'submitted');
+    const canApprove = user.status === 'Active' && (user.role === 'director' || user.role === 'admin') && (report?.status === 'reviewed' || report?.status === 'submitted');
 
     return (
         <div className="p-6 max-w-7xl mx-auto bg-gray-50 min-h-screen">
