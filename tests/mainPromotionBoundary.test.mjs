@@ -5,6 +5,7 @@ import { createRequire } from 'node:module';
 const jsonServer = createRequire(import.meta.url)('json-server');
 const source = p => readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
 const uuid = n => `00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
+import { isFullOperator } from '../src/lib/operatorIdentity.js';
 // Offline handler contracts only. No real GoTrue/DB/network clients.
 function fixture(options={}) {
     const rows=[{id:'admin',email:'admin@example.test',auth_id:uuid(1),is_admin:true,status:'Active',legacy_post_manager:true,role:'manager',rank:'차장',name:'Synthetic',company:'생산부'},
@@ -92,7 +93,7 @@ test('real in-memory json-server: canonical paths, raw DB/nested/expansion denia
     const data={users:[{id:'u1',name:'Synthetic',role:'employee',password:null,taskId:'t1'}],
         dev_notes:[{id:'d1',status:'draft',taskId:'t1'},{id:'p1',status:'published',taskId:'t1'}],tasks:[{id:'t1',userId:'u1'}]};
     const router=jsonServer.router(data);let actor=null;
-    const boundary=new Function('verifiedProfile','router',`${fn};return localIdentityBoundary;`)(async()=>actor,router);
+    const boundary=new Function('verifiedProfile','router','isFullOperator',`${fn};return localIdentityBoundary;`)(async()=>actor,router,isFullOperator);
     const app=jsonServer.create();app.use(jsonServer.bodyParser);app.use(boundary);app.use(router);
     const server=app.listen(0,'127.0.0.1');await new Promise(resolve=>server.once('listening',resolve));
     const base=`http://127.0.0.1:${server.address().port}`;

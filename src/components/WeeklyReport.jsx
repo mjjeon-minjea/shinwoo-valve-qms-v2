@@ -5,7 +5,9 @@ import {
     clearWeeklyReportDraft,
     createWeeklyReportDraftUpdater,
     isWeeklyReportEditable,
-    loadWeeklyReportDraft
+    loadWeeklyReportDraft,
+    ownsWeeklyReport,
+    weeklyApprovalRights
 } from '../lib/weeklyReportDraft';
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks } from 'date-fns';
 import { Save, Send, CheckCircle, AlertCircle, Plus, Trash2, Calendar as CalendarIcon, FileText, CheckSquare, Package, AlertTriangle, Copy } from 'lucide-react';
@@ -25,7 +27,9 @@ const WeeklyReport = ({ user: propUser }) => {
     const [activeTab, setActiveTab] = useState('schedule');
     const [report, setReport] = useState(null);
     const [reports, setReports] = useState([]);
+    const [profiles, setProfiles] = useState([]);
     const [loading, setLoading] = useState(false);
+    const draftAuthorId = ownsWeeklyReport(report, user) ? report.authorId : user?.id;
 
     // Calculate week range
     const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 }); // Monday start
@@ -41,7 +45,8 @@ const WeeklyReport = ({ user: propUser }) => {
         if (!user) return;
         setLoading(true);
         try {
-            const response = await api.fetch('/weekly_reports');
+            const [response, usersResponse] = await Promise.all([api.fetch('/weekly_reports'), api.fetch('/users')]);
+            setProfiles(usersResponse.ok ? await usersResponse.json() : []);
             if (response.ok) {
                 const data = await response.json();
                 // Ensure data is an array to prevent crashes
@@ -50,7 +55,7 @@ const WeeklyReport = ({ user: propUser }) => {
                 
                 // Find current user's report for this week
                 const myReport = availableReports.find(r =>
-                    String(r.authorId) === String(user.id) && r.weekStartDate === weekKey
+                    ownsWeeklyReport(r, user) && r.weekStartDate === weekKey
                 );
 
                 const serverReport = myReport || {
@@ -65,7 +70,7 @@ const WeeklyReport = ({ user: propUser }) => {
                 };
                 const draftReport = loadWeeklyReportDraft({
                     storage: getDraftStorage(),
-                    authorId: user.id,
+                    authorId: serverReport.authorId,
                     weekStartDate: weekKey,
                     serverReport
                 });
@@ -81,7 +86,7 @@ const WeeklyReport = ({ user: propUser }) => {
     const updateReportDraft = update => {
         setReport(createWeeklyReportDraftUpdater({
             storage: getDraftStorage(),
-            authorId: user?.id,
+            authorId: draftAuthorId,
             weekStartDate: weekKey,
             update
         }));
@@ -99,7 +104,7 @@ const WeeklyReport = ({ user: propUser }) => {
             if (response.ok) {
                 const data = await response.json();
                 const prevReport = data.find(r => 
-                    String(r.authorId) === String(user.id) && r.weekStartDate === previousWeekKey
+                    ownsWeeklyReport(r, user) && r.weekStartDate === previousWeekKey
                 );
 
                 if (prevReport) {
@@ -124,7 +129,7 @@ const WeeklyReport = ({ user: propUser }) => {
 
     const handleMyReport = () => {
         const myReport = reports.find(r => 
-            String(r.authorId) === String(user.id) && r.weekStartDate === weekKey
+            ownsWeeklyReport(r, user) && r.weekStartDate === weekKey
         );
         
         if (myReport) {
@@ -171,7 +176,7 @@ const WeeklyReport = ({ user: propUser }) => {
                 setReport(savedData);
                 clearWeeklyReportDraft({
                     storage: getDraftStorage(),
-                    authorId: user.id,
+                    authorId: draftAuthorId,
                     weekStartDate: weekKey
                 });
                 alert(submit ? '보고서가 제출되었습니다.' : '임시 저장되었습니다.');
@@ -282,7 +287,7 @@ const WeeklyReport = ({ user: propUser }) => {
             if (response.ok) {
                 clearWeeklyReportDraft({
                     storage: getDraftStorage(),
-                    authorId: user.id,
+                    authorId: draftAuthorId,
                     weekStartDate: weekKey
                 });
                 alert('보고서가 삭제되었습니다.');
@@ -397,12 +402,10 @@ const WeeklyReport = ({ user: propUser }) => {
     if (!user) return <div className="p-8">로그인이 필요합니다. (사용자 전환을 이용해주세요)</div>;
     if (loading) return <div className="p-8">로딩 중...</div>;
 
-    const isReviewMode = report && String(report.authorId) !== String(user.id);
-    const isEditable = isWeeklyReportEditable(report, user?.id);
+    const isReviewMode = report && !ownsWeeklyReport(report, user);
+    const isEditable = isWeeklyReportEditable(report, draftAuthorId);
     const isReadOnly = report && !isReviewMode && !isEditable;
-    const canReview = user.status === 'Active' && (user.role === 'manager' || user.role === 'admin' || user.weekly_review_enabled === true) && report?.status === 'submitted';
-    // Allow Director to approve. Manager Self-Approval is removed.
-    const canApprove = user.status === 'Active' && (user.role === 'director' || user.role === 'admin') && (report?.status === 'reviewed' || report?.status === 'submitted');
+    const { review: canReview, approve: canApprove } = weeklyApprovalRights(report, user, profiles);
 
     return (
         <div className="p-6 max-w-7xl mx-auto bg-gray-50 min-h-screen">
@@ -458,7 +461,7 @@ const WeeklyReport = ({ user: propUser }) => {
                             )}
 
                             {/* Author Resubmit Action (Approved/Submitted/Reviewed -> Draft) */}
-                            {(report.status === 'approved' || report.status === 'submitted' || report.status === 'reviewed') && String(report.authorId) === String(user.id) && (
+                            {(report.status === 'approved' || report.status === 'submitted' || report.status === 'reviewed') && ownsWeeklyReport(report, user) && (
                                 <button onClick={handleResubmit} className="px-4 py-2 bg-orange-100 text-orange-700 border border-orange-200 rounded-lg hover:bg-orange-200 flex items-center transition-colors">
                                     <AlertCircle className="w-4 h-4 mr-2" /> 
                                     {report.status === 'approved' ? '재상신(승인취소)' : '제출취소(수정하기)'}

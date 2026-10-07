@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Settings, CheckCircle, Clock, Hash, XCircle, Eye, Cloud } from 'lucide-react';
 import { api, supabase } from '../lib/api';
 import { LOCAL_API_URL } from '../config/config';
+import { isFullOperator } from '../lib/operatorIdentity';
 
 // ✅ 시맨틱 버전(vX.Y.Z) 정렬용 헬퍼 함수
 const compareVersions = (a, b) => {
@@ -17,7 +18,7 @@ const compareVersions = (a, b) => {
 };
 
 const PostApproval = ({ user }) => {
-    const canManagePosts = user?.status === 'Active' && user?.legacy_post_manager === true;
+    const canManagePosts = isFullOperator(user) || (user?.status === 'Active' && user?.legacy_post_manager === true);
     const localFetch = async (url, options = {}) => {
         if (!canManagePosts) throw new Error('기존 게시 관리자 전용');
         const { data: { session } } = await supabase.auth.getSession();

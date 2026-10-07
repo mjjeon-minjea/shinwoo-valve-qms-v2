@@ -14,7 +14,7 @@ export async function verifiedProfile(req) {
     const client = createClient(supabaseUrl, supabaseServiceKey, { auth: { persistSession: false, autoRefreshToken: false } });
     const { data, error } = await client.auth.getUser(token);
     if (error || !data?.user) return null;
-    const result = await client.from('users').select('id,auth_id,status,is_admin,legacy_post_manager').eq('auth_id', data.user.id).single();
+    const result = await client.from('users').select('id,email,auth_id,status,is_admin,role,company,legacy_post_manager').eq('auth_id', data.user.id).single();
     return result.error || result.data?.status !== 'Active' ? null : result.data;
 }
 
@@ -39,7 +39,7 @@ export default async function handler(req, res) {
         const before = await client.from('users').select(columns).eq('auth_id', body.auth_id).single();
         if (before.error || !before.data) return res.status(409).json({ error: '대상 정확 1행 필요' });
         const row = before.data;
-        if (row.is_admin && body.status && body.status !== 'Active') return res.status(409).json({ error: '단일 관리자 비활성화 금지' });
+        if (row.is_admin && body.status && body.status !== 'Active') return res.status(409).json({ error: '보호 관리자 비활성화 금지' });
         const updates = Object.fromEntries(fields.filter(k => k in body).map(k => [k, body[k]]));
         const keys = Object.keys(updates);
         const cas = (payload, expected) => {

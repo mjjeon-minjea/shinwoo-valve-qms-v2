@@ -1,6 +1,27 @@
+import { isFullOperator } from './operatorIdentity.js';
 const DRAFT_VERSION = 1;
 const DRAFT_KEY_PREFIX = 'qms:weekly-report-draft:v1:';
 const SECTION_NAMES = ['schedule', 'projects', 'issues', 'samples'];
+
+export function ownsWeeklyReport(report, user) {
+    return report?.authorId != null && [user?.id, user?.profileId]
+        .some(id => id != null && String(id) === String(report.authorId));
+}
+
+export function weeklyApprovalRights(report, user, profiles) {
+    const actor = profiles.filter(p => p.auth_id != null && String(p.auth_id) === String(user?.id));
+    const author = profiles.filter(p => report?.authorId != null
+        && [p.id, p.auth_id].some(id => id != null && String(id) === String(report.authorId)));
+    const valid = actor.length === 1 && author.length === 1 && actor[0].status === 'Active'
+        && actor[0].id !== author[0].id && (isFullOperator(actor[0]) || (Boolean(actor[0].company?.trim())
+        && actor[0].company.trim() === author[0].company?.trim()));
+    return {
+        review: valid && (['manager', 'admin'].includes(actor[0].role) || actor[0].weekly_review_enabled === true)
+            && report?.status === 'submitted',
+        approve: valid && ['director', 'admin'].includes(actor[0].role)
+            && ['submitted', 'reviewed'].includes(report?.status)
+    };
+}
 
 export function buildWeeklyReportDraftKey(authorId, weekStartDate) {
     return `${DRAFT_KEY_PREFIX}${String(authorId)}:${String(weekStartDate)}`;

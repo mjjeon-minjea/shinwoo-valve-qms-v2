@@ -223,6 +223,30 @@ export function buildLedgerRecord(row, index, categories = {}) {
     itemType: (row['업태(함수)'] || '외주가공').trim(), item_code: (row['품목번호'] || '').trim() };
 }
 
+export function splitLedgerRows(rows, main = false) {
+  const ready = [], pending = [];
+  // ponytail: approved pending row has no upstream ID; completion stays in its original slot, otherwise HOLD.
+  if (main) {
+    const row = rows[389];
+    if (!row || createHash('sha256').update(JSON.stringify(['제품명','품목번호'].map(k=>row[k]))).digest('hex') !== '29134d7285f6831e6f12adb8d862b9a24e8833aa0429bcfc751939f43546b25a') {
+      throw new Error('approved pending identity moved/changed/deleted: HOLD');
+    }
+    if (row['입고일'] && row['업체명']?.trim() && (!row['인수검사 보고서 번호']?.trim() || rows.filter(r=>r['인수검사 보고서 번호']===row['인수검사 보고서 번호'] && r['품목번호']===row['품목번호']).length!==1)) {
+      throw new Error('completed pending RI/part target ambiguous/absent: HOLD');
+    }
+  }
+  rows.forEach((row, index) => {
+    const fingerprint = createHash('sha256').update(JSON.stringify(row)).digest('hex');
+    if (main && (!/^\d{4}-\d{2}-\d{2}$/.test(row['입고일'] || '') || !row['업체명']?.trim() || !row['제품명']?.trim())) {
+      if (fingerprint !== 'c4083356116884f4091c3238fd40ecaf88fa9f5dfc6a3be2867199da4836e8c1' || pending.length) {
+        throw new Error('unapproved incomplete original ledger row: HOLD');
+      }
+      pending.push({index, source_row:row.__source_row ?? index+2, fingerprint});
+    } else ready.push({row, index});
+  });
+  return {ready, pending};
+}
+
 export function planLedgerSync(records, existing, sourceUrl, mode = 'legacy') {
   if (!['legacy','source'].includes(mode)) throw new Error('explicit ledger identity mode required');
   const url = new URL(sourceUrl);
@@ -232,22 +256,44 @@ export function planLedgerSync(records, existing, sourceUrl, mode = 'legacy') {
     .concat(['totalQuantity','inspectionQuantity','defectQuantity'].map(k => Number(row[k] || 0)), String(row.defectType || '').replace(/^\[[^\]]*\]\s*/, '')));
   const before = new Map(existing.map(row => [row.id,row]));
   const matches = new Map();
+  // ponytail: one approved MAIN ledger; scope category seeds per source if multiple ledgers are approved.
+  const sourceCategories = new Map();
+  if (mode === 'source') for (const row of existing) {
+    const match = String(row.defectType || '').match(/^\[([^\]]+)\]\s*(.+)$/);
+    if (!row.id.startsWith('sheet_') || !match) continue;
+    const term = match[2].trim(), category = normalizeStandardCategory(match[1]);
+    sourceCategories.set(term, sourceCategories.has(term) && sourceCategories.get(term) !== category ? null : category);
+  }
   for (const row of existing) { const key=body(row); matches.set(key,[...(matches.get(key)||[]),row.id]); }
   const seen = new Map(), used = new Set();
-  return records.map(row => {
-    // ponytail: duplicate natural keys require stable occurrence order; changed/ambiguous matches HOLD, never guessed corrections.
+  const planned = records.map(row => {
+    // ponytail: no upstream immutable row ID; duplicate business keys HOLD rather than guess an occurrence.
     const key = JSON.stringify(['date','supplier','itemName','inspectionReportNo'].map(k => String(row[k] ?? '')));
     const occurrence = seen.get(key) || 0; seen.set(key,occurrence+1);
+    if (mode === 'source' && occurrence) throw new Error('duplicate source business key: HOLD');
     let id = `sheet_${hash(JSON.stringify([source,key,occurrence]))}`;
     const fail = () => { const e=new Error('대장 source/내용 충돌 또는 미승인 정정: 쓰기 전 HOLD'); e.code='LEDGER_SOURCE_HOLD'; throw e; };
     if (mode === 'legacy') {
       if (before.has(row.id)) { if (body(before.get(row.id))!==body(row)) fail(); id=row.id; }
       else if (matches.has(body(row))) { const candidates=matches.get(body(row)).filter(x=>!used.has(x)); if(candidates.length!==1) fail(); id=candidates[0]; }
     }
-    if (before.has(id) && body(before.get(id))!==body(row)) fail();
+    if (before.has(id) && (mode === 'legacy' ? body(before.get(id))!==body(row) : before.get(id).item_code !== row.item_code)) fail();
     if (used.has(id)) fail(); used.add(id);
+    if (mode === 'source') {
+      const term = String(row.defectType || '').replace(/^\[[^\]]*\]\s*/, '');
+      const oldTerm = String(before.get(id)?.defectType || '').replace(/^\[[^\]]*\]\s*/, '');
+      if (oldTerm !== term && sourceCategories.get(term) === null) fail();
+      // Same raw term keeps its classification; corrected terms use the existing source rule.
+      return {...row,id,defectType:before.has(id) && oldTerm === term ? before.get(id).defectType
+        : term ? `[${sourceCategories.get(term) || classifyDefectTypeByRule(term)}] ${term}` : ''};
+    }
     return {...row,id};
   });
+  // ponytail: one approved source, no immutable row ID; missing keys HOLD, never guess a replacement.
+  if (mode === 'source' && existing.some(row => row.id.startsWith('sheet_') && !used.has(row.id))) {
+    const e = new Error('source identity change/deletion: HOLD'); e.code = 'LEDGER_SOURCE_HOLD'; throw e;
+  }
+  return planned;
 }
 
 async function loadLedgerSnapshot() {
@@ -277,8 +323,12 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
-  if (new URL(SUPABASE_URL).hostname === 'zuahpjdsypovxdplxryw.supabase.co') {
-    return res.status(503).json({success:false,error:'MAIN Sheets source/정정 승인 미해결: 동기화 쓰기 HOLD'});
+  const main = new URL(SUPABASE_URL).hostname === 'zuahpjdsypovxdplxryw.supabase.co';
+  if (main && process.env.QMS_SYNC_MAINTENANCE !== 'off') return res.status(503).json({success:false,error:'MAIN sync writes paused'});
+  const sourceUrl = process.env.GOOGLE_SHEETS_CSV_URL;
+  if (main && (!sourceUrl || createHash('sha256').update(sourceUrl).digest('hex') !== '09169ad3228d39fc1d61ae4f677a472a204b2c3fdbd9afe9db7b70bebc4dd998'
+      || createHash('sha256').update(buildMeasurementCsvUrl(sourceUrl)).digest('hex') !== '361e7277e4abd35f83a1715a1563fb5dd5c022afd15b6331537b6370f869bb75')) {
+    return res.status(503).json({success:false,error:'MAIN original source binding mismatch: HOLD'});
   }
 
   // 042 P8 — 인증 게이트. 통과하지 못하면 시트도 읽지 않고 즉시 끝낸다.
@@ -350,7 +400,7 @@ export default async function handler(req, res) {
     }
 
     // 간단하고 강력한 CSV 파서 구현 (따옴표 내 쉼표 보존)
-    const rows = parseCSV(csvData);
+    let rows = parseCSV(csvData);
     log(`Parsed ${rows.length} rows from CSV.`);
 
     if (rows.length === 0) {
@@ -365,11 +415,23 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, message: 'CSV에 데이터가 존재하지 않습니다.', logs });
     }
 
-    // MAIN source decision is unresolved: never use this gate as approval to switch env/source.
+    // Approved original→MAIN only; STG is not a continuing data proxy.
     // Hold the measurement source lock from observation through syncMeasurements' final decision.
     measLogId = await createSyncLog({status:'running',sheet_url:buildMeasurementCsvUrl(sheetUrl),sheet_gid:MEAS_SHEET_GID,processed_rows:0}, log);
     const measurementCsv = await prepareMeasurementSnapshot(sheetUrl);
-    const ledgerPlan = planLedgerSync(rows.map((row,index)=>buildLedgerRecord(row,index)), await loadLedgerSnapshot(), sheetUrl);
+    const {ready, pending} = splitLedgerRows(rows, main);
+    if (!ready.length) throw new Error('no complete original ledger rows: HOLD');
+    rows = ready.map(({row})=>row);
+    log(`Original ledger ready=${ready.length}, pending=${pending.length}; ${JSON.stringify(pending)}`);
+    const ledgerPlan = planLedgerSync(ready.map(({row,index})=>buildLedgerRecord(row,index)), await loadLedgerSnapshot(), sheetUrl, main ? 'source' : 'legacy');
+    if (main) {
+      const snapshot = await loadMeasurementSnapshot(log);
+      const existingKeys = new Set(snapshot.rows.map(r=>`${r.ri_no} ${r.seq}`));
+      const preview = buildMeasurementRecords(parseMeasurementCSV(measurementCsv),measLogId,snapshot,true);
+      if (preview.records.some(r=>!existingKeys.has(`${r.ri_no} ${r.seq}`) && ledgerPlan.filter(l=>l.inspectionReportNo===r.ri_no && l.item_code===r.part_no).length!==1)) {
+        throw new Error('new measurement RI/part target absent/ambiguous: HOLD');
+      }
+    }
     const termMap = buildNormalizedTermMap(rows);
     const rawTerms = [...new Set(rows.map(r => (r['부적합 유형'] || '').trim()).filter(Boolean))];
     const nonemptyDefectRows = rows.filter(r => (r['부적합 유형'] || '').trim()).length;
@@ -398,7 +460,7 @@ export default async function handler(req, res) {
     log(`Defect category resolve: total=${termMap.size}, cacheHit=${Object.keys(cachedMap).length}, ruleClassified=${missingTerms.length}`);
 
     // 2단계: 데이터 가공 및 Supabase Upsert 리스트 생성
-    const inspectionsToUpsert = rows.map((row, index) => ({...buildLedgerRecord(row,index,defectCategoryMap),id:ledgerPlan[index].id}));
+    const inspectionsToUpsert = main ? ledgerPlan : ready.map(({row,index},i) => ({...buildLedgerRecord(row,index,defectCategoryMap),id:ledgerPlan[i].id}));
 
     log(`Upserting ${inspectionsToUpsert.length} records into Supabase "inspections" table...`);
 
@@ -443,6 +505,7 @@ export default async function handler(req, res) {
       finished_at: new Date().toISOString(),
       /* (r12) 행 수 칸은 시작 때 알 수 없어 여기서 적는다 — 값·뜻은 r11 과 같다. */
       processed_rows: rows.length,
+      error_message: pending.length ? JSON.stringify({pending}) : null,
       nonempty_defect_rows: nonemptyDefectRows,
       unique_raw_terms: rawTerms.length,
       unique_normalized_terms: termMap.size,
@@ -453,7 +516,7 @@ export default async function handler(req, res) {
 
     // 두 DB 요청은 atomic하지 않다. 측정값 부분실패는 전체 성공으로 응답하지 않는다.
     try {
-      measResult = await syncMeasurements(sheetUrl, log, measurementCsv, measLogId);
+      measResult = await syncMeasurements(sheetUrl, log, measurementCsv, measLogId, main);
     } catch (measFatal) {
       // syncMeasurements 는 자기 오류를 스스로 다 잡는다. 여기 오면 그 바깥의 사고다.
       log(`[measurements][ERROR] 예상 밖 오류: ${measFatal.message} (대장 결과에는 영향 없음)`);
@@ -465,6 +528,8 @@ export default async function handler(req, res) {
       success: complete,
       message: complete ? '대장·측정값 동기화 완료' : '대장 저장 후 측정값 실패/HOLD: 전체 완료 아님',
       processedCount: inspectionsToUpsert.length,
+      pendingCount: pending.length,
+      pending,
       measurements: measResult,   // 042 P8d — 측정값 덩이 결과(대장 값은 위 그대로다)
       classification: {
         totalTerms: termMap.size,
@@ -818,6 +883,8 @@ function parseCSV(text) {
 
     const values = parseCSVLine(line);
     const row = {};
+    // Non-enumerable provenance does not alter legacy IDs or the approved raw fingerprint.
+    Object.defineProperty(row, '__source_row', {value:i+1});
 
     headers.forEach((header, index) => {
       row[header] = values[index] || '';
@@ -832,23 +899,7 @@ function parseCSV(text) {
 }
 
 function parseCSVLine(line) {
-  const result = [];
-  let current = '';
-  let inQuotes = false;
-
-  for (let i = 0; i < line.length; i++) {
-    const char = line[i];
-    if (char === '"') {
-      inQuotes = !inQuotes;
-    } else if (char === ',' && !inQuotes) {
-      result.push(current.trim());
-      current = '';
-    } else {
-      current += char;
-    }
-  }
-  result.push(current.trim());
-  return result;
+  return parseMeasCSVLine(line);
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -1058,6 +1109,10 @@ function measContentKey(row) {
     .join('\u0001');   // 자료에 나올 수 없는 글자로 칸을 가른다
 }
 
+function measurementExactKey(row) {
+  return JSON.stringify([measContentKey(row), ...['part_no','item_name','x1','x2','x3','x4','x5','judgment','note'].map(k => String(row[k] ?? '').trim())]);
+}
+
 /* 「아직 기준치수·공차가 안 적힌 줄」인가 — 검사원이 검사포인트만 먼저 적어 둔
    **미완성 자리**다. 실측 : 09-02 정본 986행 중 이런 줄이 6줄 있었고, 09-10 시트
    에는 그 자리에 기준·공차·측정값이 채워져 있다.
@@ -1151,8 +1206,9 @@ function measReviewText(v) {
    시트 순서대로 1,2,3… 이 되어 예전과 같다.
    content_hash 는 기존 986행과 **같은 계산식**을 쓴다
    (base64(`RI|품번|검사포인트`) 앞 24자 + '_' + 시트행번호 — 986행 전부 재현 확인). */
-function buildMeasurementRecords(rows, batchId, existing) {
+function buildMeasurementRecords(rows, batchId, existing, preserveActive = false) {
   const byKey = new Map();
+  const priorByKey = new Map((existing?.rows || []).map(r => [`${r.ri_no} ${r.seq}`,r]));
   let duplicateKeys = 0;
   let seqInherited = 0;
   let seqNew = 0;
@@ -1191,6 +1247,12 @@ function buildMeasurementRecords(rows, batchId, existing) {
     const taken = new Set();
     const chosen = new Array(sheetRows.length).fill(null);
 
+    // Preserve existing identities even when identical-spec rows are reordered.
+    for (let i = 0; i < sheetRows.length; i++) {
+      const slot = slots.find(s => !s.used && s.exact === measurementExactKey(sheetRows[i]));
+      if (slot) { slot.used=true; chosen[i]=slot.seq; taken.add(slot.seq); seqInherited++; }
+    }
+
     /* ② 1차 — 내용이 같은 기존 줄이 있으면 그 seq 를 **물려받는다**.
           같은 RI 안에 내용이 똑같은 줄이 여럿일 때(오늘 실측 46행)는
           **시트에 나온 순서대로 작은 seq 부터 차례로** 가져간다(선착순).
@@ -1198,8 +1260,13 @@ function buildMeasurementRecords(rows, batchId, existing) {
           결과가 나오는 규칙」을 택한 것이다. 어느 쪽으로 붙어도 두 줄의
           기준·공차가 같으므로 Cpk 규격선은 달라지지 않는다. */
     for (let i = 0; i < sheetRows.length; i++) {
+      if (chosen[i] !== null) continue;
       const k = measContentKey(sheetRows[i]);
-      const slot = slots.find(s => !s.used && s.key === k);
+      const candidates = slots.filter(s => !s.used && s.key === k);
+      if (candidates.length > 1 || (candidates.length && sheetRows.filter((r,j) => chosen[j] === null && measContentKey(r) === k).length > 1)) {
+        throw new Error('ambiguous measurement correction/identity: HOLD');
+      }
+      const slot = candidates[0];
       if (slot) {
         slot.used = true;
         chosen[i] = slot.seq;
@@ -1339,6 +1406,10 @@ function buildMeasurementRecords(rows, batchId, existing) {
     if (seq === -1) continue;
 
     const partNo = measBlankToNull(r.part_no);
+    const previous = priorByKey.get(`${ri} ${seq}`);
+    if (previous && (measBlankToNull(previous.part_no) !== partNo || measBlankToNull(previous.item_name) !== measBlankToNull(r.item_name))) {
+      throw new Error('measurement RI/part/item linking correction: HOLD');
+    }
     const point = measBlankToNull(r.inspect_point);
     const rawHash = `${ri}|${partNo || ''}|${point || ''}`;
 
@@ -1370,6 +1441,14 @@ function buildMeasurementRecords(rows, batchId, existing) {
     const key = `${ri} ${seq}`;
     if (byKey.has(key)) duplicateKeys++;   // 설계상 나올 수 없다. 나오면 로그로 드러낸다
     byKey.set(key, record);
+  }
+
+  if (preserveActive) {
+    const retained = new Set([...byKey.keys(), ...specReview.map(r => `${r.ri} ${r.seq}`)]);
+    // ponytail: no upstream immutable ID; review is not replacement authority, unexplained non-missing loss HOLDs.
+    if (existing.rows.some(r => !r.missing_since && !r.missing_confirmed_at && !retained.has(`${r.ri_no} ${r.seq}`))) {
+      throw new Error('active measurement identity change/deletion: HOLD');
+    }
   }
 
   return {
@@ -1483,10 +1562,10 @@ async function resolveMeasurementGuardBaseline(log) {
    07 전에도 그대로 작동하고 ㉯ 만 건너뛴다. **두 번째 읽기까지 실패하면 그때는
    진짜로 표를 못 읽는 것이므로 위로 던져 그 판을 보류시킨다**(예림 지적 ③). */
 const MEAS_SNAPSHOT_COLS_FULL =
-  'id, ri_no, seq, inspect_point, kind, nominal, tol_upper, tol_lower, '
+  'id, ri_no, seq, inspect_point, kind, nominal, tol_upper, tol_lower, part_no,item_name,x1,x2,x3,x4,x5,judgment,note, '
   + 'missing_since, missing_seen, missing_confirmed_at, review_reason';
 const MEAS_SNAPSHOT_COLS_BASE =
-  'id, ri_no, seq, inspect_point, kind, nominal, tol_upper, tol_lower';
+  'id, ri_no, seq, inspect_point, kind, nominal, tol_upper, tol_lower,part_no,item_name,x1,x2,x3,x4,x5,judgment,note';
 
 async function loadMeasurementSnapshot(log) {
   async function scan(cols) {
@@ -1530,6 +1609,7 @@ async function loadMeasurementSnapshot(log) {
       seq: s,
       id: r.id,
       key: measContentKey(r),
+      exact: measurementExactKey(r),
       point: measBlankToNull(r.inspect_point) || '',
       kind: measBlankToNull(r.kind) || '',
       specText: measSpecText(r),                 // (r3 ③) 정정 확인 대상 기록용
@@ -1767,7 +1847,7 @@ async function countMeasurementRows(batchId = null) {
    이미 성공으로 기록돼 있어야 하기 때문이다(설계안 §7 「한 판에 두 표」).
    기록은 sync_logs 에 **자기 줄을 따로** 남긴다 — 열을 새로 더하지 않고
    (sheet_gid = 40080222 로 구분) 대장 줄과 건수가 섞이지 않게 한다. */
-async function syncMeasurements(ledgerSheetUrl, log, preparedCsv, measLogId) {
+async function syncMeasurements(ledgerSheetUrl, log, preparedCsv, measLogId, main = false) {
   const result = {
     status: 'failed',
     gid: MEAS_SHEET_GID,
@@ -1880,7 +1960,7 @@ async function syncMeasurements(ledgerSheetUrl, log, preparedCsv, measLogId) {
     result.guardBaseline = Number.isFinite(Number(baseValue)) ? Number(baseValue) : null;
 
     /* ── (r2 ④) 기존 줄과 **내용으로 짝지어** seq 를 물려받는다 ────────── */
-    const built = buildMeasurementRecords(rows, measLogId, snapshot);
+    const built = buildMeasurementRecords(rows, measLogId, snapshot, main);
     if (built.duplicateKeys > 0) {
       log(`[measurements][WARNING] (ri_no, seq) 열쇠가 ${built.duplicateKeys}건 겹쳤다. 뒤엣것만 남긴다.`);
     }

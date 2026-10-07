@@ -1,6 +1,6 @@
 -- Non-destructive production recovery. No old password ACL / rank API restoration.
 -- Modes: pause (also valid before forward), recover_user, rollback_data.
--- Executor supplies qms.target_ref/system_identifier/old_api_closed/writer_quiescent,
+-- Executor supplies qms.target_ref/system_identifier/old_api_closed/integrity_entry_verified,
 -- qms.recovery_mode and protected pg_temp receipt tables described in report.md.
 BEGIN;
 SET LOCAL lock_timeout='5s';
@@ -9,22 +9,47 @@ DO $$ BEGIN
  IF session_user NOT IN ('postgres','supabase_admin') OR coalesce(auth.role(),'')<>'' THEN RAISE EXCEPTION 'protected SQL only'; END IF;
  IF current_setting('qms.target_ref',true) IS DISTINCT FROM 'zuahpjdsypovxdplxryw'
  OR current_setting('qms.old_api_closed',true) IS DISTINCT FROM 'true'
- OR current_setting('qms.writer_quiescent',true) IS DISTINCT FROM 'true'
  OR current_setting('qms.expected_system_identifier',true) IS NULL
  OR (SELECT system_identifier::text FROM pg_control_system()) IS DISTINCT FROM current_setting('qms.expected_system_identifier') THEN RAISE EXCEPTION 'recovery bindings required'; END IF;
  IF current_setting('qms.recovery_mode',true) NOT IN ('pause','recover_user','rollback_data') OR current_setting('qms.recovery_mode',true) IS NULL THEN RAISE EXCEPTION 'explicit recovery mode required'; END IF;
+ IF current_setting('qms.recovery_mode')='pause' THEN
+  IF current_setting('qms.pause_bootstrap_authorized',true) IS DISTINCT FROM 'true' THEN RAISE EXCEPTION 'explicit pause bootstrap approval required'; END IF;
+ ELSIF current_setting('qms.integrity_entry_verified',true) IS DISTINCT FROM 'true' THEN
+  RAISE EXCEPTION 'actual entry controls required after bootstrap';
+ END IF;
 END $$;
 CREATE OR REPLACE FUNCTION public.qms_transition_guard() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $$
 BEGIN
  IF TG_TABLE_SCHEMA='storage' THEN
   IF NOT (coalesce(NEW.bucket_id,OLD.bucket_id)='qms-files' AND split_part(coalesce(NEW.name,OLD.name),'/',1)='resources') THEN RETURN coalesce(NEW,OLD); END IF;
+  -- Server-only Storage API remains available for receipt-checked upload/compensation; no browser key.
+  IF auth.role()='service_role' AND auth.uid() IS NULL THEN RETURN coalesce(NEW,OLD); END IF;
  END IF;
  IF coalesce(auth.role(),'')='' AND session_user IN ('postgres','supabase_admin') THEN RETURN coalesce(NEW,OLD); END IF;
  RAISE EXCEPTION 'QMS maintenance: writes paused';
 END $$;
 REVOKE ALL ON FUNCTION public.qms_transition_guard() FROM PUBLIC,anon,authenticated,service_role;
-DO $$ BEGIN
+DO $$ DECLARE tab text; safe_columns text; BEGIN
  IF current_setting('qms.recovery_mode')='pause' THEN
+  -- Bridge before forward: table SELECT overrides column REVOKE, so remove broad grants first.
+  -- After forward, keep its safe write grants for the eventual release.
+  IF to_regprocedure('public.qms_approved_admin(text,text,text)') IS NULL THEN
+   REVOKE ALL ON public.users FROM PUBLIC,anon,authenticated;
+  END IF;
+  SELECT string_agg(quote_ident(column_name),',') INTO safe_columns FROM information_schema.columns
+   WHERE table_schema='public' AND table_name='users' AND column_name IN ('id','name','email','company','rank','role','status','date','created_at','auth_id','is_admin','weekly_review_enabled','legacy_post_manager');
+  EXECUTE format('GRANT SELECT(%s) ON public.users TO authenticated',safe_columns);
+  IF to_regprocedure('public.check_legacy_password(text,text)') IS NOT NULL THEN
+   REVOKE ALL ON FUNCTION public.check_legacy_password(text,text) FROM PUBLIC,anon,authenticated,service_role;
+  END IF;
+  FOREACH tab IN ARRAY ARRAY['weekly_reports','inspections','sync_logs','dev_notes','notices','settings','process_inspections','suggestions'] LOOP
+   IF to_regclass('public.'||tab) IS NOT NULL AND NOT EXISTS(SELECT 1 FROM pg_trigger WHERE tgrelid=to_regclass('public.'||tab) AND tgname='qms_business_transition') THEN
+    EXECUTE format('CREATE TRIGGER qms_business_transition BEFORE INSERT OR UPDATE OR DELETE ON public.%I FOR EACH ROW EXECUTE FUNCTION public.qms_transition_guard()',tab);
+   END IF;
+   IF to_regclass('public.'||tab) IS NOT NULL THEN
+    EXECUTE format('ALTER TABLE public.%I ENABLE TRIGGER qms_business_transition',tab);
+   END IF;
+  END LOOP;
   IF NOT EXISTS(SELECT 1 FROM pg_trigger WHERE tgrelid='public.users'::regclass AND tgname='qms_users_transition') THEN
    CREATE TRIGGER qms_users_transition BEFORE INSERT OR UPDATE OR DELETE ON public.users FOR EACH ROW EXECUTE FUNCTION public.qms_transition_guard();
   END IF;
@@ -37,6 +62,12 @@ DO $$ BEGIN
   IF to_regclass('public.inspection_measurements') IS NOT NULL AND NOT EXISTS(SELECT 1 FROM pg_trigger WHERE tgrelid=to_regclass('public.inspection_measurements') AND tgname='qms_measurements_transition') THEN
    CREATE TRIGGER qms_measurements_transition BEFORE INSERT OR UPDATE OR DELETE ON public.inspection_measurements FOR EACH ROW EXECUTE FUNCTION public.qms_transition_guard();
   END IF;
+  ALTER TABLE public.users ENABLE TRIGGER qms_users_transition;
+  ALTER TABLE public.resources ENABLE TRIGGER qms_resources_transition;
+  ALTER TABLE storage.objects ENABLE TRIGGER qms_storage_transition;
+  IF to_regclass('public.inspection_measurements') IS NOT NULL THEN
+   ALTER TABLE public.inspection_measurements ENABLE TRIGGER qms_measurements_transition;
+  END IF;
  END IF;
 END $$;
 DO $$ DECLARE r record; n integer; canonical jsonb; BEGIN
@@ -46,8 +77,8 @@ DO $$ DECLARE r record; n integer; canonical jsonb; BEGIN
   IF (SELECT count(*) FROM pg_temp.qms_user_recovery)<>1 THEN RAISE EXCEPTION 'one recovery receipt required'; END IF;
   SELECT * INTO STRICT r FROM pg_temp.qms_user_recovery;
   SELECT x INTO canonical FROM jsonb_array_elements(current_setting('qms.expected_existing_bindings')::jsonb) x WHERE x->>'id'=r.id AND x->>'email'=r.email AND x->>'auth_id'=r.canonical_auth_id;
-  IF canonical IS NULL OR NOT EXISTS(SELECT 1 FROM auth.users a WHERE a.id::text=r.canonical_auth_id AND a.email=r.email)
-   OR r.restore_is_admin IS DISTINCT FROM (r.id=current_setting('qms.admin_pk')) OR r.restore_status<>'Active'
+  IF (canonical IS NULL AND NOT (r.id='hermes' AND public.qms_approved_admin(r.id,r.canonical_auth_id,r.email))) OR NOT EXISTS(SELECT 1 FROM auth.users a WHERE a.id::text=r.canonical_auth_id AND a.email=r.email)
+   OR r.restore_is_admin IS DISTINCT FROM public.qms_approved_admin(r.id,r.canonical_auth_id,r.email) OR r.restore_status<>'Active'
    OR NOT EXISTS(SELECT 1 FROM pg_trigger WHERE tgrelid='public.users'::regclass AND tgname='guard_users_admin' AND tgenabled='O') THEN RAISE EXCEPTION 'approved canonical recovery rejected'; END IF;
   IF NOT EXISTS(SELECT 1 FROM public.users u WHERE u.id=r.id AND u.email=r.email AND u.auth_id IS NOT DISTINCT FROM r.before_auth_id AND u.is_admin IS NOT DISTINCT FROM r.before_is_admin AND u.status IS NOT DISTINCT FROM r.before_status) THEN RAISE EXCEPTION 'recovery CAS drift'; END IF;
   -- ACCESS EXCLUSIVE lock prevents every concurrent writer while the exact exception exists.
@@ -56,7 +87,7 @@ DO $$ DECLARE r record; n integer; canonical jsonb; BEGIN
    UPDATE public.users SET auth_id=r.canonical_auth_id,is_admin=r.restore_is_admin,status=r.restore_status
     WHERE id=r.id AND email=r.email AND auth_id IS NOT DISTINCT FROM r.before_auth_id AND is_admin IS NOT DISTINCT FROM r.before_is_admin AND status IS NOT DISTINCT FROM r.before_status;
    GET DIAGNOSTICS n=ROW_COUNT;
-   IF n<>1 OR NOT EXISTS(SELECT 1 FROM public.users WHERE id=r.id AND auth_id=r.canonical_auth_id AND is_admin=r.restore_is_admin AND status=r.restore_status) OR (SELECT count(*) FROM public.users WHERE is_admin)<>1 THEN RAISE EXCEPTION 'recovery readback failed'; END IF;
+   IF n<>1 OR NOT EXISTS(SELECT 1 FROM public.users WHERE id=r.id AND auth_id=r.canonical_auth_id AND is_admin=r.restore_is_admin AND status=r.restore_status) OR (SELECT count(*) FROM public.users WHERE is_admin)<>2 THEN RAISE EXCEPTION 'recovery readback failed'; END IF;
    ALTER TABLE public.users ENABLE TRIGGER guard_users_admin;
   EXCEPTION WHEN OTHERS THEN
    ALTER TABLE public.users ENABLE TRIGGER guard_users_admin;

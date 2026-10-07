@@ -4,7 +4,7 @@ SET LOCAL lock_timeout='5s';
 LOCK TABLE public.users,public.resources,public.weekly_reports,public.inspections,public.sync_logs,public.notices,public.settings IN SHARE ROW EXCLUSIVE MODE;
 DO $$ DECLARE actual text; expected jsonb; BEGIN
  IF session_user NOT IN ('postgres','supabase_admin') OR coalesce(auth.role(),'')<>'' THEN RAISE EXCEPTION 'trusted maintenance SQL only'; END IF;
- IF current_setting('qms.target_ref',true) IS DISTINCT FROM 'zuahpjdsypovxdplxryw' OR current_setting('qms.old_api_closed',true) IS DISTINCT FROM 'true' OR current_setting('qms.writer_quiescent',true) IS DISTINCT FROM 'true' THEN RAISE EXCEPTION 'binding/closure/writer receipts required'; END IF;
+ IF current_setting('qms.target_ref',true) IS DISTINCT FROM 'zuahpjdsypovxdplxryw' OR current_setting('qms.old_api_closed',true) IS DISTINCT FROM 'true' OR current_setting('qms.integrity_entry_verified',true) IS DISTINCT FROM 'true' THEN RAISE EXCEPTION 'binding/actual entry controls required'; END IF;
  IF current_setting('qms.expected_system_identifier',true) IS NULL OR (SELECT system_identifier::text FROM pg_control_system()) IS DISTINCT FROM current_setting('qms.expected_system_identifier') THEN RAISE EXCEPTION 'database identity mismatch'; END IF;
  SELECT md5(string_agg(table_name||':'||column_name||':'||udt_name,'|' ORDER BY table_name COLLATE "C",column_name COLLATE "C")) INTO actual FROM information_schema.columns WHERE table_schema='public' AND table_name IN ('users','resources','weekly_reports','inspections','sync_logs','notices','settings');
  IF actual IS DISTINCT FROM 'a3526954181f455d8c3aa1f222a94837' THEN RAISE EXCEPTION 'MAIN schema fingerprint drift'; END IF;
@@ -13,6 +13,7 @@ DO $$ DECLARE actual text; expected jsonb; BEGIN
  IF jsonb_array_length(expected)<>6 OR (SELECT count(*) FROM public.users)<>6 OR (SELECT count(DISTINCT x->>'id') FROM jsonb_array_elements(expected) x)<>6 OR EXISTS(SELECT 1 FROM jsonb_array_elements(expected) x WHERE NOT EXISTS(SELECT 1 FROM public.users u WHERE u.id=x->>'id' AND u.email=x->>'email' AND u.auth_id=x->>'auth_id' AND u.role IS NOT DISTINCT FROM x->>'role' AND u.status IS NOT DISTINCT FROM x->>'status')) THEN RAISE EXCEPTION 'existing six binding drift'; END IF;
  IF EXISTS(SELECT 1 FROM public.resources) OR EXISTS(SELECT 1 FROM storage.objects WHERE bucket_id='qms-files') OR EXISTS(SELECT 1 FROM storage.buckets WHERE id='qms-files') THEN RAISE EXCEPTION 'resource/bucket baseline drift'; END IF;
  IF (SELECT count(*) FROM public.users WHERE role='manager')<>1 OR NOT EXISTS(SELECT 1 FROM public.users WHERE id=current_setting('qms.admin_pk') AND auth_id=current_setting('qms.admin_auth') AND role='manager' AND status='Active') OR NOT EXISTS(SELECT 1 FROM public.users WHERE id=current_setting('qms.qa_pk') AND auth_id=current_setting('qms.qa_auth') AND status='Active' AND company='품질보증부') THEN RAISE EXCEPTION 'approved capability binding mismatch'; END IF;
+ IF NOT EXISTS(SELECT 1 FROM auth.users WHERE id::text=current_setting('qms.operator_auth') AND email='hermes@shinwoovalve.com') OR EXISTS(SELECT 1 FROM public.users WHERE id='hermes' OR email='hermes@shinwoovalve.com' OR auth_id=current_setting('qms.operator_auth')) THEN RAISE EXCEPTION 'operator Auth binding/collision'; END IF;
  IF EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='storage' AND tablename='objects') THEN RAISE EXCEPTION 'storage policy baseline drift'; END IF;
  IF (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename IN ('notices','settings'))<>2 OR EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename IN ('notices','settings') AND (policyname<>'Enable ALL for authenticated users' OR cmd<>'ALL' OR roles<>ARRAY['authenticated']::name[] OR qual IS DISTINCT FROM 'true' OR with_check IS NOT NULL)) THEN RAISE EXCEPTION 'notice/settings policy baseline drift'; END IF;
 END $$;
@@ -24,12 +25,23 @@ ALTER TABLE public.users ADD COLUMN weekly_review_enabled boolean NOT NULL DEFAU
 ALTER TABLE public.users ADD COLUMN legacy_post_manager boolean NOT NULL DEFAULT false;
 ALTER TABLE public.users ADD CONSTRAINT users_email_key UNIQUE(email);
 CREATE UNIQUE INDEX users_auth_id_uniq ON public.users(auth_id) WHERE auth_id IS NOT NULL;
-CREATE UNIQUE INDEX users_one_site_admin_uniq ON public.users((is_admin)) WHERE is_admin;
+-- Freeze both exact PK/Auth/email triples in owner-installed SQL, not mutable GUCs.
+DO $$ BEGIN
+ EXECUTE format('CREATE FUNCTION public.qms_approved_admin(text,text,text) RETURNS boolean LANGUAGE sql IMMUTABLE SET search_path=pg_catalog AS %L',
+  format('SELECT coalesce(($1=%L AND $2=%L AND $3=%L) OR ($1=''hermes'' AND $2=%L AND $3=''hermes@shinwoovalve.com''),false)',
+   current_setting('qms.admin_pk'),current_setting('qms.admin_auth'),(SELECT email FROM public.users WHERE id=current_setting('qms.admin_pk')),current_setting('qms.operator_auth')));
+END $$;
+REVOKE ALL ON FUNCTION public.qms_approved_admin(text,text,text) FROM PUBLIC,anon;
+GRANT EXECUTE ON FUNCTION public.qms_approved_admin(text,text,text) TO authenticated,service_role;
 UPDATE public.users SET legacy_post_manager=true WHERE role='manager';
 UPDATE public.users SET is_admin=true WHERE id=current_setting('qms.admin_pk') AND auth_id=current_setting('qms.admin_auth');
 UPDATE public.users SET role='director', weekly_review_enabled=true
  WHERE id=current_setting('qms.qa_pk') AND auth_id=current_setting('qms.qa_auth');
--- 위 두 binding은 이름/rank 추정이 아니라 정본 대응표; 영향행/사이트관리자 1명/기존6 UUID 불변 확인.
+INSERT INTO public.users(id,email,auth_id,name,company,rank,role,status,is_admin,date)
+ VALUES('hermes','hermes@shinwoovalve.com',current_setting('qms.operator_auth'),'Hermes 운영계정','시스템운영','운영계정','admin','Active',true,current_date::text);
+ALTER TABLE public.users ADD CONSTRAINT users_approved_admin_check CHECK(is_admin=public.qms_approved_admin(id,auth_id,email));
+ALTER TABLE public.users ADD CONSTRAINT users_operator_contract CHECK(id<>'hermes' OR (company='시스템운영' AND role='admin' AND status='Active' AND is_admin));
+-- Existing six Auth UUIDs/credentials/references stay unchanged; only one operator added.
 
 -- Table-level privilege가 있으면 password만 REVOKE해도 충분하지 않다.
 REVOKE SELECT, INSERT, UPDATE, DELETE ON public.users FROM PUBLIC, anon, authenticated;
@@ -46,10 +58,16 @@ ALTER FUNCTION public.check_legacy_password(text,text) SET search_path=pg_catalo
 DROP POLICY "Enable ALL for authenticated users" ON public.users;
 CREATE FUNCTION public.qms_site_admin() RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER
  SET search_path=pg_catalog,public AS $$
- SELECT EXISTS(SELECT 1 FROM public.users u WHERE u.auth_id=auth.uid()::text AND u.is_admin AND u.status='Active')
+ SELECT EXISTS(SELECT 1 FROM public.users u WHERE u.auth_id=auth.uid()::text AND u.is_admin AND u.status='Active' AND public.qms_approved_admin(u.id,u.auth_id,u.email))
 $$;
 REVOKE ALL ON FUNCTION public.qms_site_admin() FROM PUBLIC,anon;
 GRANT EXECUTE ON FUNCTION public.qms_site_admin() TO authenticated;
+CREATE FUNCTION public.qms_full_operator() RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER
+ SET search_path=pg_catalog,public AS $$
+ SELECT public.qms_site_admin() AND EXISTS(SELECT 1 FROM public.users WHERE id='hermes' AND auth_id=auth.uid()::text AND email='hermes@shinwoovalve.com' AND company='시스템운영' AND role='admin')
+$$;
+REVOKE ALL ON FUNCTION public.qms_full_operator() FROM PUBLIC,anon;
+GRANT EXECUTE ON FUNCTION public.qms_full_operator() TO authenticated;
 CREATE POLICY users_read_safe ON public.users FOR SELECT TO authenticated USING(true);
 CREATE POLICY users_insert_pending_or_admin ON public.users FOR INSERT TO authenticated WITH CHECK(
  (auth_id=auth.uid()::text AND role='employee' AND status='Pending' AND NOT is_admin
@@ -67,7 +85,7 @@ BEGIN
  IF TG_OP='UPDATE' AND (NEW.id IS DISTINCT FROM OLD.id OR NEW.email IS DISTINCT FROM OLD.email OR NEW.auth_id IS DISTINCT FROM OLD.auth_id OR NEW.password IS DISTINCT FROM OLD.password) THEN
   RAISE EXCEPTION 'identity/password mirror immutable';
  END IF;
- IF TG_OP='UPDATE' AND OLD.is_admin AND (NOT NEW.is_admin OR NEW.status IS DISTINCT FROM 'Active') THEN RAISE EXCEPTION 'sole administrator immutable'; END IF;
+ IF TG_OP='UPDATE' AND OLD.is_admin AND (NOT NEW.is_admin OR NEW.status IS DISTINCT FROM 'Active') THEN RAISE EXCEPTION 'approved administrator immutable'; END IF;
  IF trusted THEN RETURN NEW; END IF;
  IF coalesce(auth.role(),'') NOT IN ('authenticated','service_role') THEN RAISE EXCEPTION 'verified actor required'; END IF;
  IF TG_OP='INSERT' THEN
@@ -86,18 +104,19 @@ CREATE TRIGGER guard_users_admin BEFORE INSERT OR UPDATE OR DELETE ON public.use
 REVOKE ALL ON FUNCTION public.guard_users_admin() FROM PUBLIC,anon,authenticated,service_role;
 
 CREATE FUNCTION public.guard_weekly_review() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $$
-DECLARE actor record; own boolean; same_body boolean;
+DECLARE actor record; author_company text; author_count integer; own boolean; same_body boolean; operator boolean;
 BEGIN
  IF coalesce(auth.role(),'')='' AND session_user IN ('postgres','supabase_admin') THEN RETURN coalesce(NEW,OLD); END IF;
- SELECT id,auth_id,role,weekly_review_enabled INTO actor FROM public.users WHERE auth_id=auth.uid()::text AND status='Active';
+ SELECT id,auth_id,role,company,weekly_review_enabled INTO actor FROM public.users WHERE auth_id=auth.uid()::text AND status='Active';
  IF NOT FOUND THEN RAISE EXCEPTION 'Active report actor required'; END IF;
+ operator := public.qms_full_operator();
  IF TG_OP='INSERT' THEN
   IF NEW."authorId" NOT IN (actor.id,actor.auth_id) OR NEW."authorId" IS NULL OR NEW.status NOT IN ('draft','submitted') OR coalesce(NEW."reviewerComment",'')<>'' OR coalesce(NEW."approverComment",'')<>'' THEN RAISE EXCEPTION 'report insert rejected'; END IF;
   RETURN NEW;
  END IF;
  own := OLD."authorId" IN (actor.id,actor.auth_id);
  IF TG_OP='DELETE' THEN
-  IF NOT coalesce(own,false) OR OLD.status<>'draft' THEN RAISE EXCEPTION 'report delete rejected'; END IF;
+  IF NOT operator AND (NOT coalesce(own,false) OR OLD.status<>'draft') THEN RAISE EXCEPTION 'report delete rejected'; END IF;
   RETURN OLD;
  END IF;
  IF NEW.id IS DISTINCT FROM OLD.id OR NEW."authorId" IS DISTINCT FROM OLD."authorId" OR NEW."weekStartDate" IS DISTINCT FROM OLD."weekStartDate" THEN RAISE EXCEPTION 'report identity immutable'; END IF;
@@ -105,6 +124,9 @@ BEGIN
  -- Own draft/submit and own cancellation retain the original editing contract.
  IF own AND NEW.status IN ('draft','submitted') AND (OLD.status='draft' OR (NEW.status='draft' AND same_body)) AND coalesce(NEW."reviewerComment",'')='' AND coalesce(NEW."approverComment",'')='' THEN RETURN NEW; END IF;
  IF own OR NOT same_body THEN RAISE EXCEPTION 'report body/write actor rejected'; END IF;
+ SELECT count(*),min(btrim(company)) INTO author_count,author_company FROM public.users
+  WHERE id=OLD."authorId" OR auth_id=OLD."authorId";
+ IF author_count<>1 OR (NOT operator AND (coalesce(btrim(actor.company),'')='' OR coalesce(author_company,'')='' OR btrim(actor.company) IS DISTINCT FROM author_company)) THEN RAISE EXCEPTION 'report author department required'; END IF;
  IF NEW.status=OLD.status AND NEW."reviewerComment" IS DISTINCT FROM OLD."reviewerComment" AND OLD.status IN ('reviewed','approved') AND (actor.role IN ('manager','admin') OR actor.weekly_review_enabled) AND NEW."approverComment" IS NOT DISTINCT FROM OLD."approverComment" THEN RETURN NEW; END IF;
  IF NEW.status='approved' AND OLD.status='approved' AND actor.role IN ('director','admin') AND NEW."reviewerComment" IS NOT DISTINCT FROM OLD."reviewerComment" THEN RETURN NEW; END IF;
  IF NEW.status='reviewed' AND OLD.status='submitted' AND (actor.role IN ('manager','admin') OR actor.weekly_review_enabled) AND NEW."approverComment" IS NOT DISTINCT FROM OLD."approverComment" THEN RETURN NEW; END IF;
@@ -115,7 +137,7 @@ CREATE TRIGGER guard_weekly_review BEFORE INSERT OR UPDATE OR DELETE ON public.w
 REVOKE ALL ON FUNCTION public.guard_weekly_review() FROM PUBLIC,anon,authenticated,service_role;
 CREATE FUNCTION public.qms_legacy_post_manager() RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER
  SET search_path=pg_catalog,public AS $$
- SELECT EXISTS(SELECT 1 FROM public.users u WHERE u.auth_id=auth.uid()::text AND u.status='Active' AND u.legacy_post_manager)
+ SELECT public.qms_full_operator() OR EXISTS(SELECT 1 FROM public.users u WHERE u.auth_id=auth.uid()::text AND u.status='Active' AND u.legacy_post_manager)
 $$;
 REVOKE ALL ON FUNCTION public.qms_legacy_post_manager() FROM PUBLIC,anon;
 GRANT EXECUTE ON FUNCTION public.qms_legacy_post_manager() TO authenticated;
@@ -174,7 +196,7 @@ REVOKE SELECT ON public.resources FROM PUBLIC,anon;
 GRANT SELECT ON public.resources TO authenticated;
 CREATE POLICY resources_select_current_or_quality ON public.resources FOR SELECT TO authenticated USING(
  (is_current AND NOT is_deleted) OR EXISTS(SELECT 1 FROM public.users u
-  WHERE u.auth_id=auth.uid()::text AND u.status='Active' AND btrim(coalesce(u.company,''))='품질보증부')
+  WHERE u.auth_id=auth.uid()::text AND u.status='Active' AND (btrim(coalesce(u.company,''))='품질보증부' OR public.qms_full_operator()))
 );
 
 CREATE FUNCTION public.resource_publish_revision(p_id uuid, p_module text, p_module_label text, p_category text, p_category_label text, p_doc_key text, p_title text, p_description text, p_source_ref text, p_revision_note text, p_storage_path text, p_original_name text, p_file_size bigint, p_mime_type text, p_sha256 text)
@@ -204,7 +226,7 @@ begin
   from public.users u
   where u.auth_id = auth.uid()::text
     and u.status = 'Active'
-    and btrim(coalesce(u.company, '')) = '품질보증부'
+    and (btrim(coalesce(u.company, '')) = '품질보증부' OR public.qms_full_operator())
   limit 1;
 
   if not found then
@@ -396,7 +418,7 @@ begin
   from public.users u
   where u.auth_id = auth.uid()::text
     and u.status = 'Active'
-    and btrim(coalesce(u.company, '')) = '품질보증부'
+    and (btrim(coalesce(u.company, '')) = '품질보증부' OR public.qms_full_operator())
   limit 1;
   if not found then
     raise exception using errcode = '42501', message = 'resource_soft_delete: quality department (Active) required';
@@ -434,7 +456,7 @@ declare
 begin
   select auth.uid() into v_actor_auth
   from public.users u
-  where u.auth_id = auth.uid()::text and u.status = 'Active' and btrim(coalesce(u.company, '')) = '품질보증부'
+  where u.auth_id = auth.uid()::text and u.status = 'Active' and (btrim(coalesce(u.company, '')) = '품질보증부' OR public.qms_full_operator())
   limit 1;
   if not found then
     raise exception using errcode = '42501', message = 'resource_restore: quality department (Active) required';
@@ -474,13 +496,13 @@ CREATE POLICY qms_files_authenticated_read ON storage.objects FOR SELECT TO auth
  (EXISTS(SELECT 1 FROM public.resources r WHERE r.bucket_id=storage.objects.bucket_id
   AND r.storage_path=storage.objects.name AND r.is_current AND NOT r.is_deleted)
  OR EXISTS(SELECT 1 FROM public.users u WHERE u.auth_id=auth.uid()::text
-  AND u.status='Active' AND btrim(coalesce(u.company,''))='품질보증부'))
+  AND u.status='Active' AND (btrim(coalesce(u.company,''))='품질보증부' OR public.qms_full_operator())))
 );
 CREATE POLICY qms_files_authenticated_insert ON storage.objects FOR INSERT TO authenticated WITH CHECK(
  bucket_id='qms-files' AND split_part(name,'/',1)='resources'
  AND lower(storage.extension(name)) IN ('pdf','png','jpg','jpeg','webp','gif','doc','docx','xls','xlsx','ppt','pptx','csv','txt','zip','hwp','hwpx')
  AND EXISTS(SELECT 1 FROM public.users u WHERE u.auth_id=auth.uid()::text
-  AND u.status='Active' AND btrim(coalesce(u.company,''))='품질보증부')
+  AND u.status='Active' AND (btrim(coalesce(u.company,''))='품질보증부' OR public.qms_full_operator()))
 );
 -- anon/UPDATE/DELETE 정책은 만들지 않는다. 실제 byte/MIME는 승인된 업로드/다운로드 시험으로 별도 확인.
 ALTER TABLE public.inspections ADD COLUMN item_code text;
@@ -498,13 +520,17 @@ CREATE POLICY inspection_measurements_authenticated_select ON public.inspection_
 REVOKE ALL ON public.inspection_measurements FROM PUBLIC,anon,authenticated;
 GRANT SELECT ON public.inspection_measurements TO authenticated;
 GRANT ALL ON public.inspection_measurements TO service_role;
+-- An installed maintenance window survives forward, including this new table.
+DO $$ BEGIN
+ IF to_regprocedure('public.qms_transition_guard()') IS NOT NULL THEN
+  CREATE TRIGGER qms_measurements_transition BEFORE INSERT OR UPDATE OR DELETE ON public.inspection_measurements FOR EACH ROW EXECUTE FUNCTION public.qms_transition_guard();
+ END IF;
+END $$;
 CREATE UNIQUE INDEX sync_logs_one_running_per_gid ON public.sync_logs(sheet_gid) WHERE status='running';
 DO $$ BEGIN
- IF (SELECT count(*) FROM public.users WHERE is_admin)<>1 OR NOT EXISTS(SELECT 1 FROM public.users WHERE id=current_setting('qms.qa_pk') AND role='director' AND weekly_review_enabled) THEN RAISE EXCEPTION 'capability readback failed'; END IF;
+ IF (SELECT count(*) FROM public.users WHERE is_admin)<>2 OR EXISTS(SELECT 1 FROM public.users WHERE is_admin IS DISTINCT FROM public.qms_approved_admin(id,auth_id,email)) OR NOT EXISTS(SELECT 1 FROM public.users WHERE id=current_setting('qms.qa_pk') AND role='director' AND weekly_review_enabled) THEN RAISE EXCEPTION 'capability readback failed'; END IF;
  IF has_column_privilege('authenticated','public.users','password','SELECT') OR has_column_privilege('authenticated','public.users','password','UPDATE') OR has_function_privilege('authenticated','public.check_legacy_password(text,text)','EXECUTE') THEN RAISE EXCEPTION 'password ACL readback failed'; END IF;
 END $$;
 NOTIFY pgrst,'reload schema';
-DROP TRIGGER IF EXISTS qms_users_transition ON public.users;
-DROP TRIGGER IF EXISTS qms_resources_transition ON public.resources;
-DROP TRIGGER IF EXISTS qms_storage_transition ON storage.objects;
+-- Only the receipt-checked release removes maintenance triggers.
 COMMIT;

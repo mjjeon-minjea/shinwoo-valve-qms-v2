@@ -24,6 +24,7 @@ import PostApproval from './PostApproval';
 import ResourceRoom from './ResourceRoom';
 import { listCurrentResources } from '../lib/resourceFiles';
 import { canManageResources } from '../lib/resourceBoard';
+import { isFullOperator } from '../lib/operatorIdentity';
 import WeeklyReport from './WeeklyReport';
 import WeeklyStatus from './WeeklyStatus';
 import CalendarView from './CalendarView';
@@ -592,7 +593,7 @@ const Home = ({ setActiveTab }) => {
 };
 
 const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAddMember, onRefresh }) => {
-    const canManagePosts = user?.status === 'Active' && user?.legacy_post_manager === true;
+    const canManagePosts = isFullOperator(user) || (user?.status === 'Active' && user?.legacy_post_manager === true);
     // eslint-disable-next-line no-unused-vars
     const navigate = useNavigate();
     const getInitialTab = () => {

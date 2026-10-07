@@ -1,3 +1,4 @@
+import { isFullOperator } from './operatorIdentity.js';
 // 자료실 게시판 화면이 쓰는 순수 함수 모음 — React·서버 호출 없음(서버 연결은 resourceFiles.js).
 // 화면은 이름(구분·업무)만 다루고, 서버가 요구하는 영문 키는 여기서 자동으로 채운다.
 
@@ -167,11 +168,11 @@ export const freshLabel = (row, now = Date.now()) => {
 
 /**
  * 자료실 관리(등록·새 판·숨기기·되살리기·관리 탭) 권한 = 품질보증부 + 승인(Active).
- * 사이트 관리자(is_admin)와는 따로 본다 — 타부서 사이트 관리자는 자료실에서 보기·현재본 다운로드만.
+ * 지정 Hermes 운영 신원만 추가 허용; 일반 사이트관리자/타부서 권한은 불변.
  * 화면 표시용일 뿐이고, 실제 권한은 서버 함수·Storage 정책이 같은 조건으로 다시 판정한다.
  */
 export const QUALITY_DEPARTMENT = '품질보증부';
-export const canManageResources = (user) => user?.status === 'Active' && clean(user?.company) === QUALITY_DEPARTMENT;
+export const canManageResources = (user) => isFullOperator(user) || (user?.status === 'Active' && clean(user?.company) === QUALITY_DEPARTMENT);
 
 /** 원본이 최신 개정본인지 아직 확인되지 않은 자료(등록 때 바뀐 점·내용에 이 표시를 붙였다). */
 export const LATEST_UNVERIFIED = '최신본 미확인';

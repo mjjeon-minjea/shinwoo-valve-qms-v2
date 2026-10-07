@@ -1,4 +1,5 @@
 import { createRequire } from 'module';
+import { isFullOperator } from './src/lib/operatorIdentity.js';
 const require = createRequire(import.meta.url);
 const jsonServer = require('json-server');
 const path = require('path');
@@ -226,7 +227,7 @@ export async function localIdentityBoundary(req, res, next) {
             const projected = rows.map(row => Object.fromEntries(safe.filter(k => k in row).map(k => [k, row[k]])));
             return res.json(id ? projected[0] || null : projected);
         }
-        if (actor.legacy_post_manager === true) return next();
+        if (actor.legacy_post_manager === true || isFullOperator(actor)) return next();
         if (req.method !== 'GET') return res.status(403).json({ error: '기존 게시 관리자 전용' });
         const rows = (router.db.get('dev_notes').value() || []).filter(row => row.status === 'published' && (!id || String(row.id) === id));
         return res.json(id ? rows[0] || null : rows);
