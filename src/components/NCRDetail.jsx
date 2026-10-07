@@ -5,7 +5,7 @@ import { activeReviewDepartments, concessionTypeLabel, dispositionLabel, isLegac
 import { roleOf, canApprove, techApprovalDecision } from '../lib/ncrRoles';
 /* v10.2 H-③ 처리확인 증빙 첨부 — 작성화면과 「같은 규칙」(1280px 축소 · 비이미지 5MB)을 쓰려고
    lib/attach.jsx의 공용 함수를 그대로 가져다 쓴다(NCRCreate에 있던 것을 lib로 옮긴 것). */
-import { ATT_CAT, processAnyFile, isImageAtt, useCapturePaste, PasteZone, attUrl, uploadAtt, withAttUrls } from '../lib/attach.jsx';
+import { ATT_CAT, processAnyFile, isImageAtt, isPdfAtt, useCapturePaste, PasteZone, attUrl, uploadAtt, withAttUrls } from '../lib/attach.jsx';
 import NCRPrint, { fmtDT } from './NCRPrint';
 
 /* v10.2 G-⑦ — 흐름 세대 판정은 lib/ncrFlow.js 한 곳에만 있다(중복 정의 금지).
@@ -218,6 +218,20 @@ const CostRows = ({ rows, setRows, addLabel, placeholder, showDept, inputCls }) 
 /* 결재 패널 공통 틀.
    ※ 모듈 스코프에 둔다 — 컴포넌트 본문 안에서 정의하면 렌더마다 함수 신원이 바뀌어 React가 패널을
      통째로 언마운트·재마운트하고, 그 결과 입력 한 글자마다 포커스가 날아가 한 글자만 남는다(실측). */
+/* 10-07(080) 첨부 1건 보기 — 이름 링크(새 탭) + PDF 는 화면 안에 바로(브라우저 기본 details·iframe). open 이면 펼친 채, 그림도 보인다.
+   <object> 는 쓰지 않는다(스테이징 CSP object-src 'none'). 모듈 스코프에 두는 이유는 아래 Panel 과 같다.
+   10-07(080 B 보완) 주소 뒤 #toolbar=0&navpanes=0&view=FitH = 크롬 PDF 보기의 도구줄·옆 쪽그림 칸을 숨기고 폭에 맞춘다(없으면 100% 크기라 오른쪽이 잘린다).
+   처음 주소에 붙어 있어야 먹는다. 이름 링크(새 탭)는 원래 주소 그대로. */
+const AttView = ({ a, open }) => (
+    <div>
+        <a href={attUrl(a)} target="_blank" rel="noreferrer" className="block text-[11px] text-blue-600 hover:underline font-mono truncate">{a.name}</a>
+        {isPdfAtt(a) && attUrl(a)   /* 주소가 비면 iframe 이 이 화면 자체를 불러오므로 그리지 않는다 */
+            ? <details open={open} className="mt-1"><summary className="text-[11px] text-slate-500 cursor-pointer select-none">PDF 보기</summary>
+                <iframe src={`${attUrl(a)}#toolbar=0&navpanes=0&view=FitH`} title={a.name} className="w-full rounded border border-slate-200 bg-white" style={{ height: '70vh', minHeight: 480 }} /></details>
+            : open && isImageAtt(a) ? <img src={attUrl(a)} alt={a.name} className="mt-1 max-w-full rounded border border-slate-200" /> : null}
+    </div>
+);
+
 const Panel = ({ title, children, footer, onSubmit, submitLabel, color, needComment, commentLabel,
     comment, setComment, saving, onCancel, inputCls, btnO, btnP }) => (
     <div className="bg-slate-50 rounded-lg border border-slate-200 p-4 space-y-3">
@@ -274,6 +288,7 @@ const NCRDetail = ({ report, user, onClose, onChanged, readOnly = false, canProc
     /* 09-02 특채 요청서(933-16, 첨부#5) — 회람 담당이 특채 요청을 올릴 때 함께 올리는 서명본. 특채 요청이면 필수 */
     const [reqAtts, setReqAtts] = useState([]);                                // [{name, dataurl}] — 아직 저장 전(회신 시 POST)
     const [reqErr, setReqErr] = useState(null);                                // 파일 처리·필수 누락 안내(패널 안에서만 표시)
+    const [techAtts, setTechAtts] = useState([]);                              // 10-07(080) 기술 검토 증거자료(첨부#6) — 아직 저장 전(회신 시 POST)
 
     useEffect(() => {
         fetchNcrSettings().then(setSettings);
@@ -416,10 +431,25 @@ const NCRDetail = ({ report, user, onClose, onChanged, readOnly = false, canProc
         if (!comment.trim()) return setErr('반려 사유는 필수입니다.');
         act('발행반려', { status: '작성중', reject_note: `[발행반려 · ${user?.name}] ${comment.trim()}` }, `${comment}${dTag(g.deputy)}`);
     };
+    /* 10-07(080) 기술 검토 증거자료(첨부#6) 저장 — 특채 요청서 saveReq 와 같은 pre 패턴(버킷 업로드 → 행 INSERT).
+       건별 성공 직후 담아둔 목록에서 빼서 중간 실패 시 재시도해도 같은 파일이 두 번 올라가지 않게 한다. */
+    const saveTech = () => (techAtts.length > 0 ? async () => {
+        const at = nowIso();
+        for (const a of techAtts) {
+            const p = await uploadAtt(report.id, a.name, a.dataurl);
+            await api.fetch('/ncr_attachments', {
+                method: 'POST',
+                body: { report_id: report.id, category: ATT_CAT.TECH, name: a.name, path: p, at, by: user?.name || '' }
+            });
+            setTechAtts(prev => prev.filter(x => x !== a));
+        }
+    } : undefined);
     const doTechStaff = () => {
         if (!comment.trim()) return setErr('검토 의견은 필수입니다.');
+        // 차장 결정 1: 담당이 「승인 의견」으로 회신할 때만 증거자료(이번에 담은 것 + 이미 올라간 첨부#6) 0건이면 막는다. 승인·반려 모두 막으려면 아래 줄의 `opinion === 'approve' && ` 를 지우고, 화면에서 안 막으려면 아래 줄을 통째로 지운다.
+        if (opinion === 'approve' && techAtts.length + techDocs.length === 0) return setErr('기술 검토 회신에는 증거자료 첨부가 필요합니다.');
         const t = { ...(reviews['응용기술팀'] || {}), state: 'staffDone', staff_email: user?.email, staff_name: user?.name, opinion, staff_cmt: comment.trim(), staff_at: nowIso() };
-        act('회람회신', { reviews: { ...reviews, '응용기술팀': t } }, `[기술 검토·${opinion === 'approve' ? '승인 의견' : '반려 의견'}] ${comment.trim()}`);
+        act('회람회신', { reviews: { ...reviews, '응용기술팀': t } }, `[기술 검토·${opinion === 'approve' ? '승인 의견' : '반려 의견'}] ${comment.trim()}`, undefined, saveTech());
     };
     /* 기술 회신 확정 자격 — 부서장 결재(deptHeadGate)와 같은 원칙으로 쓰기 직전 다시 판정한다.
        렌더 가드만 두면 화면이 잘못 뜨는 순간에 확정이 실제로 완주된다. 설정을 못 읽었으면 대결은 막는다. */
@@ -430,7 +460,7 @@ const NCRDetail = ({ report, user, onClose, onChanged, readOnly = false, canProc
             : '결재 설정을 불러오는 중입니다 — 잠시 후 다시 시도해 주십시오.');
         const t = reviews['응용기술팀'] || {};
         const upd = { ...t, state: 'done', head_name: user?.name, head_cmt: comment.trim(), head_at: nowIso(), deputy: g.deputy };
-        act('기술회신', { status: '특채판단', reviews: { ...reviews, '응용기술팀': upd }, tech_reply: { summary: t.staff_cmt || comment.trim(), at: nowIso() } }, `${comment || '기술 회신 확정'}${g.deputy ? ' (차석 대결)' : ''}`);
+        act('기술회신', { status: '특채판단', reviews: { ...reviews, '응용기술팀': upd }, tech_reply: { summary: t.staff_cmt || comment.trim(), at: nowIso() } }, `${comment || '기술 회신 확정'}${g.deputy ? ' (차석 대결)' : ''}`, undefined, saveTech());
     };
     const doJudgeSubmit = () => {
         if (!comment.trim()) return setErr('판단 사유는 필수입니다.');
@@ -898,6 +928,7 @@ const NCRDetail = ({ report, user, onClose, onChanged, readOnly = false, canProc
     const refDocs = atts.filter(a => a.category === 3);
     const closedEvid = atts.filter(a => Number(a.category) === ATT_CAT.CLOSED);   // H-③ 첨부#4 처리확인 증빙
     const reqDocs = atts.filter(a => Number(a.category) === ATT_CAT.REQUEST);     // 09-02 첨부#5 특채 요청서(933-16)
+    const techDocs = atts.filter(a => Number(a.category) === ATT_CAT.TECH);       // 10-07(080) 첨부#6 기술 검토 증거자료
 
     /* ── H-③ 처리확인 증빙 담기 (완료확인 패널 전용) ──
        사진·파일 둘 다 받는다. 작성화면과 같은 processAnyFile을 통과시켜
@@ -918,10 +949,23 @@ const NCRDetail = ({ report, user, onClose, onChanged, readOnly = false, canProc
         e.target.value = '';
         if (!files.length) return;
         setReqErr(null);
+        // 차장 결정 2: 특채 요청서는 PDF·사진만 받는다(워드·엑셀은 화면·인쇄에 본문을 못 싣는다). 형식 제한을 풀려면 아래 줄과 파일 입력의 accept 를 지운다.
+        if (files.some(f => !(f.type === 'application/pdf' || f.type.startsWith('image/') || /\.pdf$/i.test(f.name)))) return setReqErr('특채 요청서는 서명된 PDF 또는 사진 파일로 올려 주세요.');
         try {
             const rows = await Promise.all(files.map(processAnyFile));
             setReqAtts(l => [...l, ...rows]);
         } catch (er) { setReqErr('파일 처리 실패: ' + (er.message || er)); }
+    };
+    /* 10-07(080) 기술 검토 증거자료 담기 (기술 회신 패널 전용) — addReqFiles 와 같은 규칙. 형식 제한 없음(9/30 「자유양식」) */
+    const addTechFiles = async (e) => {
+        const files = [...(e.target.files || [])];
+        e.target.value = '';
+        if (!files.length) return;
+        setErr(null);
+        try {
+            const rows = await Promise.all(files.map(processAnyFile));
+            setTechAtts(l => [...l, ...rows]);
+        } catch (er) { setErr('파일 처리 실패: ' + (er.message || er)); }
     };
     /* H-① 캡처 붙여넣기 — 대상은 'closed'(시뮬레이터 pendClosed와 같은 자리) · 09-02 'req'(특채 요청서) 추가 */
     const pz = useCapturePaste(async (target, file) => {
@@ -931,6 +975,14 @@ const NCRDetail = ({ report, user, onClose, onChanged, readOnly = false, canProc
                 const row = await processAnyFile(file);
                 setReqAtts(l => [...l, row]);
             } catch (er) { setReqErr('캡처 처리 실패: ' + (er.message || er)); }
+            return;
+        }
+        if (target === 'tech') {   // 10-07(080) 기술 검토 증거자료
+            setErr(null);
+            try {
+                const row = await processAnyFile(file);
+                setTechAtts(l => [...l, row]);
+            } catch (er) { setErr('캡처 처리 실패: ' + (er.message || er)); }
             return;
         }
         if (target !== 'closed') return;
@@ -971,8 +1023,46 @@ const NCRDetail = ({ report, user, onClose, onChanged, readOnly = false, canProc
     /* 모듈 스코프 Panel에 넘길 공통 props — 렌더마다 값만 바뀌고 컴포넌트 신원은 고정된다(포커스 유지) */
     const panelBase = {
         comment, setComment, saving, inputCls, btnO, btnP,
-        onCancel: () => { setMode(null); setComment(''); setErr(null); setReqAtts([]); setReqErr(null); }   // 09-02: 특채 요청서 담아둔 것도 비운다
+        onCancel: () => { setMode(null); setComment(''); setErr(null); setReqAtts([]); setReqErr(null); setTechAtts([]); }   // 09-02: 특채 요청서 담아둔 것도 비운다 · 10-07: 기술 증거자료도
     };
+    /* 10-07(080) 기술 검토 증거자료(첨부#6) 칸 — 담당·부서장 패널 공용. 특채 요청서(#5) 칸과 같은 UI·같은 저장소(ncr_attachments, category 6).
+       부서장 패널에서는 담당이 올린 것이 「기존 첨부」로 보이고 PDF 는 펼쳐 볼 수 있다. */
+    const techBox = (
+        <div className="rounded-lg border border-slate-200 bg-white p-3 space-y-2" data-tech-att>
+            <div className="text-xs font-bold text-slate-700">기술 검토 증거자료 첨부 <span className="font-normal text-slate-400">— 담당 「승인 의견」 회신이면 필수</span></div>
+            <p className="text-[11px] text-slate-400">시험·검토 근거 자료. 형식 제한 없음, 파일당 20MB(이미지는 자동 축소). PDF 는 화면에서 바로 볼 수 있습니다.</p>
+            {techDocs.length > 0 && (
+                <div className="space-y-1">
+                    <div className="text-[11px] font-semibold text-slate-500">기존 첨부 {techDocs.length}건</div>
+                    {techDocs.map((a, i) => <AttView key={a.id ?? i} a={a} />)}
+                </div>
+            )}
+            {techAtts.length > 0 && (
+                <div className="grid grid-cols-3 md:grid-cols-4 gap-2">
+                    {techAtts.map((a, i) => (
+                        <div key={i} className="relative">
+                            {isImageAtt(a)
+                                ? <img src={attUrl(a)} alt={a.name} className="w-full aspect-[4/3] object-cover rounded-lg border border-slate-200 bg-slate-50" />
+                                : <div className="w-full aspect-[4/3] flex flex-col items-center justify-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-1">
+                                    <FileIcon className="w-6 h-6 text-slate-400" />
+                                    <span className="text-[9px] text-slate-500 font-mono truncate max-w-full">{a.name}</span>
+                                </div>}
+                            <button type="button" onClick={() => setTechAtts(l => l.filter((_, j) => j !== i))}
+                                className="absolute top-1 right-1 p-1 rounded-full bg-white/90 border border-slate-300 text-slate-500 hover:text-red-600 hover:border-red-300">
+                                <Trash2 className="w-3 h-3" />
+                            </button>
+                            <div className="text-[10px] text-slate-400 font-mono truncate mt-0.5">{a.name}</div>
+                        </div>
+                    ))}
+                </div>
+            )}
+            <PasteZone {...pz} target="tech" />
+            <label className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 cursor-pointer">
+                <Plus className="w-3.5 h-3.5" /> 파일 추가
+                <input type="file" multiple className="hidden" onChange={addTechFiles} />
+            </label>
+        </div>
+    );
 
     /* ── B-20/B-21 · 회람 검토 회신 패널 하단 (검토 의견 입력칸 아래) ── */
     const deptStaffExtra = (
@@ -996,7 +1086,7 @@ const NCRDetail = ({ report, user, onClose, onChanged, readOnly = false, canProc
                         {dispReqTo === CONCESSION && (
                             <div className="rounded-lg border border-slate-200 bg-white p-3 space-y-2" data-req-att>
                                 <div className="text-xs font-bold text-slate-700">특채 요청서(933-16) 첨부 — 필수</div>
-                                <p className="text-[11px] text-slate-400">서명 완료본 스캔/파일. 형식 제한 없음, 파일당 20MB(이미지는 자동 축소)</p>
+                                <p className="text-[11px] text-slate-400">서명 완료본 스캔 — PDF 또는 사진만(PDF 권장), 파일당 20MB(이미지는 자동 축소)</p>
                                 {reqDocs.length > 0 && (
                                     <div className="space-y-1">
                                         <div className="text-[11px] font-semibold text-slate-500">기존 첨부 {reqDocs.length}건</div>
@@ -1027,7 +1117,7 @@ const NCRDetail = ({ report, user, onClose, onChanged, readOnly = false, canProc
                                 <PasteZone {...pz} target="req" />
                                 <label className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 cursor-pointer">
                                     <Plus className="w-3.5 h-3.5" /> 파일 추가
-                                    <input type="file" multiple className="hidden" onChange={addReqFiles} />
+                                    <input type="file" multiple accept="application/pdf,image/*" className="hidden" onChange={addReqFiles} />
                                 </label>
                                 {reqErr && <div className="text-[11px] text-red-600">{reqErr}</div>}
                             </div>
@@ -1095,9 +1185,7 @@ const NCRDetail = ({ report, user, onClose, onChanged, readOnly = false, canProc
                     <div className="text-xs font-bold text-slate-700">특채 요청서(933-16) {reqDocs.length > 0 && <span className="font-normal text-slate-400">{reqDocs.length}건</span>}</div>
                     {reqDocs.length === 0
                         ? <p className="text-[11px] text-slate-400">특채 요청서 없음(시공 전 요청)</p>
-                        : reqDocs.map((a, i) => (
-                            <a key={a.id ?? i} href={attUrl(a)} target="_blank" rel="noreferrer" className="block text-[11px] text-blue-600 hover:underline font-mono truncate">{a.name}</a>
-                        ))}
+                        : reqDocs.map((a, i) => <AttView key={a.id ?? i} a={a} open />) /* 10-07(080) PDF·사진은 링크 아래에 바로 펼쳐 보인다 */}
                 </div>
             )}
         </div>
@@ -1157,6 +1245,7 @@ const NCRDetail = ({ report, user, onClose, onChanged, readOnly = false, canProc
                         <div className="text-sm px-4 py-3 rounded-lg bg-violet-50 border border-violet-200">
                             <div className="text-xs font-bold text-violet-700 mb-1 flex items-center"><FlaskConical className="w-3.5 h-3.5 mr-1" /> 응용기술팀 회신 (자동 첨부)</div>
                             <div className="text-slate-700">{report.tech_reply.summary}</div>
+                            {techDocs.length > 0 && <div className="mt-2 space-y-1"><div className="text-[11px] font-semibold text-violet-700">증거자료 {techDocs.length}건 (첨부#6)</div>{techDocs.map((a, i) => <AttView key={a.id ?? i} a={a} />)}</div>}
                         </div>
                     )}
                     {newFlow && report.judge_plan && report.status === '특채승인 대기' && (
@@ -1286,12 +1375,13 @@ const NCRDetail = ({ report, user, onClose, onChanged, readOnly = false, canProc
                         </div>
                     )}
                     {/* H-③: 처리확인 증빙(#4)도 같은 방식으로 카드에 보여준다 — 올라간 증거를 상세에서 바로 확인 */}
-                    {[[drawings, '첨부#2 — 해당 도면'], [refDocs, '첨부#3 — 관련자료'], [closedEvid, '첨부#4 — 처리확인 증빙'], [reqDocs, '첨부#5 — 특채 요청서(933-16)']].map(([list, title]) => list.length > 0 && (
+                    {[[drawings, '첨부#2 — 해당 도면'], [refDocs, '첨부#3 — 관련자료'], [closedEvid, '첨부#4 — 처리확인 증빙'], [reqDocs, '첨부#5 — 특채 요청서(933-16)'], [techDocs, '첨부#6 — 기술 검토 증거자료']].map(([list, title]) => list.length > 0 && (
                         <div key={title}>
                             <div className="text-xs font-bold text-slate-500 mb-2">{title} {list.length}건</div>
                             <div className="grid grid-cols-3 md:grid-cols-4 gap-2">{list.map((a, i) => (
                                 isImageAtt(a)
                                     ? <a key={i} href={attUrl(a)} target="_blank" rel="noreferrer"><img src={attUrl(a)} alt={a.name} className="w-full aspect-[4/3] object-cover rounded-lg border border-slate-200" /></a>
+                                    : isPdfAtt(a) ? <div key={i} className="col-span-full"><AttView a={a} /></div>   /* 10-07(080) PDF 는 접힌 채, 펴면 화면 안에서 보인다 */
                                     : <a key={i} href={attUrl(a)} download={a.name} className="flex items-center justify-center aspect-[4/3] rounded-lg border border-slate-200 bg-slate-50 text-[10px] text-slate-500 font-mono px-2 text-center break-all">{a.name}</a>
                             ))}</div>
                         </div>
@@ -1328,8 +1418,9 @@ const NCRDetail = ({ report, user, onClose, onChanged, readOnly = false, canProc
                             <div className="flex gap-4 text-sm">{['approve', 'reject'].map(o => (
                                 <label key={o} className="flex items-center gap-1.5"><input type="radio" name="opn" checked={opinion === o} onChange={() => setOpinion(o)} />{o === 'approve' ? '승인 의견' : '반려 의견'}</label>
                             ))}</div>
+                            {techBox}
                         </Panel> :
-                        mode === 'techHead' ? <Panel {...panelBase} title={`기술 회신 확정 (${ro.isTechDeputy && !ro.isTechHead ? '차석 대결' : '기술부서장'}) — 특채 판단으로 회신`} onSubmit={doTechHead} submitLabel="회신 확정" color="bg-violet-700 hover:bg-violet-800" /> :
+                        mode === 'techHead' ? <Panel {...panelBase} title={`기술 회신 확정 (${ro.isTechDeputy && !ro.isTechHead ? '차석 대결' : '기술부서장'}) — 특채 판단으로 회신`} onSubmit={doTechHead} submitLabel="회신 확정" color="bg-violet-700 hover:bg-violet-800">{techBox}</Panel> :
                         mode === 'judge' ? <Panel {...panelBase} title="특채 여부 판단 상신 (품질부서장 승인 요청)" onSubmit={doJudgeSubmit} submitLabel="판단 상신" color="bg-amber-600 hover:bg-amber-700" needComment commentLabel="(판단 사유 — 필수)">
                             <div className="space-y-2 text-sm">
                                 <div className="flex gap-4">{[['special', '특채(Concession)로 진행'], ['normal', '일반 처리로 전환']].map(([k, l]) => (

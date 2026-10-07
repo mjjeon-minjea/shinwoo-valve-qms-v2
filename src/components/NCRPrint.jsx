@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { Printer, X } from 'lucide-react';
 import { api } from '../lib/api';
 import { concessionTypeLabel, dispositionLabel, isNewFlow, latestSpecialRequestApprovalCycle, statusLabel } from '../lib/ncrFlow';
-import { attUrl, isImageAtt } from '../lib/attach.jsx';
+import { attUrl, isImageAtt, isPdfAtt } from '../lib/attach.jsx';
 
 /* NCR 인쇄 뷰 — FORM 933-07 REV.2 · v10.1 정통 복원
    v9.3 시뮬레이터 §7(인쇄물 구성) 사양 재구현(React + 인라인 인쇄 CSS):
@@ -82,6 +82,10 @@ table.ncrp-rev tr{break-inside:avoid;page-break-inside:avoid;}
 .ncrp-refpage.images{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
 .ncrp-refpage.images .ncrp-att{margin-bottom:0;}
 .ncrp-cap{font-family:monospace;font-size:10px;color:#475569;text-align:center;margin-top:4px;word-break:break-all;}
+/* 10-07(080 C) PDF 첨부 쪽 그림 — 머리줄+그림이 A4 한 쪽에 들어가게(가로 꽉, 세로 상한, 비율 유지) · PDF 쪽마다 새 종이 */
+.ncrp-pdfpage{margin-bottom:12px;break-inside:avoid;page-break-inside:avoid;}
+.ncrp-pdfhead{font-family:monospace;font-size:10px;color:#475569;margin-bottom:4px;word-break:break-all;}
+.ncrp-pdfpage img{display:block;max-width:100%;max-height:246mm;margin:0 auto;border:1px solid #cbd5e1;}
 /* H-④ 첨부 목록 표 — 종이만 봐도 무슨 증거가 붙어 있는지 알 수 있게 본문 끝에 인쇄.
    table-layout:fixed + 백분율 col 폭 + word-break로 긴 파일명이 A4 폭을 밀어내지 않게 한다(과거 N-1 재발 방지). */
 table.ncrp-attlist{width:100%;table-layout:fixed;border-collapse:collapse;border:1px solid #94a3b8;margin-top:6px;font-size:10px;}
@@ -104,9 +108,49 @@ table.ncrp-attlist tr{break-inside:avoid;page-break-inside:avoid;}
   .ncrp-photo{max-height:56mm;}
   .ncrp-att img{max-height:110mm;}
   .ncrp-sect > .ncrp-att img{max-height:245mm;}
+  .ncrp-pdfpage{margin-bottom:0;}
+  .ncrp-pdfpage + .ncrp-pdfpage,.ncrp-att + .ncrp-pdfpage{break-before:page;page-break-before:always;}
   img{max-width:100%;}
 }
 `;
+
+/* ── 10-07(080 C) PDF 첨부 본문 → 쪽 그림 ──
+   종전에는 PDF 첨부(서명받은 특채 요청서·기술 검토 증거자료 등)가 별지에 「첨부 파일: 이름」 한 줄만 찍혀 종이로는 내용을 볼 수 없었다.
+   · pdfjs-dist(모질라)는 인쇄 미리보기에 PDF 첨부가 있을 때만 import() 로 불러온다 — 본 묶음에 섞이지 않는다.
+   · legacy 빌드를 쓴다 — 일반 빌드는 크롬 119 이상(Promise.withResolvers)이어야 해서 사내 구형 PC 에서 본문이 빠질 수 있다.
+   · 작업자(worker)는 같은 출처 파일 — Vite 가 new URL(…, import.meta.url) 을 보고 assets 로 복사한다. blob·CDN 안 씀.
+   · 쪽 그림 주소는 data:(JPEG) — 스테이징 CSP(frame-ancestors·base-uri·object-src)에 img-src 제한이 없고, 레거시 첨부 그림도 이미 data: 다. */
+const PDF_MAX_PAGES = 10;       // 파일당 싣는 쪽 상한(080 결정3) — 넘는 쪽은 「외 N쪽은 원본 파일 참조」
+const PDF_TIMEOUT_MS = 20000;   // 파일당 제한 시간 — 넘으면 파일 이름 한 줄로 떨어진다(인쇄는 가능)
+const PDF_PX = 1600;            // 쪽 그림 가로 픽셀 — A4 를 인쇄 폭에 실으면 약 200dpi(서명·작은 글씨 판독용)
+/* 사진대지(#1) 칸은 PDF 를 싣지 않으므로(「이미지 파일이 아닙니다」 상자) 불러오지도 않는다. */
+const hasPdfBody = (a) => isPdfAtt(a) && !!attUrl(a) && Number(a.category) !== 1;
+// ponytail: cMap·표준 글꼴 파일은 싣지 않는다 — 스캔본·워드/한글 저장본은 글꼴이 PDF 안에 들어 있어 필요 없다.
+//           글꼴이 내장 안 된 한글 PDF 는 글자가 비어 나올 수 있다 → 그런 파일이 실제로 나오면
+//           node_modules/pdfjs-dist/cmaps 를 public/ 에 복사하고 getDocument 에 cMapUrl·cMapPacked 를 넘긴다.
+const pdfToPages = async (url) => {
+    const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+    pdfjs.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/legacy/build/pdf.worker.min.mjs', import.meta.url).toString();
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const task = pdfjs.getDocument({ data: await res.arrayBuffer(), isEvalSupported: false });
+    try {
+        const doc = await task.promise;
+        const imgs = [];
+        for (let n = 1; n <= Math.min(doc.numPages, PDF_MAX_PAGES); n++) {
+            const page = await doc.getPage(n);
+            const base = page.getViewport({ scale: 1 });
+            /* 가로 PDF_PX 에 맞추되, 세로로 아주 긴 쪽은 높이(가로의 1.5배)로 묶어 캔버스가 터지지 않게 한다 */
+            const viewport = page.getViewport({ scale: Math.min(PDF_PX / base.width, PDF_PX * 1.5 / base.height) });
+            const c = document.createElement('canvas');
+            c.width = Math.ceil(viewport.width);
+            c.height = Math.ceil(viewport.height);
+            await page.render({ canvasContext: c.getContext('2d'), viewport }).promise;   // 바탕은 pdf.js 가 흰색으로 칠한다
+            imgs.push(c.toDataURL('image/jpeg', 0.85));
+        }
+        return { imgs, total: doc.numPages };
+    } finally { task.destroy(); }
+};
 
 /* 쌍 그룹핑: category 1을 pair_no별 {good, bad}로 — 인쇄 1쪽=3쌍 */
 /* v10.2 D-07 — 같은 pair_no·같은 kind 사진이 2장 이상이면 기존에는 나중 것이 앞 것을 조용히 덮어써
@@ -166,7 +210,7 @@ export const fmtDT = (iso) => {   // 070 ③ 상세 화면도 같은 서울 시�
 const won = (n) => `₩${Number(n || 0).toLocaleString()}`;
 
 /* H-④ 첨부 목록 표의 「종류」 칸 — category 숫자를 종이에 그대로 찍으면 알아볼 수 없다 */
-const ATT_KIND = { 1: '사진대지', 2: '도면', 3: '관련자료', 4: '처리확인 증빙', 5: '특채 요청서(933-16)' };   // 09-02: 5 특채 요청서 신설
+const ATT_KIND = { 1: '사진대지', 2: '도면', 3: '관련자료', 4: '처리확인 증빙', 5: '특채 요청서(933-16)', 6: '기술 검토 증거자료' };   // 09-02: 5 특채 요청서 신설 · 10-07(080): 6 기술 검토 증거자료
 
 /* 인쇄 전용 설정 로드 — 호출부 시그니처 변경 없이 NCRPrint가 자체 로드
    (NCRDetail의 fetchNcrSettings를 쓰면 NCRDetail↔NCRPrint 순환 import가 되므로 여기서 별도 구현) */
@@ -199,11 +243,35 @@ const NCRPrint = ({ report, history, attachments, onClose }) => {
     const closedAtts = (attachments || []).filter(a => Number(a.category) === 4);
     /* 09-02 — 특채 요청서(933-16, category 5). #4와 같은 규칙으로 별지 인쇄한다. */
     const reqDocs = (attachments || []).filter(a => Number(a.category) === 5);
+    /* 10-07(080) — 기술 검토 증거자료(category 6). #4·#5와 같은 규칙으로 별지 인쇄한다. */
+    const techDocs = (attachments || []).filter(a => Number(a.category) === 6);
     /* H-④ 첨부 목록 표용 — 분류 순(1→4), 같은 분류 안에서는 쌍번호·등록시각 순 */
     const attList = [...(attachments || [])].sort((x, y) =>
         (Number(x.category) - Number(y.category))
         || ((x.pair_no || 0) - (y.pair_no || 0))
         || String(x.at || '').localeCompare(String(y.at || '')));
+
+    /* 10-07(080 C) PDF 첨부 본문 — 첨부별 { imgs, total } · 실패·시간 초과면 null · 아직 안 끝났으면 키 없음.
+       파일을 하나씩 차례로 바꾼다(여러 개를 한꺼번에 돌리면 20MB 스캔본에서 메모리가 몰린다). */
+    const [pdfBody, setPdfBody] = useState(() => new Map());
+    useEffect(() => {
+        let live = true;
+        (async () => {
+            for (const a of (attachments || []).filter(hasPdfBody)) {
+                let timer;
+                const body = await Promise.race([
+                    pdfToPages(attUrl(a)),
+                    new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('시간 초과')), PDF_TIMEOUT_MS); })
+                ]).catch(() => null);
+                clearTimeout(timer);
+                if (!live) return;
+                setPdfBody(m => new Map(m).set(a, body));
+            }
+        })();
+        return () => { live = false; };
+    }, [attachments]);
+    /* 다 바뀔 때까지 「인쇄하기」를 막는다 — 덜 된 채 뽑으면 본문 없는 종이가 나온다 */
+    const pdfBusy = (attachments || []).some(a => hasPdfBody(a) && !pdfBody.has(a));
 
     /* 설정(코드표 등) 자체 로드 */
     const [settings, setSettings] = useState(null);
@@ -770,15 +838,41 @@ const NCRPrint = ({ report, history, attachments, onClose }) => {
     const PairCell = ({ att, side }) => (
         <div className={`ncrp-cell ${side}`}>
             <h5>{side === 'good' ? '정상(양품) · 선택' : '부 적 합 (불 량)'}</h5>
-            {att ? <img className="ncrp-photo" src={attUrl(att)} alt={att.name || ''} /> : <div className="ncrp-empty">사진 없음</div>}
+            {/* 09-10(061) 사진대지 칸 비이미지 가드 — 사진 자리에 PDF 등이 오면 깨진 그림 대신 안내 상자. 개발웹에만 있던 것(스테이징 미반영, 10-07 다시 얹음) */}
+            {!att ? <div className="ncrp-empty">사진 없음</div>
+                : isImageAtt(att) ? <img className="ncrp-photo" src={attUrl(att)} alt={att.name || ''} />
+                    : <div className="ncrp-empty">이미지 파일이 아닙니다</div>}
             {att?.name && <div className="ncrp-cap">{att.name}</div>}
         </div>
     );
 
+    /* 10-07(080 C) PDF 1건 → 쪽마다 그림 1장(쪽 머리줄 = 별지 이름 · 파일 이름 · n/전체쪽).
+       불러오는 중이거나 실패하면 종전처럼 파일 이름 한 줄로 떨어진다 — 인쇄는 그대로 된다. */
+    const pdfSheets = (title, a, i) => {
+        const name = a.name || `자료 ${i + 1}`;
+        const body = pdfBody.get(a);
+        if (!body?.imgs?.length) return (
+            <div key={a.id ?? i} className="ncrp-att">
+                <div className="ncrp-cap" style={{ textAlign: 'left' }}>
+                    첨부 파일: {name} {pdfBody.has(a) ? '(본문을 불러오지 못했습니다 — 원본 파일 참조)' : '— 첨부 본문 불러오는 중…'}
+                </div>
+            </div>
+        );
+        return body.imgs.map((src, p) => (
+            <div key={`${a.id ?? i}-${p}`} className="ncrp-pdfpage">
+                <div className="ncrp-pdfhead">{title} · {name} · {p + 1}/{body.total}쪽</div>
+                <img src={src} alt={`${name} ${p + 1}쪽`} />
+                {p === body.imgs.length - 1 && body.total > body.imgs.length && (
+                    <div className="ncrp-cap" style={{ textAlign: 'left' }}>외 {body.total - body.imgs.length}쪽은 원본 파일 참조</div>
+                )}
+            </div>
+        ));
+    };
+
     const AttSection = ({ title, count, items }) => (
         <div className="ncrp-sect">
             <h4>{title} <small>{count}건</small></h4>
-            {items.map((a, i) => (
+            {items.map((a, i) => hasPdfBody(a) ? pdfSheets(title, a, i) : (
                 <div key={a.id ?? i} className="ncrp-att">
                     {isImageAtt(a) ? (
                         <>
@@ -804,7 +898,7 @@ const NCRPrint = ({ report, history, attachments, onClose }) => {
                             <img src={attUrl(a)} alt={a.name || ''} />
                             <div className="ncrp-cap">{a.name || `자료 ${i + 1}`}</div>
                         </div>
-                    )) : (
+                    )) : hasPdfBody(page.items[0]) ? pdfSheets('첨부#3 — 관련자료', page.items[0], pi) : (
                         <div className="ncrp-att"><div className="ncrp-cap" style={{ textAlign: 'left' }}>첨부 파일: {page.items[0].name || `자료 ${pi + 1}`}</div></div>
                     )}
                 </div>
@@ -827,9 +921,9 @@ const NCRPrint = ({ report, history, attachments, onClose }) => {
             <div className="ncrp-toolbar ncrp-noprint" onClick={e => e.stopPropagation()}>
                 <span style={{ fontSize: 13, fontWeight: 700 }}>인쇄 미리보기 — {report.ncr_no} (FORM 933-07)</span>
                 <span style={{ display: 'flex', gap: 8 }}>
-                    <button onClick={() => window.print()}
-                        style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#2563eb', color: '#fff', border: 0, borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
-                        <Printer size={15} /> 인쇄하기
+                    <button onClick={() => window.print()} disabled={pdfBusy}
+                        style={{ display: 'flex', alignItems: 'center', gap: 6, background: pdfBusy ? '#64748b' : '#2563eb', color: '#fff', border: 0, borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 700, cursor: pdfBusy ? 'wait' : 'pointer' }}>
+                        <Printer size={15} /> {pdfBusy ? '첨부 본문 불러오는 중…' : '인쇄하기'}
                     </button>
                     <button onClick={onClose}
                         style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#475569', color: '#fff', border: 0, borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
@@ -873,7 +967,8 @@ const NCRPrint = ({ report, history, attachments, onClose }) => {
                         drawings.length ? `#2 도면 ${drawings.length}건` : null,
                         refs.length ? `#3 관련자료 ${refs.length}건` : null,
                         closedAtts.length ? `#4 처리확인 증빙 ${closedAtts.length}건` : null,
-                        reqDocs.length ? `#5 특채 요청서 ${reqDocs.length}건` : null
+                        reqDocs.length ? `#5 특채 요청서 ${reqDocs.length}건` : null,
+                        techDocs.length ? `#6 기술 검토 증거자료 ${techDocs.length}건` : null
                     ].filter(Boolean).join(' · ') || '없음'}
                 </div>
 
@@ -936,6 +1031,8 @@ const NCRPrint = ({ report, history, attachments, onClose }) => {
                 {closedAtts.length > 0 && <AttSection title="첨부#4 — 처리확인 증빙" count={closedAtts.length} items={closedAtts} />}
                 {/* 09-02 특채 요청서(933-16) 별지 — #4와 동일 규칙 */}
                 {reqDocs.length > 0 && <AttSection title="첨부#5 — 특채 요청서(933-16)" count={reqDocs.length} items={reqDocs} />}
+                {/* 10-07(080) 기술 검토 증거자료 별지 — #4·#5와 동일 규칙 */}
+                {techDocs.length > 0 && <AttSection title="첨부#6 — 기술 검토 증거자료" count={techDocs.length} items={techDocs} />}
             </div>
         </div>,
         document.body

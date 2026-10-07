@@ -11,8 +11,9 @@ import { supabase } from './api';
 /* 첨부 분류(ncr_attachments.category) — 1·2·3은 작성화면, 4는 처리확인 단계 증빙(신설).
    숫자를 코드 곳곳에 흩어 쓰면 4를 추가할 때처럼 빠뜨리는 곳이 생기므로 이름을 붙여 둔다. */
 /* 09-02 — 5 특채 요청서(933-16) 분류 신설: 회람 담당이 특채 요청을 올릴 때 서명본을 함께 첨부한다(차장 확정). */
-export const ATT_CAT = { PHOTO: 1, DRAWING: 2, REF: 3, CLOSED: 4, REQUEST: 5 };
-export const ATT_CAT_LABEL = { 1: '사진대지', 2: '도면', 3: '관련자료', 4: '처리확인 증빙', 5: '특채 요청서(933-16)' };
+/* 10-07(080) — 6 기술 검토 증거자료 분류 신설: 응용기술팀 담당·부서장이 기술 회신 때 함께 올린다. */
+export const ATT_CAT = { PHOTO: 1, DRAWING: 2, REF: 3, CLOSED: 4, REQUEST: 5, TECH: 6 };
+export const ATT_CAT_LABEL = { 1: '사진대지', 2: '도면', 3: '관련자료', 4: '처리확인 증빙', 5: '특채 요청서(933-16)', 6: '기술 검토 증거자료' };
 
 /* 이미지 축소: 최대 1280px · JPEG 0.8 dataURL — 원본 저장 금지(DB 비대 방지) */
 export const shrinkImage = (file) => new Promise((resolve, reject) => {
@@ -111,6 +112,9 @@ export const attUrl = (a) => a?.url || a?.dataurl || '';
 export const isImageAtt = (a) => (a?.dataurl
     ? a.dataurl.startsWith('data:image')
     : /\.(png|jpe?g|gif|webp|bmp)$/i.test(a?.name || ''));
+
+/* 10-07(080) PDF 판정 — 화면 안에 바로 펼쳐 보일지 정한다(이름 끝 .pdf, 대소문자 무시). */
+export const isPdfAtt = (a) => /\.pdf$/i.test(a?.name || '');
 
 /* 클립보드 이미지에는 파일명이 없다(대개 image.png) — 시뮬레이터 v9.3과 같은 규칙으로 시각 이름을 붙인다 */
 export const captureFileName = () => `캡처_${new Date().toTimeString().slice(0, 8).replaceAll(':', '')}.png`;
