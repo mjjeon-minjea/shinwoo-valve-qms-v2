@@ -59,12 +59,18 @@ DO $$ DECLARE tab text; safe_columns text; BEGIN
   IF NOT EXISTS(SELECT 1 FROM pg_trigger WHERE tgrelid='storage.objects'::regclass AND tgname='qms_storage_transition') THEN
    CREATE TRIGGER qms_storage_transition BEFORE INSERT OR UPDATE OR DELETE ON storage.objects FOR EACH ROW EXECUTE FUNCTION public.qms_transition_guard();
   END IF;
+  -- CREATE defaults to O; hosted TRIGGER privilege does not permit ALTER TABLE ENABLE.
+  IF NOT EXISTS(SELECT 1 FROM pg_trigger t WHERE t.tgrelid='storage.objects'::regclass
+    AND t.tgname='qms_storage_transition' AND t.tgfoid=to_regprocedure('public.qms_transition_guard()')
+    AND t.tgenabled='O' AND t.tgtype=31 AND NOT t.tgisinternal AND t.tgnargs=0
+    AND t.tgqual IS NULL AND t.tgattr=''::int2vector)
+   OR EXISTS(SELECT 1 FROM pg_trigger WHERE tgname='qms_storage_transition' AND tgrelid<>'storage.objects'::regclass)
+   THEN RAISE EXCEPTION 'Storage transition guard collision/disabled: HOLD'; END IF;
   IF to_regclass('public.inspection_measurements') IS NOT NULL AND NOT EXISTS(SELECT 1 FROM pg_trigger WHERE tgrelid=to_regclass('public.inspection_measurements') AND tgname='qms_measurements_transition') THEN
    CREATE TRIGGER qms_measurements_transition BEFORE INSERT OR UPDATE OR DELETE ON public.inspection_measurements FOR EACH ROW EXECUTE FUNCTION public.qms_transition_guard();
   END IF;
   ALTER TABLE public.users ENABLE TRIGGER qms_users_transition;
   ALTER TABLE public.resources ENABLE TRIGGER qms_resources_transition;
-  ALTER TABLE storage.objects ENABLE TRIGGER qms_storage_transition;
   IF to_regclass('public.inspection_measurements') IS NOT NULL THEN
    ALTER TABLE public.inspection_measurements ENABLE TRIGGER qms_measurements_transition;
   END IF;
