@@ -12,13 +12,18 @@ export function weeklyApprovalRights(report, user, profiles) {
     const actor = profiles.filter(p => p.auth_id != null && String(p.auth_id) === String(user?.id));
     const author = profiles.filter(p => report?.authorId != null
         && [p.id, p.auth_id].some(id => id != null && String(id) === String(report.authorId)));
+    // Approved exception: only the exact, active QMS administrator may approve their own report.
+    const adminApprover = actor.length === 1 && actor[0].id === '1'
+        && actor[0].auth_id === '68860389-713f-4b7f-a41e-793b86d8059c'
+        && actor[0].email === 'mjjeon@shinwoovalve.com' && actor[0].is_admin === true;
     const valid = actor.length === 1 && author.length === 1 && actor[0].status === 'Active'
-        && actor[0].id !== author[0].id && (isFullOperator(actor[0]) || (Boolean(actor[0].company?.trim())
+        && (actor[0].id !== author[0].id || adminApprover)
+        && (adminApprover || isFullOperator(actor[0]) || (Boolean(actor[0].company?.trim())
         && actor[0].company.trim() === author[0].company?.trim()));
     return {
-        review: valid && (['manager', 'admin'].includes(actor[0].role) || actor[0].weekly_review_enabled === true)
+        review: valid && (adminApprover || ['manager', 'admin'].includes(actor[0].role) || actor[0].weekly_review_enabled === true)
             && report?.status === 'submitted',
-        approve: valid && ['director', 'admin'].includes(actor[0].role)
+        approve: valid && (adminApprover || ['director', 'admin'].includes(actor[0].role))
             && ['submitted', 'reviewed'].includes(report?.status)
     };
 }

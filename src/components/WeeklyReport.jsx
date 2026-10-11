@@ -201,7 +201,7 @@ const WeeklyReport = ({ user: propUser }) => {
 
     const handleApproval = async (status, comment) => {
         if (!report || !report.id) return;
-        if (!isReviewMode || (status === 'reviewed' && !canReview) || (status === 'approved' && !canApprove)
+        if ((status === 'reviewed' && !canReview) || (status === 'approved' && !canApprove)
             || !['reviewed', 'approved'].includes(status)) return;
 
         const updatedReport = {
