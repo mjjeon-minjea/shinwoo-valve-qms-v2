@@ -671,6 +671,12 @@ const NCRCreate = ({ user }) => {
                         at: new Date().toISOString()
                     }
                 });
+                /* 261015 발행승인 요청 알림 메일(받는 사람 = 서버 NCR_MAIL_TO) — 메일 실패가 발행 흐름을 막지 않게 기다리지 않는다 */
+                supabase.auth.getSession().then(({ data: { session } }) => session && fetch('/api/ncr-notify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+                    body: JSON.stringify({ ncr_id: reportId })
+                })).catch(e => console.warn('[ncr-notify] 알림 메일 요청 실패', e));
             }
             const doneLabel = status === '작성중'
                 ? (editDoc ? '수정 저장' : '임시저장')

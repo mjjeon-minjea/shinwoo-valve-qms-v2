@@ -374,6 +374,17 @@ server.post('/api/sync-sheets', async (req, res) => {
     }
 });
 
+// POST /api/ncr-notify — 발행승인 요청 알림 메일 (Vercel 함수 호출 대행, 261015)
+server.post('/api/ncr-notify', async (req, res) => {
+    try {
+        const notify = await import('./api/ncr-notify.js');
+        await notify.default(req, res);
+    } catch (error) {
+        console.error('[Local Notify Route Error]', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 server.use(router);
 
 server.listen(PORT, '0.0.0.0', () => {

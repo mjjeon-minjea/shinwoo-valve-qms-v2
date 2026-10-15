@@ -26,6 +26,10 @@
             "destination": "/api/admin-update-member.js"
         },
         {
+            "source": "/api/ncr-notify",
+            "destination": "/api/ncr-notify.js"
+        },
+        {
             "source": "/(.*)",
             "destination": "/index.html"
         }
