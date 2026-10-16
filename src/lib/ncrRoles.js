@@ -1,6 +1,8 @@
 /* NCR 권한 판정의 단일 정본.
    직급(rank)은 화면 표시용으로만 보존하고, 승인·실무 권한은 role로만 판정한다. */
 
+import { isLegacyFlow } from './ncrFlow.js';   // .js 확장자 — 서버 알림(Node)도 이 파일을 그대로 import 한다
+
 export const DEFAULT_USER_ROLE = 'employee';
 
 const hasRole = (user, role) => user?.role === role;
@@ -68,4 +70,29 @@ export const canApprove = (user, report, settings) => {
     if (report.status === '발행') return approver && user.company === report.dept;
     if (report.status === '특채 판단') return approver && user.company === '품질보증부';
     return false;
+};
+
+/* ── 내 차례 판정 (결재함 공용) — 레거시는 단선 결재 규칙으로, 그 외는 v10.1 게이트로 ── */
+export const myTurnV101 = (user, r, settings) => {
+    if (isLegacyFlow(r)) return canApprove(user, r, settings) || (r.status === '반려' && r.author_email === user?.email);
+    const ro = roleOf(user, settings);
+    const rv = r.reviews || {};
+    switch (r.status) {
+        case '작성중': return r.author_email === user?.email && !!r.reject_note;
+        case '발행승인 대기': case '특채승인 대기': case '특채요청 결재 대기': case '최종승인 대기': case '종결승인 대기': case '무효승인 대기': return ro.isQaApprover;
+        case '기술문의': {
+            const t = rv['응용기술팀'];
+            if (!t || t.state === 'skip') return false;
+            return (t.state === 'wait' && ro.isTechStaff) || (t.state === 'staffDone' && ro.isTechApprover);
+        }
+        case '특채판단': case '종합검토': case '처리중': return ro.isQaStaff;
+        case '회람중': {
+            const mine = rv[ro.company];
+            if (!mine || ['skip', 'done'].includes(mine.state)) return false;
+            if (mine.state === 'wait') return ro.isDeptStaff(ro.company);
+            if (mine.state === 'staffDone') return ro.isDeptHead(ro.company) || ro.isDeptDeputy(ro.company);
+            return false;
+        }
+        default: return false;
+    }
 };

@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { X, CheckCircle2, XCircle, Printer, Undo2, Stamp, FlaskConical, Users, ClipboardCheck, Ban, Coins, Plus, Trash2, File as FileIcon } from 'lucide-react';
 import { api, supabase } from '../lib/api';
 import { activeReviewDepartments, concessionTypeLabel, dispositionLabel, isLegacyFlow, isNewFlow, recallReviews, reopenLatestDispositionRequests, reviewDepartmentOptions, startNextReviewRound, statusLabel } from '../lib/ncrFlow';
-import { roleOf, canApprove, techApprovalDecision } from '../lib/ncrRoles';
+import { roleOf, canApprove, techApprovalDecision, myTurnV101 } from '../lib/ncrRoles';
+import { notifyNcrTurn } from '../lib/ncrNotify';
 /* v10.2 H-③ 처리확인 증빙 첨부 — 작성화면과 「같은 규칙」(1280px 축소 · 비이미지 5MB)을 쓰려고
    lib/attach.jsx의 공용 함수를 그대로 가져다 쓴다(NCRCreate에 있던 것을 lib로 옮긴 것). */
 import { ATT_CAT, processAnyFile, isImageAtt, isPdfAtt, useCapturePaste, PasteZone, attUrl, uploadAtt, withAttUrls } from '../lib/attach.jsx';
@@ -96,32 +97,9 @@ export const fetchNcrSettings = async () => {
      ① 부서장이 '부장'이 아닌 경우(최용석 이사·황사빈 이사) 결재자가 사라짐
      ② 실무자가 '차장'인 경우(정준길) 결재자로 오인됨
    기존 import 호환을 위해 여기서 그대로 재export 한다. */
-export { roleOf, canApprove };
+export { roleOf, canApprove, myTurnV101 };
 
-/* ── 내 차례 판정 (결재함 공용) — 레거시는 단선 결재 규칙으로, 그 외는 v10.1 게이트로 ── */
-export const myTurnV101 = (user, r, settings) => {
-    if (isLegacyFlow(r)) return canApprove(user, r, settings) || (r.status === '반려' && r.author_email === user?.email);
-    const ro = roleOf(user, settings);
-    const rv = r.reviews || {};
-    switch (r.status) {
-        case '작성중': return r.author_email === user?.email && !!r.reject_note;
-        case '발행승인 대기': case '특채승인 대기': case '특채요청 결재 대기': case '최종승인 대기': case '종결승인 대기': case '무효승인 대기': return ro.isQaApprover;
-        case '기술문의': {
-            const t = rv['응용기술팀'];
-            if (!t || t.state === 'skip') return false;
-            return (t.state === 'wait' && ro.isTechStaff) || (t.state === 'staffDone' && ro.isTechApprover);
-        }
-        case '특채판단': case '종합검토': case '처리중': return ro.isQaStaff;
-        case '회람중': {
-            const mine = rv[ro.company];
-            if (!mine || ['skip', 'done'].includes(mine.state)) return false;
-            if (mine.state === 'wait') return ro.isDeptStaff(ro.company);
-            if (mine.state === 'staffDone') return ro.isDeptHead(ro.company) || ro.isDeptDeputy(ro.company);
-            return false;
-        }
-        default: return false;
-    }
-};
+/* 내 차례 판정(myTurnV101)은 서버 알림(api/ncr-notify.js)도 같은 규칙을 쓰도록 lib/ncrRoles.js 로 옮겼다(261015) — 위 export 로 기존 import 호환 */
 
 /* 되돌림 표기 — 「부서장 재검토 지시」(부서 내·품질 미경유)와 「품질 반송」(특채요청 심사 결과)은
    담당자가 취해야 할 조치가 다르다. 접두어로 구분해 라벨을 분리한다(실측 결함 260829). */
@@ -372,6 +350,7 @@ const NCRDetail = ({ report, user, onClose, onChanged, readOnly = false, canProc
                 method: 'POST',
                 body: { report_id: report.id, action, actor_name: user?.name || '', actor_company: user?.company || '', comment: cmt || '', at: nowIso() }
             });
+            notifyNcrTurn(report.id, { status: report.status, reviews: report.reviews, reject_note: report.reject_note });   // 261015 차례가 새로 된 계정에 알림 메일(기다리지 않음)
             onChanged?.(); onClose?.();
         } catch (e) { const m = String(e?.message || e); setErr(m === STALE_MSG || m.startsWith('ncr_patch_report: expected status') ? STALE_MSG : '처리 실패: ' + m); setSaving(false); actLock.current = false; }
     };

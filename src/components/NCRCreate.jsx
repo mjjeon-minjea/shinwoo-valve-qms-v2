@@ -4,6 +4,7 @@ import { api, supabase } from '../lib/api';
 import { isNcrRouteStaff } from '../lib/ncrRoles';
 import { dispositionLabel } from '../lib/ncrFlow';
 import { isNcrAttachmentRestoreReady } from '../lib/ncrAttachmentRestore';
+import { notifyNcrTurn } from '../lib/ncrNotify';
 /* v10.2 H-① 캡처 붙여넣기 복원 — 축소·용량제한·붙여넣기 규칙은 lib/attach.jsx 한 곳에만 둔다(중복 정의 금지).
    결재화면(NCRDetail 처리확인 증빙)이 같은 함수를 쓰므로 이 파일에 다시 정의하지 않는다. */
 import { ATT_CAT, shrinkImage, processAnyFile, isImageAtt, useCapturePaste, PasteZone, attUrl, uploadAtt, withAttUrls } from '../lib/attach.jsx';
@@ -671,12 +672,7 @@ const NCRCreate = ({ user }) => {
                         at: new Date().toISOString()
                     }
                 });
-                /* 261015 발행승인 요청 알림 메일(받는 사람 = 서버 NCR_MAIL_TO) — 메일 실패가 발행 흐름을 막지 않게 기다리지 않는다 */
-                supabase.auth.getSession().then(({ data: { session } }) => session && fetch('/api/ncr-notify', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-                    body: JSON.stringify({ ncr_id: reportId })
-                })).catch(e => console.warn('[ncr-notify] 알림 메일 요청 실패', e));
+                notifyNcrTurn(reportId);   // 261015 발행승인 요청 → 차례가 된 계정(품질부서장)에 알림 메일(기다리지 않음)
             }
             const doneLabel = status === '작성중'
                 ? (editDoc ? '수정 저장' : '임시저장')
