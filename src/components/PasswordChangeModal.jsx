@@ -38,7 +38,6 @@ const PasswordChangeModal = ({ onComplete }) => {
 
         // 2. 관리자 로그아웃 전 DB 이중 동기화 (console 로그 제거)
         if (!authError) {
-            await supabase.from('users').update({ password: newPassword }).eq('email', authData.user.email);
         }
 
         // 3. 완료

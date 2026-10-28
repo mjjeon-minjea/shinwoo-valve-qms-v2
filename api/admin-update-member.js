@@ -87,9 +87,7 @@ export default async function handler(req, res) {
         if (company !== undefined) dbUpdates.company = company;
         if (status !== undefined) dbUpdates.status = status;
         if (is_admin !== undefined) dbUpdates.is_admin = is_admin === true; // v10.2 관리자 축
-        // 참고: 보안상 password는 public 테이블에서 제거하는 것이 이상적이나,
-        // 기존 시스템(JSON 서버 시절의 컬럼) 레거시 호환을 고려해 일단 덮어씀 (제거는 별건)
-        if (password) dbUpdates.password = password;
+        // 086: public.users.password 기록 제거 — 비밀번호는 Auth만 보관
 
         /* r9(260830) — server.js와 동일 규격: 오류 분류(확정/불확실) + 원자적 CAS 원복 */
         // code 가 SQLSTATE(5자리)나 PGRST 코드일 때만 「DB가 요청을 받고 거부한 확정 응답」으로 본다.

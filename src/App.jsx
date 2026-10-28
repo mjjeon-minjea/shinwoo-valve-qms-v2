@@ -126,12 +126,7 @@ const AppContent = () => {
                     alert('프로필은 저장됐지만 비밀번호 변경은 실패했습니다. 이전 시도에서 비밀번호가 이미 바뀌었을 수 있으니 로그인 상태를 확인하고, 불확실하면 관리자에게 문의하세요.\n' + authError.message);
                     return false;
                 }
-                // 기존 로그인 이관 경로의 열도 동기화한다. 실패를 전체 성공으로 숨기지 않는다.
-                const { data: synced, error: syncError } = await supabase.from('users').update({ password: newPassword }).eq('auth_id', user.id).select('auth_id');
-                if (syncError || synced?.length !== 1) {
-                    alert('Auth 비밀번호는 변경됐으나 기존 비밀번호 열 동기화가 실패했습니다. 재저장하지 말고 관리자에게 문의하세요.');
-                    return false;
-                }
+                // 086: public.users.password 평문 동기화 제거 — 비밀번호는 Auth만 보관
             }
 
             alert(isPasswordChange

@@ -4,6 +4,7 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 export const LOCAL_API_URL = import.meta.env.VITE_LOCAL_API_URL || 'http://localhost:3001';
+export const USER_PUBLIC_COLUMNS = 'id,email,name,company,role,rank,date,status,created_at,auth_id,is_admin'; // 086: users 공개 열(password 제외)
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
     auth: {
@@ -105,7 +106,7 @@ export const api = {
             while (hasMore && allData.length < 20000) { // 안전을 위해 최대 20,000건으로 제한
                 let q = supabase
                     .from(table)
-                    .select('*')
+                    .select(table === 'users' ? USER_PUBLIC_COLUMNS : '*') // 086: users는 password 열 제외
                     .order('id', { ascending: false })
                     .range(from, from + step - 1);
                 if (queryString) {
