@@ -72,44 +72,15 @@ export const UserProvider = ({ children }) => {
         setLoading(true);
         const email = rawEmail.includes('@') ? rawEmail : `${rawEmail}@shinwoovalve.com`;
         
-        // 1. 진짜 Auth 서버 정문 돌파 시도
+        // 1. Auth 로그인만 쓴다.
+        // 087 — 옛 public.users.password 비교와 자동 signUp(무혈입성 이관) 경로는 제거했다(비밀번호는 Auth만 보관).
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
         
         if (error) {
-            // 2. Seamless(무혈입성) 마이그레이션: Auth에 실패했지만, 구버전 DB에 비번까지 일치하는 유저인지 확인
-            if (error.message.includes('Invalid login credentials')) {
-                 const { data: oldUser } = await supabase.from('users')
-                     .select('*')
-                     .eq('email', email)
-                     .eq('password', password) // 패스워드까지 완벽히 일치하는지 백그라운드 교차 검증
-                     .single();
-
-                 if (oldUser) {
-                      // 당첨! 유저 몰래 그 자리에서 즉시 Auth 서버로 강제 이관 (회원가입 자동화)
-                      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-                          email,
-                          password
-                      });
-                      
-                      if (signUpError) {
-                          setLoading(false);
-                          throw signUpError; // 만약 Supabase Auth Rate Limit 등 에러가 나면 뱉어냄
-                      }
-                      
-                      // [중요 로직 결함 수정] 신규 Supabase 프로젝트는 '이메일 확인(Confirm email)'이 켜져있어 세션 발급이 안 되고 무한로딩 걸리는 현상 방지!
-                      if (!signUpData.session && signUpData.user) {
-                          setLoading(false);
-                          throw new Error("Supabase 설정 오류: 'Confirm email' 기능이 켜져 있어 로그인이 대기 중입니다. 관리자 대시보드(Authentication -> Providers -> Email)에서 이 기능을 꺼주세요!");
-                      }
-                      
-                      setLoading(false);
-                      return { user: signUpData.user };
-                 } else {
-                     setLoading(false);
-                     throw new Error("아이디 또는 비밀번호가 올바르지 않습니다.");
-                 }
-            }
             setLoading(false);
+            if (error.message?.includes('Invalid login credentials')) {
+                throw new Error("아이디 또는 비밀번호가 올바르지 않습니다.");
+            }
             throw error;
         }
         

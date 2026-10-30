@@ -29,18 +29,33 @@ const PasswordChangeModal = ({ onComplete }) => {
         e.preventDefault();
         if (!allValid) return;
 
-        // 1. Auth 서버 업데이트
-        const { data: authData, error: authError } = await supabase.auth.updateUser({ password: newPassword });
-        if (authError) { 
-            alert('오류: ' + authError.message); 
-            return; 
+        /* 087 — 현재 비밀번호를 Auth 로 실제 재인증한 뒤에만 바꾼다.
+           세션 확인·재인증이 실패하거나 결과가 불명확하면 updateUser·onComplete 를 부르지 않는다. */
+        try {
+            const { data: userData, error: userError } = await supabase.auth.getUser();
+            const email = userData?.user?.email;
+            if (userError || !email) {
+                alert('로그인 상태를 확인할 수 없습니다. 다시 로그인한 뒤 변경해 주십시오.');
+                return;
+            }
+            const { error: verifyError } = await supabase.auth.signInWithPassword({ email, password: oldPassword });
+            if (verifyError) {
+                alert('현재 비밀번호 확인에 실패했습니다. 입력한 현재 비밀번호를 확인해 주십시오.');
+                return;
+            }
+
+            // 1. Auth 서버 업데이트(재인증 성공 뒤에만)
+            const { error: authError } = await supabase.auth.updateUser({ password: newPassword });
+            if (authError) {
+                alert('오류: ' + authError.message);
+                return;
+            }
+        } catch {
+            alert('비밀번호 변경 결과를 확인하지 못했습니다. 다시 로그인해 상태를 확인한 뒤 시도해 주십시오.');
+            return;
         }
 
-        // 2. 관리자 로그아웃 전 DB 이중 동기화 (console 로그 제거)
-        if (!authError) {
-        }
-
-        // 3. 완료
+        // 2. 완료
         alert("비밀번호가 안전하게 변경되었습니다. 다시 로그인해 주십시오.");
         onComplete();
     };
@@ -67,7 +82,7 @@ const PasswordChangeModal = ({ onComplete }) => {
                             <input 
                                 type={showOld ? "text" : "password"} required
                                 className="w-full pl-10 pr-10 py-3 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-red-500 outline-none" 
-                                placeholder="현재 비밀번호 (123456)"
+                                placeholder="현재 비밀번호"
                                 value={oldPassword} onChange={e => setOldPassword(e.target.value)}
                             />
                             <button type="button" onClick={() => setShowOld(!showOld)} className="absolute right-3 top-3 text-slate-400">

@@ -11,6 +11,17 @@ const deputyEnabled = (settings) => settings?.allow_deputy === true;
 
 export const isNcrRouteStaff = (user) => hasRole(user, 'employee');
 
+/* 087 — NCR OBT 시험계정 구분. 판정은 이메일 test_ 접두 하나뿐이다(app_metadata·이름·직급은 보지 않는다).
+   실직원이 처리할 때만 회람 담당·처리방안 마련자·회람 부서 후보와 알림 수신자에서 시험계정을 뺀다.
+   시험계정이 처리하면 종전 후보 전체를 그대로 쓴다. 차례(myTurnV101)·결재 권한·역할 판정에는 쓰지 않는다.
+   서버 알림(api/ncr-notify.js)도 이 함수를 그대로 쓴다 — actor는 토큰으로 찾은 계정이어야 한다. */
+export const isNcrTestAccount = (user) => String(user?.email || '').trim().toLowerCase().startsWith('test_');
+
+export const filterNcrCandidates = (actor, users) => {
+    const list = Array.isArray(users) ? users : [];
+    return isNcrTestAccount(actor) ? list : list.filter(u => !isNcrTestAccount(u));
+};
+
 export const isNcrFinished = (report) => ['종결', '무효'].includes(report?.status);
 
 /* 목록 가시성은 부서 단위 업무 기준. 품질은 전 건, 일반 부서는 실제 회람 row가 기준이다. */

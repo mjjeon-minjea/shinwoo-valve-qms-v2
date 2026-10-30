@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { X, CheckCircle2, XCircle, Printer, Undo2, Stamp, FlaskConical, Users, ClipboardCheck, Ban, Coins, Plus, Trash2, File as FileIcon } from 'lucide-react';
 import { api, supabase } from '../lib/api';
 import { activeReviewDepartments, concessionTypeLabel, dispositionLabel, isLegacyFlow, isNewFlow, recallReviews, reopenLatestDispositionRequests, reviewDepartmentOptions, startNextReviewRound, statusLabel } from '../lib/ncrFlow';
-import { roleOf, canApprove, techApprovalDecision, myTurnV101 } from '../lib/ncrRoles';
+import { roleOf, canApprove, techApprovalDecision, myTurnV101, filterNcrCandidates } from '../lib/ncrRoles';
 import { notifyNcrTurn } from '../lib/ncrNotify';
 /* v10.2 H-③ 처리확인 증빙 첨부 — 작성화면과 「같은 규칙」(1280px 축소 · 비이미지 5MB)을 쓰려고
    lib/attach.jsx의 공용 함수를 그대로 가져다 쓴다(NCRCreate에 있던 것을 lib로 옮긴 것). */
@@ -283,8 +283,10 @@ const NCRDetail = ({ report, user, onClose, onChanged, readOnly = false, canProc
             .then(setAtts)
             .catch(() => setAtts([]));
         api.fetch('/users').then(r => r.json())
-            .then(d => setAllDepts([...new Set((d || []).map(u => u.company).filter(c => c && !['품질보증부', '응용기술팀'].includes(c)))].sort()))
+            /* 087 — 실직원 처리자면 test_ 계정만 있는 부서를 회람 부서 목록에 넣지 않는다(test_ 처리자는 전체) */
+            .then(d => setAllDepts([...new Set(filterNcrCandidates(user, d || []).map(u => u.company).filter(c => c && !['품질보증부', '응용기술팀'].includes(c)))].sort()))
             .catch(() => setAllDepts([]));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [report.id]);
 
     /* v10.2 G-⑦ — 「v10.1인가」가 아니라 「레거시가 아닌가」로 판정한다(lib/ncrFlow.js 단일 정의).

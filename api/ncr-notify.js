@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import nodemailer from 'nodemailer';
-import { myTurnV101 } from '../src/lib/ncrRoles.js';
+import { myTurnV101, filterNcrCandidates } from '../src/lib/ncrRoles.js';
 import { statusLabel } from '../src/lib/ncrFlow.js';   // 화면·인쇄와 같은 절차서 용어
 
 /* NCR 「내 차례」 알림 메일 (261015)
@@ -65,7 +65,9 @@ export default async function handler(req, res) {
             admin.from('users').select('name, email, company, rank, role').eq('status', 'Active')
         ]);
         const settings = { allow_deputy: approval?.[0]?.allow_deputy === true };   // 결재함(fetchNcrSettings)과 같은 기준 — 명시적 true 일 때만
-        const targets = newTurnUsers(users || [], r, prev, settings, me.email);
+        /* 087 — actor 는 토큰→auth_id 로 찾은 me(:56) 다(요청 본문 값은 쓰지 않는다).
+           실직원이 처리했으면 test_ 계정을 알림 후보에서 빼고, test_ 계정이 처리했으면 종전 후보 그대로 */
+        const targets = newTurnUsers(filterNcrCandidates(me, users || []), r, prev, settings, me.email);
         if (!targets.length) return res.status(200).json({ ok: true, sent: [] });
 
         const transport = nodemailer.createTransport({

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { FileText, Save, Send, AlertTriangle, ChevronDown, ChevronRight, Plus, Trash2, ImagePlus, File as FileIcon, FilePlus2, RotateCcw, Info, Users } from 'lucide-react';
 import { api, supabase } from '../lib/api';
-import { isNcrRouteStaff } from '../lib/ncrRoles';
+import { isNcrRouteStaff, filterNcrCandidates } from '../lib/ncrRoles';
 import { dispositionLabel } from '../lib/ncrFlow';
 import { isNcrAttachmentRestoreReady } from '../lib/ncrAttachmentRestore';
 import { notifyNcrTurn } from '../lib/ncrNotify';
@@ -310,7 +310,7 @@ const NCRCreate = ({ user }) => {
         loadDrafts();
         loadSettings();
         api.fetch('/users').then(r => r.json()).then(d => {
-            const rows = d || [];
+            const rows = filterNcrCandidates(user, d || []);   // 087 실직원 작성자면 test_ 계정을 후보에서 뺀다(test_ 작성자는 전체)
             setStaffAll(rows);
             setDepts([...new Set(rows.map(u => u.company).filter(Boolean))].sort());
         }).catch(() => {});

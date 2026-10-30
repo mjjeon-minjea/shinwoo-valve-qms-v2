@@ -42,6 +42,18 @@ import NCRCreate from './NCRCreate';
 import NCRInbox from './NCRInbox';
 import NCRLedger from './NCRLedger';
 import { myTurnV101 as ncrMyTurnCheck, fetchNcrSettings } from './NCRDetail';
+import { roleOf } from '../lib/ncrRoles';
+
+/* 087 — 부서별 메뉴(NCR OBT). 비품질 부서는 아래 6개 화면만 쓴다
+   (개발자 노트·인수/공정/최종검사·업무 관리·일정·리포트 관리·관리자 화면 숨김).
+   사이드바·본문·주소창(#해시) 직접 진입이 모두 이 판정 하나를 쓴다.
+   관리자 화면은 기존 isAdmin 에 품질보증부를 더한 조건 — 이 화면 안에서만 쓴다(계정 권한·서버 판정은 그대로). */
+const NON_QA_TABS = ['home', 'notices', 'resources', 'suggestions', 'ncr_inbox', 'ncr_ledger'];
+const ADMIN_TABS = ['post_approval', 'members', 'settings_home'];
+const canOpenTab = (tab, isQa, isAdmin) => {
+    if (ADMIN_TABS.includes(tab)) return !!isAdmin && isQa;
+    return isQa || NON_QA_TABS.includes(tab);
+};
 // --- Helper Functions ---
 
 // Helper: Convert Excel Serial Date to YYYY-MM-DD
@@ -616,6 +628,8 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
     /* NCR Phase 4: 결재함 사이드바 배지 — 내 차례 건수(결재 가능 + 내 반려 문서) */
     const [ncrSettings, setNcrSettings] = useState(null); // 없어도 canApprove가 기본 true로 간주
     const [ncrMyTurn, setNcrMyTurn] = useState(0);
+    const isQaUser = roleOf(user).isQa;                         // 087 품질보증부 여부(사이드바·본문·주소창 공통)
+    const can = (tab) => canOpenTab(tab, isQaUser, isAdmin);
 
     useEffect(() => { fetchNcrSettings().then(setNcrSettings).catch(() => {}); }, []);
 
@@ -646,6 +660,13 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
             setActiveTab('home');
             return;
         }
+        // 087 — 사이드바·본문과 같은 판정(canOpenTab). 위 v10.2 잠금은 이 판정의 부분집합이라 결과가 같다.
+        //       비품질 부서 숨김 화면·품질 아닌 관리자의 관리자 화면도 막고, 비품질 #ncr_create 는 기존처럼 결재함으로 보낸다(권한 승격 없음).
+        if (!canOpenTab(activeTab, isQaUser, isAdmin)) {
+            console.warn(`Unauthorized access to ${activeTab} blocked.`);
+            setActiveTab(activeTab === 'ncr_create' ? 'ncr_inbox' : 'home');
+            return;
+        }
 
         // 1. 뒤로가기가 아니면 정상적으로 히스토리 스택 추가
         if (!isPopStateRef.current) {
@@ -667,7 +688,7 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
 
         window.addEventListener('popstate', handlePopState);
         return () => window.removeEventListener('popstate', handlePopState);
-    }, [activeTab, isAdmin]);
+    }, [activeTab, isAdmin, isQaUser]);
 
     useEffect(() => {
         const checkPopup = async () => {
@@ -698,6 +719,7 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
     };
 
     const renderContent = () => {
+        if (!can(activeTab)) return null;   // 087 — 주소창 직접 진입도 그리기 전에 같은 판정으로 막는다
         switch (activeTab) {
             case 'home': return <Home setActiveTab={setActiveTab} />;
             case 'notices': return <NoticeBoard />;
@@ -781,12 +803,14 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
                                     >
                                         공지사항
                                     </button>
+                                    {can('dev_notes') && (
                                     <button
                                         onClick={() => setActiveTab('dev_notes')}
                                         className={`w-full flex items-center px-3 py-2 text-xs font-medium rounded-md transition-all ${activeTab === 'dev_notes' ? 'text-blue-400 font-bold bg-slate-800/40' : 'text-slate-400 hover:text-white'}`}
                                     >
                                         개발자 노트
                                     </button>
+                                    )}
                                     <button
                                         onClick={() => setActiveTab('resources')}
                                         className={`w-full flex items-center px-3 py-2 text-xs font-medium rounded-md transition-all ${activeTab === 'resources' ? 'text-blue-400 font-bold bg-slate-800/40' : 'text-slate-400 hover:text-white'}`}
@@ -804,6 +828,7 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
                         </div>
 
                         {/* Inbound Inspection Menu Group */}
+                        {can('inbound_overview') && (
                         <div>
                             <button
                                 onClick={() => setInboundExpanded(!inboundExpanded)}
@@ -845,8 +870,10 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
                                 </div>
                             )}
                         </div>
+                        )}
 
                         {/* Process Inspection Menu Group */}
+                        {can('process_dashboard') && (
                         <div>
                             <button
                                 onClick={() => setProcessExpanded(!processExpanded)}
@@ -900,7 +927,9 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
                                 </div>
                             )}
                         </div>
+                        )}
 
+                        {can('final') && (
                         <button
                             onClick={() => setActiveTab('final')}
                             className={`w-full flex items-center justify-between px-3 py-2.5 text-sm font-semibold rounded-lg transition-all ${activeTab === 'final'
@@ -913,6 +942,7 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
                                 최종검사
                             </div>
                         </button>
+                        )}
 
                         {/* NCR (부적합 관리) Menu Group */}
                         <div>
@@ -932,7 +962,7 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
 
                             {ncrExpanded && (
                                 <div className="mt-1.5 space-y-1.5 pl-6 border-l border-slate-700/50 ml-5">
-                                    {user?.company === '품질보증부' && (
+                                    {can('ncr_create') && (
                                         <button
                                             onClick={() => setActiveTab('ncr_create')}
                                             className={`w-full flex items-center px-3 py-2 text-xs font-medium rounded-md transition-all ${activeTab === 'ncr_create' ? 'text-blue-400 font-bold bg-slate-800/40' : 'text-slate-400 hover:text-white'}`}
@@ -961,7 +991,7 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
                             )}
                         </div>
 
-                        {isAdmin && (
+                        {can('members') && (   /* 087 관리자 화면 3개는 같은 조건: 기존 isAdmin AND 품질보증부 */
                             <div>
                                 <button
                                     onClick={() => setAdminExpanded(!adminExpanded)}
@@ -1002,6 +1032,7 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
                             </div>
                         )}
 
+                        {can('weekly_report') && (
                         <div className="pt-4 mt-4 border-t border-slate-700/50">
                             <h3 className="px-3 text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">
                                 업무 관리
@@ -1043,9 +1074,11 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
                                 </div>
                             </button>
                         </div>
+                        )}
                     </nav>
 
                     {/* Additional Menu Section Mockup */}
+                    {isQaUser && (   /* 087 리포트 관리(목업)도 비품질에는 숨긴다 */
                     <div className="mt-8">
                         <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4">
                             Settings
@@ -1057,6 +1090,7 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
                             </button>
                         </nav>
                     </div>
+                    )}
                 </div>
             </aside>
 
