@@ -11,11 +11,19 @@ const deputyEnabled = (settings) => settings?.allow_deputy === true;
 
 export const isNcrRouteStaff = (user) => hasRole(user, 'employee');
 
-/* 087 — NCR OBT 시험계정 구분. 판정은 이메일 test_ 접두 하나뿐이다(app_metadata·이름·직급은 보지 않는다).
+/* 087 — NCR OBT 시험계정 구분. 이메일 test_ 접두 또는 088 승인 auth_id 목록이다(app_metadata·이름·직급·부서·is_admin 은 보지 않는다).
    실직원이 처리할 때만 회람 담당·처리방안 마련자·회람 부서 후보와 알림 수신자에서 시험계정을 뺀다.
    시험계정이 처리하면 종전 후보 전체를 그대로 쓴다. 차례(myTurnV101)·결재 권한·역할 판정에는 쓰지 않는다.
    서버 알림(api/ncr-notify.js)도 이 함수를 그대로 쓴다 — actor는 토큰으로 찾은 계정이어야 한다. */
-export const isNcrTestAccount = (user) => String(user?.email || '').trim().toLowerCase().startsWith('test_');
+/* 088 ③ — 이메일이 test_ 가 아닌 OBT 시험계정(AI)은 정확한 Auth 식별자로만 지정한다
+   (근거: qms-087 followup AI-IDENTITY-BINDING-READONLY.json). 계정의 이메일·부서·권한은 바꾸지 않는다.
+   auth_id 열만 비교한다 — 화면 actor 의 id 는 Auth UUID, 후보 행의 id 는 public UUID 라 id 끼리 비교하지 않는다.
+   화면 actor 는 UserContext 가 펼친 public 행의 auth_id, 서버는 me·후보 SELECT 의 auth_id 를 쓴다. */
+export const NCR_OBT_TEST_AUTH_IDS = Object.freeze(['7c56892c-f8fd-42a1-91e1-546cf2e3bde2']);
+
+export const isNcrTestAccount = (user) =>
+    String(user?.email || '').trim().toLowerCase().startsWith('test_')
+    || NCR_OBT_TEST_AUTH_IDS.includes(String(user?.auth_id || '').trim().toLowerCase());
 
 export const filterNcrCandidates = (actor, users) => {
     const list = Array.isArray(users) ? users : [];

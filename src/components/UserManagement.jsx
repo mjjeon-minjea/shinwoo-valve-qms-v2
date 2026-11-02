@@ -214,7 +214,7 @@ const UserManagement = ({ members, onDeleteMember, onEditMember, onAddMember, on
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1">비밀번호 (초기화)</label>
-                                <input name="password" minLength="6" defaultValue={editingUser.password} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500" placeholder="6자리 이상 입력 (예: 123456)" />
+                                <input name="password" type="password" minLength="6" defaultValue="" autoComplete="new-password" className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500" placeholder="바꿀 때만 6자 이상 입력 (비우면 변경 없음)" />{/* 088④ 옛 password 열 값·예시를 채우지 않는다 */}
                                 <p className="text-xs text-slate-500 mt-1">※ 기존 회원이 로그인하지 못할 때 6자리 이상 임시 비밀번호로 설정해주세요.</p>
                             </div>
                             <div>

@@ -53,7 +53,7 @@ export default async function handler(req, res) {
 
         const admin = createClient(url, service, { auth: { autoRefreshToken: false, persistSession: false } });
         // 가입만 하고 승인 안 된(Pending) 계정은 메일을 못 쏘게 — admin-update-member 와 같은 auth_id 기준
-        const { data: me } = await admin.from('users').select('status, email').eq('auth_id', user.id).single();
+        const { data: me } = await admin.from('users').select('status, email, auth_id').eq('auth_id', user.id).single();
         if (me?.status !== 'Active') return res.status(403).json({ error: '승인된 회원만 가능합니다.' });
 
         const { ncr_id, prev } = req.body || {};
@@ -62,11 +62,12 @@ export default async function handler(req, res) {
 
         const [{ data: approval }, { data: users }] = await Promise.all([
             admin.from('ncr_settings').select('*').eq('id', 'approval'),
-            admin.from('users').select('name, email, company, rank, role').eq('status', 'Active')
+            admin.from('users').select('name, email, company, rank, role, auth_id').eq('status', 'Active')
         ]);
         const settings = { allow_deputy: approval?.[0]?.allow_deputy === true };   // 결재함(fetchNcrSettings)과 같은 기준 — 명시적 true 일 때만
         /* 087 — actor 는 토큰→auth_id 로 찾은 me(:56) 다(요청 본문 값은 쓰지 않는다).
-           실직원이 처리했으면 test_ 계정을 알림 후보에서 빼고, test_ 계정이 처리했으면 종전 후보 그대로 */
+           실직원이 처리했으면 test_ 계정을 알림 후보에서 빼고, test_ 계정이 처리했으면 종전 후보 그대로
+           088 ③ — 승인된 AI auth_id 도 같은 판정이라 me·후보 SELECT 양쪽에 auth_id 를 읽는다(수신 규칙·차례 판정은 그대로) */
         const targets = newTurnUsers(filterNcrCandidates(me, users || []), r, prev, settings, me.email);
         if (!targets.length) return res.status(200).json({ ok: true, sent: [] });
 

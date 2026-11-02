@@ -11,6 +11,11 @@ import PasswordChangeModal from './components/PasswordChangeModal';
 
 import { UserProvider, useUser } from './contexts/UserContext';
 
+/* 088② 프로필 새 비밀번호 규칙 — 강제 변경 창(PasswordChangeModal.jsx:23-25)·Header 와 같은 10자·같은 특수문자 목록·확인 일치.
+   검사한 값 그대로(trim 없이) Auth 에 보낸다. */
+const NEW_PW_MIN = 10;
+const NEW_PW_SPECIAL = /[!@#$%^&*(),.?":{}|<>]/;
+
 // AppContent uses the UserContext to manage UI state
 const AppContent = () => {
     const { user, login, logout, signup, loading: authLoading, migrateUser } = useUser();
@@ -111,16 +116,52 @@ const AppContent = () => {
 
     const handleUpdateProfile = async (updatedData) => {
         if (!user) return false;
+        const text = (v) => (typeof v === 'string' ? v : '');
+        const newPassword = text(updatedData?.password);
+        const confirmPassword = text(updatedData?.confirmPassword);
+        const currentPassword = text(updatedData?.currentPassword);   // 088① 다듬지 않고 재인증에만 쓴다(저장·로그·안내 금지)
+        // 088① 새 비밀번호·확인이 모두 비면 이름·직급만 저장 — 재인증·Auth 호출 없음
+        const isPasswordChange = newPassword !== '' || confirmPassword !== '';
+
+        if (isPasswordChange) {
+            const problem = currentPassword === '' ? '현재 비밀번호를 입력해 주십시오.'
+                : newPassword.length < NEW_PW_MIN ? `새 비밀번호는 ${NEW_PW_MIN}자 이상이어야 합니다.`
+                : !NEW_PW_SPECIAL.test(newPassword) ? '새 비밀번호에 특수문자를 1개 이상 넣어 주십시오.'
+                : newPassword !== confirmPassword ? '새 비밀번호와 확인 값이 일치하지 않습니다.' : '';
+            if (problem) {
+                alert(problem + '\n이름·직급과 비밀번호 모두 저장하지 않았습니다.');
+                return false;
+            }
+            /* 088① 현재 비밀번호 재인증(강제 변경 창과 같은 getUser→signInWithPassword)이 성공해야만 프로필 DB→Auth 를 쓴다.
+               세션 확인·재인증이 실패하거나 결과가 불명확하면 이름·직급도 저장하지 않는다. */
+            try {
+                const { data: authData, error: userError } = await supabase.auth.getUser();
+                const email = authData?.user?.email;
+                if (userError || !email) {
+                    alert('로그인 상태를 확인할 수 없어 이름·직급과 비밀번호 모두 저장하지 않았습니다. 다시 로그인한 뒤 변경해 주십시오.');
+                    return false;
+                }
+                const { error: verifyError } = await supabase.auth.signInWithPassword({ email, password: currentPassword });
+                if (verifyError) {
+                    alert('현재 비밀번호 확인에 실패해 이름·직급과 비밀번호 모두 저장하지 않았습니다. 현재 비밀번호를 확인해 주십시오.');
+                    return false;
+                }
+            } catch {
+                alert('현재 비밀번호 확인 결과를 알 수 없어 이름·직급과 비밀번호 모두 저장하지 않았습니다. 다시 로그인해 상태를 확인한 뒤 시도해 주십시오.');
+                return false;
+            }
+        }
+
+        let profileSaved = false;
         try {
             // 부서·승인상태·비밀번호는 프로필 저장 payload에서 제외한다.
-            const isPasswordChange = !!updatedData.password?.trim();
             const profilePayload = { name: updatedData.name, rank: updatedData.rank };
             const { data, error } = await supabase.from('users').update(profilePayload).eq('auth_id', user.id).select('auth_id');
             if (error) throw error;
             if (data?.length !== 1) throw new Error('프로필 갱신 대상이 확인되지 않았습니다.');
+            profileSaved = true;
 
             if (isPasswordChange) {
-                const newPassword = updatedData.password.trim();
                 const { error: authError } = await supabase.auth.updateUser({ password: newPassword });
                 if (authError) {
                     alert('프로필은 저장됐지만 비밀번호 변경은 실패했습니다. 이전 시도에서 비밀번호가 이미 바뀌었을 수 있으니 로그인 상태를 확인하고, 불확실하면 관리자에게 문의하세요.\n' + authError.message);
@@ -134,7 +175,10 @@ const AppContent = () => {
                 : '프로필이 수정되었습니다. (새로고침 시 반영)');
             return true;
         } catch (err) {
-            alert('수정 실패: ' + err.message);
+            // 088① 프로필 저장 뒤 Auth 변경이 예외로 끝나면 비밀번호가 바뀌었는지 알 수 없다 — 부분 성공·결과 불명확으로 알린다
+            alert(profileSaved
+                ? '프로필은 저장됐지만 비밀번호 변경 결과를 확인하지 못했습니다. 다시 로그인해 어느 비밀번호가 맞는지 확인하고, 불확실하면 관리자에게 문의하세요.'
+                : '수정 실패: ' + err.message);
             return false;
         }
     };

@@ -3,6 +3,11 @@ import { Eye, EyeOff } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import logo from '../assets/logo.png';
 
+/* 088② 새 비밀번호 규칙 — 강제 변경 창(PasswordChangeModal.jsx:23-25)과 같은 10자·같은 특수문자 목록·확인 일치.
+   입력값은 다듬지(trim) 않고 검사한 값 그대로 넘긴다. App.handleUpdateProfile 도 같은 규칙으로 다시 검사한다. */
+const NEW_PW_MIN = 10;
+const NEW_PW_SPECIAL = /[!@#$%^&*(),.?":{}|<>]/;
+
 const Header = ({ isLoggedIn, onLogout, currentUser, onUpdateProfile }) => {
     const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
@@ -10,11 +15,26 @@ const Header = ({ isLoggedIn, onLogout, currentUser, onUpdateProfile }) => {
     const handleProfileSubmit = async (e) => {
         e.preventDefault();
         const formData = new FormData(e.target);
+        const text = (key) => { const v = formData.get(key); return typeof v === 'string' ? v : ''; };
+        const password = text('password');
+        const confirmPassword = text('confirmPassword');
+        /* 088① 새 비밀번호·확인이 모두 비면 이름·직급만 저장 — 현재 비밀번호는 읽지도 넘기지도 않는다 */
+        const isPasswordChange = password !== '' || confirmPassword !== '';
+        const currentPassword = isPasswordChange ? text('currentPassword') : '';
+        if (isPasswordChange) {
+            const problem = currentPassword === '' ? '현재 비밀번호를 입력해 주십시오.'
+                : password.length < NEW_PW_MIN ? `새 비밀번호는 ${NEW_PW_MIN}자 이상이어야 합니다.`
+                : !NEW_PW_SPECIAL.test(password) ? '새 비밀번호에 특수문자를 1개 이상 넣어 주십시오.'
+                : password !== confirmPassword ? '새 비밀번호와 확인 값이 일치하지 않습니다.' : '';
+            if (problem) { alert(problem); return; }
+        }
         // 부서명(company)은 서버 가드상 시스템 관리자만 바꾼다 — 본인 저장 값에 싣지 않는다
         const updatedData = {
             name: formData.get('name'),
             rank: formData.get('rank'),
-            password: formData.get('password'),
+            password,
+            confirmPassword,
+            currentPassword,
         };
         if (await onUpdateProfile(updatedData)) setIsProfileModalOpen(false);
     };
@@ -79,13 +99,15 @@ const Header = ({ isLoggedIn, onLogout, currentUser, onUpdateProfile }) => {
                                                     <input name="rank" defaultValue={currentUser?.rank || ''} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 text-sm" placeholder="직급을 입력하세요" />
                                                 </div>
                                                 <div>
-                                                    <label className="block text-xs font-medium text-slate-700 mb-1">비밀번호 변경</label>
+                                                    <label className="block text-xs font-medium text-slate-700 mb-1">비밀번호 변경 (바꿀 때만 입력)</label>
+                                                    <input name="currentPassword" type="password" defaultValue="" autoComplete="current-password" className="mb-2 w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 text-sm" placeholder="현재 비밀번호" />
                                                     <div className="relative">
-                                                        <input name="password" type={showPassword ? "text" : "password"} defaultValue="" autoComplete="new-password" className="w-full px-3 py-2 pr-10 border rounded-lg focus:ring-2 focus:ring-primary-500 text-sm" placeholder="변경할 때만 입력" />
+                                                        <input name="password" type={showPassword ? "text" : "password"} defaultValue="" autoComplete="new-password" className="w-full px-3 py-2 pr-10 border rounded-lg focus:ring-2 focus:ring-primary-500 text-sm" placeholder="새 비밀번호 (10자 이상, 특수문자 포함)" />
                                                         <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 focus:outline-none">
                                                             {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                                                         </button>
                                                     </div>
+                                                    <input name="confirmPassword" type={showPassword ? "text" : "password"} defaultValue="" autoComplete="new-password" className="mt-2 w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 text-sm" placeholder="새 비밀번호 확인" />
                                                 </div>
 
                                                 <div className="pt-2 flex gap-2">
