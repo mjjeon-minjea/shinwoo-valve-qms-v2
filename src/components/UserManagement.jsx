@@ -120,8 +120,8 @@ const UserManagement = ({ members, onDeleteMember, onEditMember, onAddMember, on
                                         'bg-slate-100 text-slate-800'
                                     }`}>
                                         {member.role === 'admin' ? '최고 관리자 (통합 승인)' : 
-                                         member.role === 'director' ? '작성+검토+승인' : 
-                                         member.role === 'manager' ? '작성+검토' : '작성'}
+                                         member.role === 'director' ? '부서장(승인)' : 
+                                         member.role === 'manager' ? '차석(승인·대결)' : '실무자(작성)'}
                                     </span>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap">
@@ -195,9 +195,9 @@ const UserManagement = ({ members, onDeleteMember, onEditMember, onAddMember, on
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1">권한 (Role)</label>
                                 <select name="role" defaultValue={editingUser.role || 'employee'} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500">
-                                    <option value="employee">작성</option>
-                                    <option value="manager">작성+검토</option>
-                                    <option value="director">작성+검토+승인</option>
+                                    <option value="employee">실무자(작성)</option>
+                                    <option value="manager">차석(승인·대결)</option>
+                                    <option value="director">부서장(승인)</option>
                                     {editingUser.role === 'admin' && <option value="admin">최고 관리자 (통합 승인)</option>}
                                 </select>
                             </div>
@@ -255,9 +255,9 @@ const UserManagement = ({ members, onDeleteMember, onEditMember, onAddMember, on
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1">권한 (Role)</label>
                                 <select name="role" className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500">
-                                    <option value="employee">작성</option>
-                                    <option value="manager">작성+검토</option>
-                                    <option value="director">작성+검토+승인</option>
+                                    <option value="employee">실무자(작성)</option>
+                                    <option value="manager">차석(승인·대결)</option>
+                                    <option value="director">부서장(승인)</option>
                                 </select>
                             </div>
                             <div>
