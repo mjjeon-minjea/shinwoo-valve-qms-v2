@@ -349,3 +349,38 @@ test('스테이징 SQL: 한 트랜잭션 · 스테이징 신원/원문 해시 �
     assert.match(body, /split_part\(name, '\/', 1\) <> 'resources'/); // resources 밖(NCR 첨부 등) 경로는 그대로 허용
     assert.doesNotMatch(body, /grant |revoke /i); // EXECUTE ACL 은 create or replace 로 보존(바꾸지 않음)
 });
+
+// --- 2026-11-09 090 동영상 탭: 칩 목록 · 영상/문서 나누기 · 재생 시간 ---
+test('동영상 칩: 기본 영상 구분 4개 → 영상에 있는 그 밖의 구분(가나다) — 문서 구분과 섞이지 않는다', () => {
+    const video = (category, label) => row({ id: label, category, category_label: label, mime_type: 'video/mp4', original_name: `${label}.mp4` });
+    assert.deepEqual(board.videoCategoryOptions([]), [
+        { key: 'manual', label: '매뉴얼' }, { key: 'issue', label: '품질이슈' }, { key: 'policy-meeting', label: '품질정책회의' }, { key: 'improvement', label: '품질개선' }
+    ]);
+    const videos = [video('c-b', '현장 교육'), video('issue', '품질이슈'), video('c-a', '신입 교육')];
+    const chips = ['매뉴얼', '품질이슈', '품질정책회의', '품질개선', '신입 교육', '현장 교육'];
+    assert.deepEqual(board.videoCategoryOptions(videos).map(option => option.label), chips);
+    // 문서 쪽(구분 탭·등록 창 구분 목록)에는 영상 구분이 끼지 않고, 칩에는 문서 구분(절차서·안내지)이 끼지 않는다
+    const all = [row(), row({ id: 'n', category: 'c-x', category_label: '안내지' }), ...videos];
+    const documents = all.filter(item => !board.isVideo(item));
+    assert.deepEqual(categoryTabs(documents).map(tab => tab.label), ['매뉴얼', '절차서', '지침서', '양식', '규격', '안내지']);
+    assert.deepEqual(categoryOptions(documents).map(option => option.label), ['매뉴얼', '절차서', '지침서', '양식', '규격', '안내지']);
+    assert.deepEqual(board.videoCategoryOptions(all.filter(board.isVideo)).map(option => option.label), chips);
+});
+
+test('영상/문서 나누기: mime_type 이 video/ 로 시작하면 영상 — 문서 탭의 건수·목록·검색에서 빠지고 칩(구분 이름)으로 거른다', () => {
+    const clip = row({ id: 'v', category: 'manual', category_label: '매뉴얼', title: '검사 교육 영상', mime_type: 'video/mp4', original_name: '교육.mp4' });
+    assert.deepEqual([clip, row({ mime_type: 'application/pdf' }), row({ mime_type: null }), row(), null].map(board.isVideo), [true, false, false, false, false]);
+    const all = [row(), manual, clip];
+    const documents = all.filter(item => !board.isVideo(item));
+    const videos = all.filter(board.isVideo);
+    assert.deepEqual(categoryTabs(documents).slice(0, 2).map(tab => `${tab.label} ${tab.count}`), ['매뉴얼 1', '절차서 1']); // 매뉴얼 구분 영상은 문서 건수에 안 든다
+    assert.deepEqual(filterResources(documents, { search: '교육' }), []); // 문서 검색에 영상이 안 나온다
+    assert.deepEqual(filterResources(videos, { search: '교육' }).map(item => item.id), ['v']);
+    assert.deepEqual(filterResources(videos, { category: '매뉴얼' }).map(item => item.id), ['v']);
+    assert.deepEqual(filterResources(videos, { category: '품질이슈' }), []);
+});
+
+test('재생 시간 표기(대표 화면 배지): 0:59 · 1:00 · 13:56 · 1:02:03 — 모르는 값은 빈 문자열', () => {
+    assert.deepEqual([59, 60, 836, 3723, 836.9, 0].map(board.formatDuration), ['0:59', '1:00', '13:56', '1:02:03', '13:56', '0:00']);
+    for (const unknown of [NaN, Infinity, -1, undefined]) assert.equal(board.formatDuration(unknown), '', String(unknown));
+});

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, Download, EyeOff, FileText, History, Info, Plus, RefreshCw, RotateCcw, Search, Settings, Upload, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, EyeOff, FileText, History, Info, Play, Plus, RefreshCw, RotateCcw, Search, Settings, Upload, X } from 'lucide-react';
 import {
     MAX_RESOURCE_FILE_SIZE,
     createResourceDownload,
@@ -7,23 +7,28 @@ import {
     listResourceHistory,
     publishResourceRevision,
     restoreResource,
+    signResourceThumbnails,
     softDeleteResource,
     validateResourceFile
 } from '../lib/resourceFiles';
 import {
     COMMON_MODULE, FIRST_NOTE, NEW_OPTION, activeTabOf, adminRows, adminSummary, buildDraft, categoryOptions, categoryTabs, docId, draftProblem,
-    fileExt, filterResources, formatSize, freshLabel, isLatestUnverified, latestLabel, latestNotice, moduleOptions, revisionStatus, startCategory
+    fileExt, filterResources, formatDuration, formatSize, freshLabel, isLatestUnverified, isVideo, latestLabel, latestNotice, moduleOptions, revisionStatus,
+    startCategory, videoCategoryOptions
 } from '../lib/resourceBoard';
 
 /* 자료실 = 게시판. 직원은 구분 탭에서 보고 내려받기만 하고, 등록·새 판 올리기·숨기기·되살리기는 품질보증부(Active)만 한다(isAdmin prop = canManageResources).
-   지난 판과 숨긴 자료는 관리자에게만 보이는 「관리」 탭에 모았다.
+   지난 판과 숨긴 자료는 관리자에게만 보이는 「관리」 탭에 모았다. 영상은 「동영상」 탭에 카드로만 보이고, 누르면 큰 재생 창이 뜬다.
    저장·권한·지난 판 보관은 lib/resourceFiles.js 가 맡고, 이 화면은 이름만 다룬다 —
    서버가 요구하는 영문 키는 lib/resourceBoard.js 가 자동으로 채우며 화면 어디에도 보이지 않는다. */
 
 const ITEMS_PER_PAGE = 10;
+const VIDEOS_PER_PAGE = 12; // 영상 격자는 1·2·3·4열 어디서나 줄이 꽉 차게
+const VIDEO_TAB = '__video__'; // 「동영상」 탭의 tab 값 — 구분 이름과 겹치지 않게
 const EMPTY_FORM = {
     base: null, category: '', categoryNew: '', module: '', moduleNew: '',
-    title: '', description: '', sourceRef: '', revisionNote: '', file: null
+    title: '', description: '', sourceRef: '', revisionNote: '', file: null,
+    video: false, thumb: null, thumbAt: 0 // 영상 모드(동영상 탭의 「영상 올리기」) · 대표 화면 JPEG · 그 장면(초)
 };
 
 // 모양은 원래 자료실·공지사항 게시판의 클래스 조합을 그대로 쓴다(새 색·그림자·글꼴 없음).
@@ -45,6 +50,49 @@ const categoryBadge = (label) => `${BADGE} ${CATEGORY_COLOR[label] || GRAY}`;
 // 고르지 않은 탭에도 투명한 밑줄을 둬 높이가 흔들리지 않는다.
 const tabClass = (on) => `max-w-full px-4 py-3 flex items-center justify-center text-sm font-medium transition-colors border-b-2 ${on
     ? 'border-blue-600 text-blue-600 bg-blue-50' : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`;
+// 동영상 탭 맨 위 칩(유튜브 첫 화면 위 줄처럼) — 고른 칩만 검게
+const chipClass = (on) => `shrink-0 whitespace-nowrap rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${on
+    ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100'}`;
+
+// 영상 대표 화면 = 640×360 JPEG: 지금 장면(비율 유지 · 남는 곳 검정) + 오른쪽 아래 재생 시간 배지(유튜브처럼). 재생 시간은 그림에만 있다(DB 저장 없음).
+const drawThumbnail = (video) => new Promise((resolve) => {
+    if (!video?.videoWidth) { resolve(null); return; } // 장면을 못 읽는 영상(이 브라우저가 못 푸는 형식 등) → 대표 화면 없이 등록
+    const canvas = Object.assign(document.createElement('canvas'), { width: 640, height: 360 });
+    const ctx = canvas.getContext('2d');
+    const scale = Math.min(640 / video.videoWidth, 360 / video.videoHeight);
+    const [width, height] = [video.videoWidth * scale, video.videoHeight * scale];
+    ctx.fillRect(0, 0, 640, 360); // 처음 칠하는 색 = 검정
+    ctx.drawImage(video, (640 - width) / 2, (360 - height) / 2, width, height);
+    const duration = formatDuration(video.duration);
+    if (duration) {
+        ctx.font = '600 22px sans-serif';
+        const badge = Math.ceil(ctx.measureText(duration).width) + 16;
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+        ctx.beginPath();
+        ctx.roundRect(630 - badge, 318, badge, 32, 6);
+        ctx.fill();
+        ctx.fillStyle = '#fff';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(duration, 630 - badge / 2, 335);
+    }
+    canvas.toBlob(resolve, 'image/jpeg', 0.85);
+});
+
+// Blob(고른 영상·대표 화면)을 화면에 보여 줄 임시 주소 — 바뀌거나 사라지면 풀어 준다(StrictMode 의 두 번 실행에도 안전하게 effect 안에서 만든다)
+const useObjectUrl = (blob) => {
+    const [url, setUrl] = useState('');
+    useEffect(() => {
+        if (!blob) {
+            setUrl('');
+            return undefined;
+        }
+        const next = URL.createObjectURL(blob);
+        setUrl(next);
+        return () => URL.revokeObjectURL(next);
+    }, [blob]);
+    return url;
+};
 
 // 자료명 옆 표시: 2판 이상이면 「N판」, 등록 14일 이내면 「새 자료」(1판)·「새 판」(2판 이상), 원본 최신 여부 미확인이면 「최신본 미확인」
 const Marks = ({ row }) => {
@@ -83,8 +131,14 @@ const ResourceRoom = ({ isAdmin = false }) => {
     const [actionError, setActionError] = useState('');
     const [notice, setNotice] = useState('');
     const [publishReceipt, setPublishReceipt] = useState(null);
+    const [player, setPlayer] = useState(null); // 재생 창 { row, url, failed } — 영상만
+    const [chip, setChip] = useState(''); // 동영상 탭에서 고른 칩(구분 이름). 비어 있으면 「전체」
+    const [thumbs, setThumbs] = useState({}); // 동영상 탭 카드의 대표 화면 주소 { 자료 id: 서명 주소 } — 못 만든 것은 ''
     const publishLock = useRef(false);
     const fileInput = useRef(null);
+    const previewVideo = useRef(null); // 영상 모드 등록 창의 미리보기
+    const previewUrl = useObjectUrl(form.video ? form.file : null);
+    const thumbUrl = useObjectUrl(form.thumb);
 
     const loadResources = useCallback(async () => {
         setLoading(true);
@@ -126,21 +180,29 @@ const ResourceRoom = ({ isAdmin = false }) => {
 
     // 관리자는 지난 판·숨긴 자료까지 안다 — 문서 키 겹침 검사에 쓴다. 고르기 목록은 지금 보이는 자료 + 기본값만(숨긴 자료에만 있던 이름은 보기로 남기지 않는다).
     const known = useMemo(() => [...resources, ...history], [history, resources]);
-    const categories = useMemo(() => categoryOptions(resources), [resources]);
+    // 영상은 「동영상」 탭에만, 문서는 구분 탭에만 — 탭·건수·검색·등록 창의 구분 목록을 따로 만든다.
+    const videos = useMemo(() => resources.filter(isVideo), [resources]);
+    const documents = useMemo(() => resources.filter(row => !isVideo(row)), [resources]);
+    const categories = useMemo(() => categoryOptions(documents), [documents]);
+    const chips = useMemo(() => videoCategoryOptions(videos), [videos]); // 동영상 탭 칩 = 영상 등록 창의 구분 목록
     const modules = useMemo(() => moduleOptions(resources), [resources]);
     const moduleNames = useMemo(() => [...new Set(resources.map(row => row.module_label))], [resources]);
     // 고른 업무가 목록에서 사라졌으면(숨김 등) 그 조건은 없는 것으로 본다 — 풀 수 없는 조건이 남지 않게.
     const activeModule = moduleNames.length >= 2 && moduleNames.includes(moduleFilter) ? moduleFilter : '';
-    const tabs = useMemo(() => categoryTabs(resources, activeModule), [activeModule, resources]);
+    const tabs = useMemo(() => categoryTabs(documents, activeModule), [activeModule, documents]);
     const activeTab = activeTabOf(tabs, tab); // 처음 열었거나 보던 구분이 사라졌으면 자료가 있는 첫 탭
     const adminView = isAdmin && adminOpen;
-    const searching = !adminView && search.trim() !== ''; // 검색어가 있으면 탭과 무관하게 모든 구분에서 찾는다
+    const videoView = !adminView && tab === VIDEO_TAB;
+    const activeChip = chips.some(option => option.label === chip) ? chip : ''; // 고른 칩의 영상이 사라졌으면 「전체」
+    const videoCount = videos.filter(row => !activeModule || row.module_label === activeModule).length; // 구분 탭처럼 고른 업무의 것만 센다
+    const searching = !adminView && search.trim() !== ''; // 검색어가 있으면 탭과 무관하게 모든 구분에서 찾는다(동영상 탭에서는 영상끼리)
     const filtered = useMemo(
-        () => filterResources(resources, { search, category: activeTab, module: activeModule }),
-        [activeModule, activeTab, resources, search]
+        () => filterResources(videoView ? videos : documents, { search, category: videoView ? activeChip : activeTab, module: activeModule }),
+        [activeChip, activeModule, activeTab, documents, search, videoView, videos]
     );
-    const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
-    const pageItems = filtered.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
+    const perPage = videoView ? VIDEOS_PER_PAGE : ITEMS_PER_PAGE;
+    const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
+    const pageItems = filtered.slice((page - 1) * perPage, page * perPage);
     // 상세는 행이 아니라 「어느 자료인지」만 기억한다 → 새 판을 올리면 열려 있던 상세가 새 판 내용으로 바뀐다.
     const detail = (detailId && resources.find(row => docId(row) === detailId)) || null;
     const adminList = useMemo(() => adminRows(history, { search: adminSearch, hiddenOnly }), [adminSearch, hiddenOnly, history]);
@@ -150,8 +212,17 @@ const ResourceRoom = ({ isAdmin = false }) => {
     const counted = !error && !firstLoad; // 조회 실패·첫 불러오기 중에는 건수를 적지 않는다(0건으로 읽히지 않게)
     const adminCounted = !historyError && !firstLoad;
 
-    useEffect(() => { setPage(1); }, [search, activeTab, activeModule]);
+    useEffect(() => { setPage(1); }, [search, activeTab, activeModule, activeChip, videoView]);
     useEffect(() => { if (page > totalPages) setPage(totalPages); }, [page, totalPages]);
+
+    // 동영상 탭을 열 때(목록을 다시 읽었을 때도) 대표 화면 주소를 새로 만든다.
+    // shortcut: 영상 전부를 영상마다 요청 1건으로 서명한다 — 영상이 수백 개로 늘면 보이는 쪽만 서명하도록 바꾼다
+    useEffect(() => {
+        if (!videoView) return undefined;
+        let alive = true;
+        signResourceThumbnails(videos).then(found => { if (alive) setThumbs(found); });
+        return () => { alive = false; };
+    }, [videoView, videos]);
 
     // 탭을 누르면 검색어를 지우고 그 탭으로 간다.
     const pickTab = (label) => {
@@ -178,8 +249,13 @@ const ResourceRoom = ({ isAdmin = false }) => {
         if (!publishReceipt) {
             setForm(base
                 ? { ...EMPTY_FORM, base, title: base.title, description: base.description || '', sourceRef: base.source_ref || '' }
-                // 새 자료: 구분의 처음 값 = 지금 보고 있는 탭(관리 탭·검색 중이면 비워 「구분을 고르세요」), 업무 = 전사 공통
-                : { ...EMPTY_FORM, category: startCategory(categories, adminView || searching ? '' : activeTab), module: (modules.find(option => option.label === COMMON_MODULE) || modules[0]).label });
+                // 새 자료: 구분의 처음 값 = 지금 보고 있는 탭(동영상 탭이면 고른 칩 · 관리 탭·검색 중이면 비워 「구분을 고르세요」), 업무 = 전사 공통
+                // 동영상 탭에서 열면 영상 모드(구분 = 칩 목록 · 파일 = MP4 · 대표 화면 고르기)
+                : {
+                    ...EMPTY_FORM, video: videoView,
+                    category: startCategory(videoView ? chips : categories, adminView || searching ? '' : videoView ? activeChip : activeTab),
+                    module: (modules.find(option => option.label === COMMON_MODULE) || modules[0]).label
+                });
         }
         setModalOpen(true);
     };
@@ -199,18 +275,36 @@ const ResourceRoom = ({ isAdmin = false }) => {
     const pickFile = (file) => {
         if (!file) return;
         try {
-            validateResourceFile(file); // 허용 형식·크기를 고르는 즉시 확인한다
-            updateForm('file', file);
+            // 허용 형식·크기를 고르는 즉시 확인한다. 영상은 동영상 탭의 영상 모드로만 올린다
+            if (form.video !== validateResourceFile(file).mimeType.startsWith('video/')) {
+                throw new Error(form.video ? '영상 올리기에는 MP4 파일만 올릴 수 있습니다.' : '영상은 동영상 탭의 「영상 올리기」로 올려 주세요.');
+            }
+            setActionError('');
+            setForm(previous => ({ ...previous, file, thumb: null, thumbAt: 0 })); // 파일이 바뀌면 대표 화면도 새로 잡는다
         } catch (fileError) {
             setActionError(fileError.message);
         }
+    };
+
+    // 대표 화면 잡기 = 미리보기 영상의 지금 장면. 못 잡으면(이 브라우저가 못 푸는 영상 등) 대표 화면 없이 등록된다
+    const grabThumb = async (video) => {
+        const at = video.currentTime;
+        const thumb = await drawThumbnail(video).catch(() => null);
+        if (thumb) setForm(previous => ({ ...previous, thumb, thumbAt: at }));
+    };
+
+    // 파일을 고르면 3초 장면(3초보다 짧으면 가운데)을 먼저 잡아 둔다 — 「이 장면을 대표 화면으로」를 누르면 그 장면으로 바뀐다
+    const autoThumb = (event) => {
+        const video = event.currentTarget;
+        video.addEventListener('seeked', () => grabThumb(video), { once: true });
+        video.currentTime = video.duration >= 3 ? 3 : (video.duration / 2) || 0;
     };
 
     const handlePublish = async (event) => {
         event.preventDefault();
         if (!isAdmin || publishLock.current) return;
         const base = form.base;
-        const draft = buildDraft(form, { receipt: publishReceipt, categories, modules, takenDocKeys: known.map(row => row.doc_key) });
+        const draft = buildDraft(form, { receipt: publishReceipt, categories: form.video ? chips : categories, modules, takenDocKeys: known.map(row => row.doc_key) });
         const problem = draftProblem(draft, !!base);
         if (problem) {
             setActionError(problem);
@@ -220,19 +314,22 @@ const ResourceRoom = ({ isAdmin = false }) => {
         setSaving(true);
         setActionError('');
         try {
-            await publishResourceRevision({ draft, file: form.file, receipt: publishReceipt, isAdmin });
+            const saved = await publishResourceRevision({ draft, file: form.file, receipt: publishReceipt, isAdmin, thumbnail: form.thumb });
             setModalOpen(false);
             setPublishReceipt(null);
             setForm(EMPTY_FORM);
-            if (!base) { // 새 자료가 목록 맨 위에 보이도록 그 구분 탭으로 가고 찾기 조건을 푼다
+            if (!base) { // 새 자료가 목록 맨 위에 보이도록 그 구분 탭(영상은 동영상 탭의 그 칩)으로 가고 찾기 조건을 푼다
                 setModuleFilter('');
-                pickTab(draft.categoryLabel);
+                if (form.video) {
+                    setSearch('');
+                    setChip(draft.categoryLabel);
+                } else pickTab(draft.categoryLabel);
             }
             const current = await refresh();
             const published = base && current?.find(row => docId(row) === docId(base));
-            setNotice(base
+            setNotice((base
                 ? `새 판을 올렸습니다.${published ? ` 직원 화면에는 지금부터 ${published.revision}판만 보입니다.` : ''}`
-                : `등록했습니다.${current ? ' 목록 맨 위에 있습니다.' : ''}`);
+                : `등록했습니다.${current ? ' 목록 맨 위에 있습니다.' : ''}`) + (saved?.thumbnailFailed ? ' 대표 화면은 저장하지 못했습니다.' : ''));
         } catch (publishError) {
             console.error('Resource publish failed:', publishError);
             setPublishReceipt(publishError.receipt || publishReceipt);
@@ -276,11 +373,14 @@ const ResourceRoom = ({ isAdmin = false }) => {
         }
     };
 
-    const handleDownload = async (row) => {
+    // play = 영상 재생(동영상 탭 카드) — 주소 만들기·오류 처리는 다운로드와 같고, 받은 주소를 화면 위 재생 창에 넣는다
+    const handleDownload = async (row, play = false) => {
         setActionError('');
         setNotice('');
         try {
-            window.location.assign(await createResourceDownload({ id: row.id, isAdmin })); // 5분짜리 주소
+            const url = await createResourceDownload({ id: row.id, isAdmin, play });
+            if (play) setPlayer({ row, url, failed: false }); // 2시간짜리 주소
+            else window.location.assign(url); // 5분짜리 주소
         } catch (downloadError) {
             console.error('Resource download failed:', downloadError);
             if (['RESOURCE_NOT_CURRENT', 'RESOURCE_DELETED', 'RESOURCE_NOT_FOUND'].includes(downloadError.code)) {
@@ -434,7 +534,7 @@ const ResourceRoom = ({ isAdmin = false }) => {
                         <button type="button" onClick={() => openForm()} data-testid="resource-upload-open"
                             className="flex items-center px-4 py-2 bg-primary-600 text-white rounded-xl hover:bg-primary-700 transition-colors shadow-sm">
                             <Plus className="w-4 h-4 mr-2" />
-                            자료 등록
+                            {videoView ? '영상 올리기' : '자료 등록'}
                         </button>
                     )}
                 </div>
@@ -445,14 +545,14 @@ const ResourceRoom = ({ isAdmin = false }) => {
                 <span>{latestNotice(resources)}</span>
             </p>
 
-            {!modalOpen && !detail && feedback}
+            {!modalOpen && !detail && !player && feedback}
 
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                 {/* 구분 탭 — 「전체」 탭은 없다. 좁은 화면에서는 줄바꿈된다(가로 스크롤 없음).
                     ponytail: 화살표 키로 탭 사이를 옮기는 기능은 넣지 않았다(탭마다 Tab 키로 닿는다) — 필요해지면 roving tabindex 를 더한다 */}
                 <div role="tablist" aria-label="자료 구분" className="flex flex-wrap border-b border-slate-200">
                     {tabs.map(item => {
-                        const on = !adminView && !searching && item.label === activeTab; // 검색 중에는 고른 표시가 없다
+                        const on = !adminView && !videoView && !searching && item.label === activeTab; // 검색 중에는 고른 표시가 없다
                         return (
                             <button key={item.label} type="button" role="tab" aria-selected={on} data-testid="resource-tab" data-label={item.label} title={item.label}
                                 onClick={() => pickTab(item.label)} className={tabClass(on)}>
@@ -461,6 +561,11 @@ const ResourceRoom = ({ isAdmin = false }) => {
                             </button>
                         );
                     })}
+                    {/* 동영상 탭 — 문서 구분 탭 다음 · 관리 앞. 검색해도 영상끼리 찾으므로 고른 표시가 남는다 */}
+                    <button type="button" role="tab" aria-selected={videoView} data-testid="resource-tab-video" onClick={() => pickTab(VIDEO_TAB)} className={tabClass(videoView)}>
+                        <span className="truncate">동영상</span>
+                        {counted && <span className="ml-1.5 text-xs">{videoCount}</span>}
+                    </button>
                     {isAdmin && (
                         <button type="button" role="tab" aria-selected={adminView} data-testid="resource-tab-admin" onClick={() => openAdmin()}
                             className={`${tabClass(adminView)} ml-auto`}>
@@ -471,6 +576,20 @@ const ResourceRoom = ({ isAdmin = false }) => {
 
                 {!adminView && (
                     <div className="p-4 border-b border-slate-100 bg-slate-50/50 space-y-3">
+                        {/* 동영상 탭 맨 위 칩 줄 — 고른 칩 = 그 구분의 영상만. 좁은 화면에서는 이 줄만 가로로 넘긴다(페이지는 가로 스크롤 없음) */}
+                        {videoView && (
+                            <div role="group" aria-label="영상 구분" data-testid="resource-video-chips" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
+                                {['', ...chips.map(option => option.label)].map(label => {
+                                    const on = !searching && label === activeChip;
+                                    return (
+                                        <button key={label || '전체'} type="button" aria-pressed={on} data-testid="resource-video-chip" data-label={label || '전체'}
+                                            onClick={() => { setSearch(''); setChip(label); }} className={chipClass(on)}>
+                                            {label || '전체'}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )}
                         <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                             {moduleNames.length >= 2 && (
                                 <select aria-label="업무 고르기" value={activeModule} onChange={event => setModuleFilter(event.target.value)}
@@ -489,7 +608,7 @@ const ResourceRoom = ({ isAdmin = false }) => {
                         </div>
                         {searching && (
                             <p data-testid="resource-search-scope" className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-700">
-                                <span role="status">모든 구분에서 찾은 결과{counted && ` ${filtered.length}건`}</span>
+                                <span role="status">{videoView ? '모든 영상에서' : '모든 구분에서'} 찾은 결과{counted && ` ${filtered.length}건`}</span>
                                 <button type="button" data-testid="resource-search-clear" onClick={() => setSearch('')} className="font-medium text-primary-600 hover:underline">검색 지우기</button>
                             </p>
                         )}
@@ -504,8 +623,29 @@ const ResourceRoom = ({ isAdmin = false }) => {
                     </div>
                 ) : filtered.length === 0 ? (
                     <p className="py-10 text-center text-slate-500">
-                        {resources.length === 0 ? '등록된 자료가 없습니다.' : searching || activeModule ? '조건에 맞는 자료가 없습니다.' : `「${activeTab}」 자료가 아직 없습니다.`}
+                        {videoView ? (videos.length === 0 ? '등록된 영상이 없습니다.' : searching || activeModule ? '조건에 맞는 영상이 없습니다.' : `「${activeChip}」 영상이 아직 없습니다.`)
+                            : documents.length === 0 ? '등록된 자료가 없습니다.' : searching || activeModule ? '조건에 맞는 자료가 없습니다.' : `「${activeTab}」 자료가 아직 없습니다.`}
                     </p>
+                ) : videoView ? (
+                    // 동영상 탭: 유튜브 첫 화면처럼 카드 격자(1·2·3·4열) — 16:9 대표 화면 + 제목 2줄 + 등록자 · 등록일. 누르면 큰 재생 창
+                    <ul data-testid="resource-video-grid" className="grid grid-cols-1 gap-x-4 gap-y-6 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                        {pageItems.map(row => (
+                            <li key={row.id}>
+                                <button type="button" data-testid="resource-video-card" title={row.title} onClick={() => handleDownload(row, true)} className="group block w-full text-left">
+                                    {/* 대표 화면이 없거나 못 읽으면 어두운 칸의 재생 아이콘이 그대로 보인다(그림이 아이콘을 덮는다) */}
+                                    <span className="relative flex aspect-video items-center justify-center overflow-hidden rounded-xl bg-slate-800">
+                                        <Play className="h-10 w-10 text-white/70" />
+                                        {thumbs[row.id] && <img src={thumbs[row.id]} alt="" data-testid="resource-video-thumb" className="absolute inset-0 h-full w-full object-cover" />}
+                                    </span>
+                                    <span className="mt-2 line-clamp-2 break-words text-sm font-semibold text-slate-900 group-hover:text-primary-600">{row.title}</span>
+                                    <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500">
+                                        <span>{row.registered_by_name} · {formatDate(row.created_at)}</span>
+                                        <Marks row={row} />
+                                    </span>
+                                </button>
+                            </li>
+                        ))}
+                    </ul>
                 ) : (
                     <>
                         {/* 넓은 화면: 표. 열 폭을 고정(table-fixed)해 긴 자료명이 표를 밀어내지 않고 칸 안에서 줄바꿈된다. */}
@@ -641,7 +781,7 @@ const ResourceRoom = ({ isAdmin = false }) => {
                             <div className="min-w-0">
                                 {form.base && <p className="mb-1 text-xs font-medium text-primary-700">새 판 올리기</p>}
                                 <h2 id="resource-form-heading" className="text-xl font-bold text-slate-900 break-words">
-                                    {form.base ? `${form.base.title} (현재 ${form.base.revision}판)` : '새 자료 등록'}
+                                    {form.base ? `${form.base.title} (현재 ${form.base.revision}판)` : form.video ? '영상 올리기' : '새 자료 등록'}
                                 </h2>
                             </div>
                             <button type="button" onClick={closeForm} aria-label="올리는 창 닫기" className={CLOSE}><X className="w-6 h-6" /></button>
@@ -662,7 +802,7 @@ const ResourceRoom = ({ isAdmin = false }) => {
                                         <label htmlFor="resource-form-category" className={LABEL}>구분 *</label>
                                         <select id="resource-form-category" required disabled={locked} value={form.category} onChange={event => updateForm('category', event.target.value)} className={INPUT}>
                                             <option value="" disabled>구분을 고르세요</option>
-                                            {categories.map(option => <option key={option.label} value={option.label}>{option.label}</option>)}
+                                            {(form.video ? chips : categories).map(option => <option key={option.label} value={option.label}>{option.label}</option>)}
                                             <option value={NEW_OPTION}>직접 입력…</option>
                                         </select>
                                         {form.category === NEW_OPTION && (
@@ -711,7 +851,7 @@ const ResourceRoom = ({ isAdmin = false }) => {
                                         <div className="flex flex-wrap text-sm text-slate-600 justify-center">
                                             <label htmlFor="resource-form-file" className="relative cursor-pointer bg-white rounded-md font-medium text-primary-600 hover:text-primary-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-primary-500" onClick={event => event.stopPropagation()}>
                                                 <span>파일 선택</span>
-                                                <input id="resource-form-file" ref={fileInput} type="file" disabled={locked} className="sr-only" onChange={event => pickFile(event.target.files?.[0])} />
+                                                <input id="resource-form-file" ref={fileInput} type="file" accept={form.video ? '.mp4,video/mp4' : undefined} disabled={locked} className="sr-only" onChange={event => pickFile(event.target.files?.[0])} />
                                             </label>
                                             <p className="pl-1">또는 여기로 끌어다 놓기</p>
                                         </div>
@@ -720,7 +860,25 @@ const ResourceRoom = ({ isAdmin = false }) => {
                                         </p>
                                     </div>
                                 </div>
-                                <p className="mt-1 text-xs text-slate-500">PDF, 이미지, Office, CSV/TXT, ZIP, HWP/HWPX · 최대 {MAX_RESOURCE_FILE_SIZE / 1048576}MB · 파일 이름은 올린 그대로 보존됩니다.</p>
+                                <p className="mt-1 text-xs text-slate-500">{form.video ? 'MP4' : 'PDF, 이미지, Office, CSV/TXT, ZIP, HWP/HWPX'} · 최대 {MAX_RESOURCE_FILE_SIZE / 1073741824}GB · 파일 이름은 올린 그대로 보존됩니다.</p>
+                                {/* 영상 모드: 고른 영상 미리보기 + 대표 화면 고르기(안 고르면 3초 장면을 자동으로 잡아 둔다) */}
+                                {form.video && previewUrl && (
+                                    <div data-testid="resource-thumb-picker" className="mt-3 space-y-2">
+                                        <video ref={previewVideo} src={previewUrl} muted controls preload="metadata" onLoadedMetadata={autoThumb} className="aspect-video w-full rounded-lg bg-black" />
+                                        <div className="flex flex-wrap items-center gap-3">
+                                            {thumbUrl && <img src={thumbUrl} alt="고른 대표 화면" data-testid="resource-thumb-preview" className="aspect-video w-32 rounded-md object-cover" />}
+                                            <div className="min-w-0 flex-1 basis-48 space-y-1">
+                                                <button type="button" data-testid="resource-thumb-pick" disabled={locked} onClick={() => grabThumb(previewVideo.current)}
+                                                    className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 disabled:opacity-50">
+                                                    이 장면을 대표 화면으로
+                                                </button>
+                                                <p data-testid="resource-thumb-note" className="text-xs text-slate-500">
+                                                    {form.thumb ? `대표 화면: ${formatDuration(form.thumbAt)} 장면` : '대표 화면을 고르지 않으면 3초 장면(3초보다 짧으면 가운데)을 씁니다.'}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                             {form.base && (
                                 <div>
@@ -741,6 +899,35 @@ const ResourceRoom = ({ isAdmin = false }) => {
                                 </button>
                             </div>
                         </form>
+                    </section>
+                </div>
+            )}
+
+            {/* 재생 창 — 동영상 탭 카드를 누르면 뜬다(상세 창보다 넓게). 닫으면 video 가 화면에서 빠지면서 재생도 멈춘다 */}
+            {player && (
+                <div className={OVERLAY}>
+                    <section role="dialog" aria-modal="true" aria-labelledby="resource-player-title" data-testid="resource-player"
+                        className="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-xl bg-white p-4 shadow-xl space-y-3">
+                        <div className="flex items-center justify-between gap-3">
+                            <span className={`${categoryBadge(player.row.category_label)} max-w-full truncate`}>{player.row.category_label}</span>
+                            <button type="button" onClick={() => setPlayer(null)} aria-label="재생 창 닫기" className={CLOSE}><X className="w-6 h-6" /></button>
+                        </div>
+                        <video controls autoPlay preload="metadata" src={player.url} className="aspect-video max-h-[70vh] w-full rounded-lg bg-black"
+                            onError={() => setPlayer(current => current && { ...current, failed: true })} />
+                        {player.failed && <p role="alert" className={ALERT}>재생할 수 없습니다 — 주소가 만료됐거나 지원하지 않는 형식입니다. 다운로드해서 보세요.</p>}
+                        {feedback}
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div className="min-w-0 flex-1 basis-60">
+                                <h2 id="resource-player-title" className="text-lg font-bold text-slate-900 break-words">{player.row.title}</h2>
+                                <p className="mt-1 text-sm text-slate-500">{player.row.registered_by_name} · {formatDate(player.row.created_at)}</p>
+                            </div>
+                            <button type="button" data-testid="resource-player-download" onClick={() => handleDownload(player.row)}
+                                className="flex w-full sm:w-auto items-center justify-center px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 transition-colors shadow-sm">
+                                <Download className="w-4 h-4 mr-2" />
+                                다운로드
+                            </button>
+                        </div>
+                        {player.row.description && <p className="whitespace-pre-wrap break-words rounded-lg bg-slate-50 p-3 text-sm leading-6 text-slate-700">{player.row.description}</p>}
                     </section>
                 </div>
             )}

@@ -70,10 +70,10 @@ test('accepts arbitrary module/category keys, preserves Korean original name, an
     assert.equal(path, 'resources/incoming-inspection/supplier-form/2026/lot-2026.09/11111111-1111-4111-8111-111111111111--file.hwpx');
 });
 
-test('rejects disallowed extensions and a file one byte over the 20 MiB boundary', () => {
+test('rejects disallowed extensions and a file one byte over the 1 GiB boundary', () => {
     assert.throws(() => validateResourceFile(file('script.js')), /허용되지 않는 파일 확장자/);
     assert.doesNotThrow(() => validateResourceFile(file('limit.pdf', MAX_RESOURCE_FILE_SIZE)));
-    assert.throws(() => validateResourceFile(file('too-large.pdf', MAX_RESOURCE_FILE_SIZE + 1)), /20 MiB/);
+    assert.throws(() => validateResourceFile(file('too-large.pdf', MAX_RESOURCE_FILE_SIZE + 1)), /1 GiB/);
 });
 
 test('lists only current non-deleted resources and keeps failures distinct from an empty result', async () => {
@@ -189,4 +189,105 @@ test('re-reads a resource before a 300-second signed download and blocks deleted
 
     const deleted = createResourceFiles({ apiClient: { async fetch() { return response([resource({ is_deleted: true })]); } } });
     await assert.rejects(deleted.createDownload({ id: RESOURCE_ID, isAdmin: true }), /삭제된 자료/);
+});
+
+test('accepts an .mp4 training video as video/mp4 and still rejects other video extensions', () => {
+    const video = file('교육영상 전체본.mp4', 102962729, '');
+    assert.equal(mimeForResourceFile(video), 'video/mp4');
+    assert.deepEqual(validateResourceFile(video), { extension: 'mp4', mimeType: 'video/mp4', originalName: '교육영상 전체본.mp4' });
+    assert.throws(() => validateResourceFile(file('교육영상.mov', 4, 'video/quicktime')), /허용되지 않는 파일 확장자/);
+});
+
+test('signs a 2-hour in-browser play URL without the download option, after the same re-read checks', async () => {
+    const signs = [];
+    const video = resource({ original_name: '교육영상.mp4', mime_type: 'video/mp4' });
+    const files = createResourceFiles({
+        apiClient: { async fetch() { return response([video]); } },
+        supabaseClient: {
+            storage: {
+                from() {
+                    return {
+                        async createSignedUrl(path, seconds, options) {
+                            signs.push({ path, seconds, options });
+                            return { data: { signedUrl: 'https://example.test/signed?token=t' }, error: null };
+                        }
+                    };
+                }
+            }
+        }
+    });
+    const url = await files.createDownload({ id: RESOURCE_ID, play: true });
+    assert.equal(url, 'https://example.test/signed?token=t');
+    assert.doesNotMatch(url, /download=/);
+    assert.deepEqual(signs[0], { path: video.storage_path, seconds: 7200, options: undefined });
+
+    const stale = createResourceFiles({ apiClient: { async fetch() { return response([resource({ is_current: false })]); } } });
+    await assert.rejects(stale.createDownload({ id: RESOURCE_ID, play: true }), error => error.code === 'RESOURCE_NOT_CURRENT');
+});
+
+// --- 2026-11-09 090 동영상 탭: 대표 화면(썸네일) 저장·읽기 ---
+test('대표 화면: 영상 등록(업로드 → 발행)이 끝난 뒤 <영상 경로>.thumb.jpg 로 올리고, 못 올려도 등록은 성공', async () => {
+    const draft = {
+        module: 'common', moduleLabel: '전사 공통', category: 'issue', categoryLabel: '품질이슈',
+        docKey: 'd20261109-abc123', title: '교육 영상', description: '', sourceRef: '', revisionNote: '최초 등록'
+    };
+    const thumbnail = { size: 3, type: 'image/jpeg' }; // 화면이 만든 JPEG Blob 자리
+    const videoPath = `resources/common/issue/2026/d20261109-abc123/${RESOURCE_ID}--file.mp4`;
+    for (const outcome of ['ok', 'error', 'throw']) {
+        const steps = [];
+        const files = createResourceFiles({
+            apiClient: { async rpc(name, args) { steps.push(`rpc ${name}`); return resource({ id: args.p_id, storage_path: args.p_storage_path }); } },
+            supabaseClient: { storage: { from: () => ({
+                async upload(path, body, options) {
+                    steps.push(`upload ${path}`);
+                    if (!path.endsWith('.thumb.jpg')) return { error: null };
+                    assert.equal(body, thumbnail);
+                    assert.deepEqual(options, { contentType: 'image/jpeg', upsert: false });
+                    if (outcome === 'throw') throw new Error('network');
+                    return { error: outcome === 'error' ? { message: 'denied' } : null };
+                }
+            }) } },
+            createId: () => RESOURCE_ID,
+            hashFile: async () => SHA,
+            now: () => new Date('2026-11-09T00:00:00Z')
+        });
+        const saved = await files.publish({ draft, file: file('교육.mp4', 4, 'video/mp4'), thumbnail, isAdmin: true });
+        assert.deepEqual(steps, [`upload ${videoPath}`, 'rpc resource_publish_revision', `upload ${videoPath}.thumb.jpg`], outcome);
+        assert.equal(saved.id, RESOURCE_ID, outcome); // 등록은 성공
+        assert.equal(saved.thumbnailFailed, outcome === 'ok' ? undefined : true, outcome);
+    }
+    // 대표 화면이 없으면(문서·장면을 못 잡은 영상) 올리지 않고, 발행이 실패하면 대표 화면도 올리지 않는다
+    for (const [label, rpcFails, image] of [['대표 화면 없음', false, null], ['발행 실패', true, thumbnail]]) {
+        const steps = [];
+        const files = createResourceFiles({
+            apiClient: { async rpc() { steps.push('rpc'); if (rpcFails) throw new Error('RPC unavailable'); return resource(); } },
+            supabaseClient: { storage: { from: () => ({ async upload(path) { steps.push(path.endsWith('.thumb.jpg') ? 'thumb' : 'video'); return { error: null }; } }) } },
+            createId: () => RESOURCE_ID,
+            hashFile: async () => SHA
+        });
+        const run = files.publish({ draft, file: file('교육.mp4', 4, 'video/mp4'), thumbnail: image, isAdmin: true });
+        if (rpcFails) await assert.rejects(run, error => error.code === 'RESOURCE_PUBLISH_FAILED');
+        else assert.equal((await run).thumbnailFailed, undefined);
+        assert.deepEqual(steps, ['video', 'rpc'], label);
+    }
+});
+
+test('대표 화면 읽기: 영상마다 <경로>.thumb.jpg 를 1시간짜리로 하나씩 서명하고, 못 만든 것(없음·오류)은 빈 칸', async () => {
+    const signs = [];
+    const files = createResourceFiles({
+        supabaseClient: { storage: { from: () => ({
+            async createSignedUrl(path, seconds, options) {
+                signs.push([path, seconds, options]);
+                if (path.includes('/old--')) return { data: null, error: { message: 'Object not found' } }; // 대표 화면이 없는 옛 자료
+                if (path.includes('/down--')) throw new Error('network');
+                return { data: { signedUrl: `https://example.test/${path}?token=t` }, error: null };
+            }
+        }) } }
+    });
+    const rows = ['new', 'old', 'down'].map(id => ({ id, storage_path: `resources/common/issue/2026/d1/${id}--file.mp4` }));
+    assert.deepEqual(await files.signThumbnails(rows), {
+        new: 'https://example.test/resources/common/issue/2026/d1/new--file.mp4.thumb.jpg?token=t', old: '', down: ''
+    });
+    assert.deepEqual(signs, rows.map(row => [`${row.storage_path}.thumb.jpg`, 3600, undefined]));
+    assert.deepEqual(await files.signThumbnails([]), {});
 });

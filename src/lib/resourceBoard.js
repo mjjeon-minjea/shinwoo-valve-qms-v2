@@ -126,6 +126,12 @@ export const activeTabOf = (tabs, wanted) =>
 /** 새 자료 등록 창의 구분 처음 값 = 보고 있는 탭. 탭을 보고 있지 않거나(관리 탭·검색 중 → 빈 값) 고르기 목록에 없는 이름이면 비운다 → 「구분을 고르세요」. */
 export const startCategory = (options, tab) => (options.some(option => option.label === tab) ? tab : '');
 
+/** 영상 = mime_type 이 video/ 로 시작하는 자료. 영상은 문서 구분 탭(건수·목록·검색)에서 빠지고 「동영상」 탭에만 나온다. */
+export const isVideo = (row) => String(row?.mime_type ?? '').startsWith('video/');
+export const VIDEO_CATEGORIES = [['manual', '매뉴얼'], ['issue', '품질이슈'], ['policy-meeting', '품질정책회의'], ['improvement', '품질개선']];
+/** 동영상 탭의 칩 = 영상 등록 창의 구분 목록 [{ key, label }]: 기본 영상 구분 → 영상 자료에 있는 그 밖의 구분(가나다). 「전체」 칩은 화면이 앞에 붙인다. */
+export const videoCategoryOptions = (videos) => mergeOptions(videos, 'category', 'category_label', VIDEO_CATEGORIES);
+
 /** 자료 하나를 가리키는 값 — 서버가 판을 묶는 기준(업무·구분·문서 키)과 같다. */
 export const docId = (row) => [row.module, row.category, row.doc_key].join('\n');
 
@@ -191,4 +197,13 @@ export const formatSize = (bytes) => {
     if (bytes == null || !Number.isFinite(size) || size < 0) return '';
     if (size < 1024) return `${size} B`;
     return size < 1048576 ? `${(size / 1024).toFixed(1)} KB` : `${(size / 1048576).toFixed(1)} MB`;
+};
+
+/** 재생 시간(유튜브 표기): 59 → 0:59 · 60 → 1:00 · 836 → 13:56 · 3723 → 1:02:03. 모르는 값이면 빈 문자열. */
+export const formatDuration = (seconds) => {
+    const total = Math.floor(Number(seconds));
+    if (!Number.isFinite(total) || total < 0) return '';
+    const two = (value) => String(value).padStart(2, '0');
+    const [hours, minutes] = [Math.floor(total / 3600), Math.floor(total / 60) % 60];
+    return hours ? `${hours}:${two(minutes)}:${two(total % 60)}` : `${minutes}:${two(total % 60)}`;
 };

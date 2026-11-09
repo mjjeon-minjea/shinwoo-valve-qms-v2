@@ -1,5 +1,5 @@
 export const RESOURCE_BUCKET = 'qms-files';
-export const MAX_RESOURCE_FILE_SIZE = 20971520;
+export const MAX_RESOURCE_FILE_SIZE = 1073741824;
 
 const MIME_BY_EXTENSION = Object.freeze({
     pdf: 'application/pdf',
@@ -18,7 +18,8 @@ const MIME_BY_EXTENSION = Object.freeze({
     txt: 'text/plain',
     zip: 'application/zip',
     hwp: 'application/x-hwp',
-    hwpx: 'application/vnd.hancom.hwpx'
+    hwpx: 'application/vnd.hancom.hwpx',
+    mp4: 'video/mp4'
 });
 
 const KEY_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}$/;
@@ -94,7 +95,7 @@ export const validateResourceFile = (file) => {
         throw new ResourceFilesError('빈 파일은 올릴 수 없습니다.', 'RESOURCE_FILE_EMPTY');
     }
     if (!Number.isFinite(file.size) || file.size < 0 || file.size > MAX_RESOURCE_FILE_SIZE) {
-        throw new ResourceFilesError('파일은 20 MiB 이하만 등록할 수 있습니다.', 'RESOURCE_FILE_SIZE');
+        throw new ResourceFilesError('파일은 1 GiB 이하만 등록할 수 있습니다.', 'RESOURCE_FILE_SIZE');
     }
     return { extension, mimeType: mimeForResourceFile(file), originalName: String(file.name) };
 };
@@ -143,6 +144,9 @@ const receiptInputs = (draft, fileInfo, sha256) => ({
 });
 
 const sameReceiptInputs = (left, right) => JSON.stringify(left) === JSON.stringify(right);
+
+// 영상의 대표 화면(JPEG)은 같은 버킷의 영상 옆에 둔다 — DB 열 없이 경로로만 찾는다
+const thumbnailPath = (storagePath) => `${storagePath}.thumb.jpg`;
 
 const throwIfResponseFailed = (response, message) => {
     if (!response?.ok) throw new ResourceFilesError(message, 'RESOURCE_LIST_FAILED');
@@ -196,7 +200,18 @@ export const createResourceFiles = ({
         }
     };
 
-    const publish = async ({ draft, file, receipt = null, isAdmin }) => {
+    // 대표 화면 올리기 — 영상 등록이 끝난 뒤에 부르므로 실패해도 던지지 않고 false
+    const uploadThumbnail = async (storagePath, image) => {
+        try {
+            const { error } = await (await getSupabaseClient()).storage.from(RESOURCE_BUCKET)
+                .upload(thumbnailPath(storagePath), image, { contentType: 'image/jpeg', upsert: false });
+            return !error;
+        } catch {
+            return false;
+        }
+    };
+
+    const publish = async ({ draft, file, receipt = null, isAdmin, thumbnail = null }) => {
         if (!isAdmin) {
             throw new ResourceFilesError('관리자만 자료를 발행할 수 있습니다.', 'RESOURCE_ADMIN_REQUIRED');
         }
@@ -254,7 +269,7 @@ export const createResourceFiles = ({
         }
 
         try {
-            return await (await getApiClient()).rpc('resource_publish_revision', {
+            const saved = await (await getApiClient()).rpc('resource_publish_revision', {
                 p_id: activeReceipt.id,
                 p_module: normalizedDraft.module,
                 p_module_label: normalizedDraft.moduleLabel,
@@ -271,6 +286,8 @@ export const createResourceFiles = ({
                 p_mime_type: fileInfo.mimeType,
                 p_sha256: immutable.sha256
             });
+            // 영상의 대표 화면은 등록(업로드 → 발행)이 끝난 뒤 올린다 — 못 올려도 등록은 성공이고 thumbnailFailed 로만 알린다
+            return thumbnail && !(await uploadThumbnail(activeReceipt.storagePath, thumbnail)) ? { ...saved, thumbnailFailed: true } : saved;
         } catch (error) {
             throw new ResourceFilesError('파일은 저장되었지만 자료 발행에 실패했습니다. 같은 입력으로 다시 시도하세요.', 'RESOURCE_PUBLISH_FAILED', activeReceipt);
         }
@@ -296,7 +313,8 @@ export const createResourceFiles = ({
         }
     };
 
-    const createDownload = async ({ id, isAdmin = false }) => {
+    // play = 화면 안 재생(영상) — 검사는 다운로드와 같고, 주소만 download 없이 2시간짜리(넘겨보기 요청도 이 주소로 간다)
+    const createDownload = async ({ id, isAdmin = false, play = false }) => {
         try {
             const response = await (await getApiClient()).fetch(`/resources?id=eq.${encodeURIComponent(id)}`);
             throwIfResponseFailed(response, '자료 정보를 다시 확인하지 못했습니다.');
@@ -305,7 +323,7 @@ export const createResourceFiles = ({
             if (!row) throw new ResourceFilesError('자료를 찾을 수 없습니다.', 'RESOURCE_NOT_FOUND');
             if (row.is_deleted) throw new ResourceFilesError('삭제된 자료는 다운로드할 수 없습니다.', 'RESOURCE_DELETED');
             if (!row.is_current && !isAdmin) throw new ResourceFilesError('현재 개정본만 다운로드할 수 있습니다.', 'RESOURCE_NOT_CURRENT');
-            const { data, error } = await (await getSupabaseClient()).storage.from(RESOURCE_BUCKET).createSignedUrl(row.storage_path, 300, {
+            const { data, error } = await (await getSupabaseClient()).storage.from(RESOURCE_BUCKET).createSignedUrl(row.storage_path, play ? 7200 : 300, play ? undefined : {
                 download: row.original_name
             });
             if (error || !data?.signedUrl) {
@@ -319,7 +337,18 @@ export const createResourceFiles = ({
         }
     };
 
-    return { listCurrent, listHistory, publish, softDelete, restore, createDownload };
+    // 동영상 탭 카드의 대표 화면 주소(1시간) { 자료 id: 주소 } — 영상마다 하나씩 서명한다(모의서버에는 여러 개를 한 번에 서명하는 주소가 없다).
+    // 대표 화면이 없거나(옛 자료·저장 실패) 서명이 안 되면 '' → 화면은 빈 칸
+    const signThumbnails = async (rows) => Object.fromEntries(await Promise.all((rows || []).map(async (row) => {
+        try {
+            const { data, error } = await (await getSupabaseClient()).storage.from(RESOURCE_BUCKET).createSignedUrl(thumbnailPath(row.storage_path), 3600);
+            return [row.id, (!error && data?.signedUrl) || ''];
+        } catch {
+            return [row.id, ''];
+        }
+    })));
+
+    return { listCurrent, listHistory, publish, softDelete, restore, createDownload, signThumbnails };
 };
 
 const resourceFiles = createResourceFiles();
@@ -329,3 +358,4 @@ export const publishResourceRevision = resourceFiles.publish;
 export const softDeleteResource = resourceFiles.softDelete;
 export const createResourceDownload = resourceFiles.createDownload;
 export const restoreResource = resourceFiles.restore;
+export const signResourceThumbnails = resourceFiles.signThumbnails;
