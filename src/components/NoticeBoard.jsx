@@ -3,9 +3,13 @@ import { useState, useEffect } from 'react';
 import { Search, Plus, Edit, Trash2, X, ChevronLeft, ChevronRight, Eye, AlertTriangle } from 'lucide-react';
 import { api } from '../lib/api';
 import { useUser } from '../contexts/UserContext';
+import { canManageResources } from '../lib/resourceBoard';
 
 const NoticeBoard = () => {
     const { user } = useUser();
+    /* 공지 작성·수정·삭제 = 품질보증부(Active)만 — 자료실 관리와 같은 경계(사이트 관리자 is_admin 과는 따로 본다).
+       4부서는 읽기만. 화면 표시용이고, 실제 권한은 notices RLS 정책이 같은 조건으로 다시 판정한다. */
+    const canManage = canManageResources(user);
     const [notices, setNotices] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -179,10 +183,12 @@ const NoticeBoard = () => {
                                 <span>조회수: {currentNotice.views || 0}</span>
                             </div>
                         </div>
+                        {canManage && (
                         <div className="flex gap-2">
                             <button onClick={() => { setIsDetailOpen(false); openModal(currentNotice); }} className="p-2 text-slate-400 hover:text-primary-600 bg-white border border-slate-200 rounded-lg shadow-sm"><Edit className="w-4 h-4" /></button>
                             <button onClick={() => handleDelete(currentNotice.id)} className="p-2 text-slate-400 hover:text-red-600 bg-white border border-slate-200 rounded-lg shadow-sm"><Trash2 className="w-4 h-4" /></button>
                         </div>
+                        )}
                     </div>
                     <div className="p-8 min-h-[400px] whitespace-pre-wrap text-slate-700 leading-relaxed">
                         {currentNotice.content}
@@ -202,10 +208,12 @@ const NoticeBoard = () => {
                     </h1>
                     <p className="text-slate-500">사내 주요 소식 및 업데이트 안내</p>
                 </div>
+                {canManage && (
                 <button onClick={() => openModal()} className="flex items-center px-4 py-2 bg-primary-600 text-white rounded-xl hover:bg-primary-700 transition-colors shadow-sm">
                     <Plus className="w-4 h-4 mr-2" />
                     공지 작성
                 </button>
+                )}
             </div>
 
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
