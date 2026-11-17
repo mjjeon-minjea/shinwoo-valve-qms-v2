@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Printer, X } from 'lucide-react';
 import { api } from '../lib/api';
-import { concessionTypeLabel, dispositionLabel, isNewFlow, latestSpecialRequestApprovalCycle, statusLabel } from '../lib/ncrFlow';
+import { concessionTypeLabel, costTotals, dispositionLabel, isNewFlow, latestSpecialRequestApprovalCycle, reviewedDispLabel, statusLabel } from '../lib/ncrFlow';
 import { attUrl, isImageAtt, isPdfAtt } from '../lib/attach.jsx';
 
 /* NCR 인쇄 뷰 — FORM 933-07 REV.2 · v10.1 정통 복원
@@ -479,6 +479,14 @@ const NCRPrint = ({ report, history, attachments, onClose }) => {
                     <th>업체(발생처)</th><td>{report.supplier || ''}</td>
                     <th>도면번호</th><td>{report.drawing_no || '—'}</td>
                 </tr>
+                {/* 종이 933-07 머리 칸 — 값 없는 옛 건은 빈칸 */}
+                <tr>
+                    <th>고객명/공사명</th><td colSpan={3}>{report.customer_project || ''}</td>
+                </tr>
+                <tr>
+                    <th>발견처/장소</th><td>{report.found_place || ''}</td>
+                    <th>발 견 자</th><td>{report.finder || ''}</td>
+                </tr>
                 <tr>
                     <th>품 명</th><td>{report.item_name || ''}</td>
                     <th>수 량</th>
@@ -619,6 +627,9 @@ const NCRPrint = ({ report, history, attachments, onClose }) => {
                                                     {r.opinion === 'approve' ? '승인 의견' : '반려 의견'}
                                                 </span>
                                             )}
+                                            {archived && <div className="ncrp-note" style={{ marginTop: 0 }}>이전 안 「{reviewedDispLabel(r, report)}」에 대한 의견</div>}
+                                            {/* 상세 화면과 같은 규칙 — 여러 차수 문서의 현 차수도 무엇에 대한 의견인지(최종반려 뒤 머리 처리방안과 다를 수 있음) */}
+                                            {!archived && r.review_rounds?.length > 0 && <div className="ncrp-note" style={{ marginTop: 0 }}>현 안 「{r.disp != null ? reviewedDispLabel(r, report) : `${dispositionLabel(report.disposition) || '미정'}${report.concession_type ? ` · ${report.concession_type}` : ''}`}」에 대한 의견</div>}
                                             <div className="ncrp-pre s" style={{ marginTop: r.opinion ? 4 : 0 }}>{r.staff_cmt || '—'}</div>
                                             {r.head_cmt && <div className="ncrp-note">부서장 의견: {r.head_cmt}</div>}
                                             {r.remand_note && <div className="ncrp-note re">부서 내 재검토: {r.remand_note}</div>}
@@ -637,8 +648,9 @@ const NCRPrint = ({ report, history, attachments, onClose }) => {
                                             ))}
                                             {Array.isArray(r.cost_items) && r.cost_items.length > 0 && (
                                                 <div className="ncrp-note">
-                                                    [품질비용] {r.cost_items.map((c, i) => `${c.label || `항목 ${i + 1}`} ${won(c.amount)}`).join(' · ')}
-                                                    {' · 소계 '}{won(r.cost_items.reduce((a, c) => a + Number(c.amount || 0), 0))}
+                                                    [품질비용] {r.cost_items.map((c, i) => `${c.recovery ? '[회수] ' : ''}${c.label || `항목 ${i + 1}`} ${won(c.amount)}`).join(' · ')}
+                                                    {' · 소계 '}{won(costTotals(r.cost_items).cost)}
+                                                    {costTotals(r.cost_items).recovery > 0 ? ` · 회수 ${won(costTotals(r.cost_items).recovery)}` : ''}
                                                 </div>
                                             )}
                                         </>
@@ -711,6 +723,7 @@ const NCRPrint = ({ report, history, attachments, onClose }) => {
                             <tr key={i}>
                                 <td>
                                     {c.dept ? <span className="ncrp-stage">[{c.dept}]</span> : null}
+                                    {c.recovery ? <span className="ncrp-stage">[회수]</span> : null}
                                     {c.label || `항목 ${i + 1}`}
                                 </td>
                                 <td className="amt">{won(c.amount)}</td>
@@ -720,6 +733,9 @@ const NCRPrint = ({ report, history, attachments, onClose }) => {
                             <td>품질비용 — 처리방안 확정 소계</td>
                             <td className="amt">{won(report.cost_stage1.total)}</td>
                         </tr>
+                        {costTotals(report.cost_stage1.items).recovery > 0 && (
+                            <tr className="sub"><td>회수 (업체 감액·청구 — 비용 소계 제외)</td><td className="amt">{won(costTotals(report.cost_stage1.items).recovery)}</td></tr>
+                        )}
                     </tbody>
                 </table>
             )}
@@ -754,7 +770,8 @@ const NCRPrint = ({ report, history, attachments, onClose }) => {
         const items = closed?.cost_items || [];
         const total = closed?.cost_total != null
             ? closed.cost_total
-            : items.reduce((s, it) => s + Number(it.amount || 0), 0);
+            : costTotals(items).cost;
+        const recovery = closed?.recovery_total ?? costTotals(items).recovery;   // 회수는 비용 합계와 따로
         /* B-21 2단 산출 — 1차(처리방안 확정분) 소계가 보존된 문서만 3줄 소계로 출력한다 */
         const twoStage = closed?.cost_stage1_total != null;
         const s1Total = Number(closed?.cost_stage1_total || 0);
@@ -786,6 +803,7 @@ const NCRPrint = ({ report, history, attachments, onClose }) => {
                                                 <tr key={i}>
                                                     <td>
                                                         {twoStage && it.stage ? <span className="ncrp-stage">[{it.stage}]</span> : null}
+                                                        {it.recovery ? <span className="ncrp-stage">[회수]</span> : null}
                                                         {it.dept ? `${it.dept} · ` : ''}{it.label || `항목 ${i + 1}`}
                                                         {it.edit_why ? <span className="ncrp-chg">수정 사유: {it.edit_why}</span> : null}
                                                     </td>
@@ -800,6 +818,7 @@ const NCRPrint = ({ report, history, attachments, onClose }) => {
                                                 <td>합 계</td>
                                                 <td className="amt">{won(total)}</td>
                                             </tr>
+                                            {recovery > 0 && <tr className="sub"><td>회수 (업체 감액·청구 — 합계 제외)</td><td className="amt">{won(recovery)}</td></tr>}
                                         </tbody>
                                     </table>
                                 ) : (

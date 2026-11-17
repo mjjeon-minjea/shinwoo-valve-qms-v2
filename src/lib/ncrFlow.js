@@ -60,9 +60,13 @@ export const dispositionLabel = (value) => {
     return LEGACY_DISPOSITION_LABELS.has(s) ? '불채용(반송)' : s;
 };
 
-const blankReview = (roundNo, history, state) => ({
+const blankReview = (roundNo, history, state, plan) => ({
     round_no: roundNo,
     ...(history.length ? { review_rounds: history } : {}),
+    /* 이 차수가 검토하는 처리방안 — 차수가 보존(review_rounds)되면 「몇 차가 어느 안에 대한 의견인지」의 근거.
+       시작 시점에 찍는 이유: 보존 시점의 report.disposition은 경로마다 이미 바뀌었거나(기술트랙) 아직 안 바뀌어(품질판단) 믿을 수 없다. */
+    ...(plan?.disp != null ? { disp: plan.disp } : {}),
+    ...(plan?.conc ? { conc: plan.conc } : {}),
     state,
     staff_email: null,
     staff_name: null,
@@ -78,7 +82,7 @@ const blankReview = (roundNo, history, state) => ({
 
 /* 기존 회신을 부서 row 안에 보존하고 다음 회차만 비운다.
    기술문의 row는 본회람이 아니므로 그대로 둔다. */
-export const startNextReviewRound = (reviews, selectedDepartments, allDepartments = []) => {
+export const startNextReviewRound = (reviews, selectedDepartments, allDepartments = [], plan = null) => {
     const src = reviews || {};
     const selected = new Set(selectedDepartments || []);
     const depts = new Set([
@@ -100,11 +104,31 @@ export const startNextReviewRound = (reviews, selectedDepartments, allDepartment
         const hasRound = Object.keys(snapshot).length > 0;
         const roundNo = hasRound ? Number(storedRound || 1) : 0;
         if (hasRound) history.push({ round_no: roundNo, ...snapshot });
-        next[dept] = blankReview(roundNo + 1, history, selected.has(dept) ? 'wait' : 'skip');
+        next[dept] = blankReview(roundNo + 1, history, selected.has(dept) ? 'wait' : 'skip', plan);
     });
 
     return next;
 };
+
+/* 지난 회람 차수가 검토한 처리방안 이름.
+   차수 시작 때 찍은 disp가 없으면(작성 화면이 만드는 1차 · 이 기능 전 문서) 문서의 첫 처리방안으로 폴백 —
+   disposition_prev가 있으면 그것(값이 ''여도 「미정」), 없으면 disposition. */
+export const reviewedDispLabel = (row, report) => {
+    const stamped = row?.disp !== undefined && row?.disp !== null;
+    const prev = report?.disposition_prev;
+    const disp = stamped ? row.disp : (prev !== undefined && prev !== null ? prev : report?.disposition);
+    const label = dispositionLabel(disp) || '미정';
+    return stamped && row.conc ? `${label} · ${row.conc}` : label;
+};
+
+/* 품질비용 줄 합계 — 회수(recovery: 업체 감액·청구로 돌려받는 돈)는 비용이 아니므로 따로 센다 */
+export const costTotals = (items) => (items || []).reduce((t, c) => {
+    const n = Number(String(c?.amount ?? '').replace(/[^0-9]/g, '')) || 0;
+    if (c?.recovery) t.recovery += n; else t.cost += n;
+    return t;
+}, { cost: 0, recovery: 0 });
+/* 저장된 비용 줄 → 입력칸 줄(금액은 글자). 회수 표시를 버리면 회수가 비용으로 둔갑한다(부서 재회신 결함) */
+export const costRowsForEdit = (items) => (items || []).map(c => ({ label: c?.label || '', amount: String(c?.amount ?? ''), ...(c?.recovery ? { recovery: true } : {}) }));
 
 /* 최종반려 때 최신 보존 회차의 처리방안 요청을 다시 미해결로 연다. */
 export const reopenLatestDispositionRequests = (reviews) => {

@@ -41,6 +41,7 @@ import InboundRecords from './InboundRecords';
 import NCRCreate from './NCRCreate';
 import NCRInbox from './NCRInbox';
 import NCRLedger from './NCRLedger';
+import NCRLegacy from './NCRLegacy';
 import { myTurnV101 as ncrMyTurnCheck, fetchNcrSettings } from './NCRDetail';
 import { roleOf } from '../lib/ncrRoles';
 
@@ -48,7 +49,7 @@ import { roleOf } from '../lib/ncrRoles';
    (개발자 노트·인수/공정/최종검사·업무 관리·일정·리포트 관리·관리자 화면 숨김).
    사이드바·본문·주소창(#해시) 직접 진입이 모두 이 판정 하나를 쓴다.
    관리자 화면은 기존 isAdmin 에 품질보증부를 더한 조건 — 이 화면 안에서만 쓴다(계정 권한·서버 판정은 그대로). */
-const NON_QA_TABS = ['home', 'notices', 'resources', 'suggestions', 'ncr_inbox', 'ncr_ledger'];
+const NON_QA_TABS = ['home', 'notices', 'resources', 'suggestions', 'ncr_inbox', 'ncr_ledger', 'ncr_legacy']; // ncr_legacy = 과거 부적합 조회(보기 전용, 전 부서)
 const ADMIN_TABS = ['post_approval', 'members', 'settings_home'];
 const canOpenTab = (tab, isQa, isAdmin) => {
     if (ADMIN_TABS.includes(tab)) return !!isAdmin && isQa;
@@ -742,6 +743,7 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
             case 'ncr_create': return user?.company === '품질보증부' ? <NCRCreate user={user} /> : <NCRInbox user={user} />;
             case 'ncr_inbox': return <NCRInbox user={user} targetReportId={ncrInboxTarget} onTargetConsumed={() => setNcrInboxTarget(null)} />;
             case 'ncr_ledger': return <NCRLedger user={user} onProcess={openNcrInInbox} />;
+            case 'ncr_legacy': return <NCRLegacy />;
             case 'dev_notes': return <DevNotes user={user} />;
             case 'suggestions': return <Suggestions user={user} />;
             case 'post_approval': return isAdmin ? <PostApproval user={user} /> : null;
@@ -986,6 +988,12 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
                                         className={`w-full flex items-center px-3 py-2 text-xs font-medium rounded-md transition-all ${activeTab === 'ncr_ledger' ? 'text-blue-400 font-bold bg-slate-800/40' : 'text-slate-400 hover:text-white'}`}
                                     >
                                         부적합 대장
+                                    </button>
+                                    <button
+                                        onClick={() => setActiveTab('ncr_legacy')}
+                                        className={`w-full flex items-center px-3 py-2 text-xs font-medium rounded-md transition-all ${activeTab === 'ncr_legacy' ? 'text-blue-400 font-bold bg-slate-800/40' : 'text-slate-400 hover:text-white'}`}
+                                    >
+                                        과거 부적합 조회
                                     </button>
                                 </div>
                             )}

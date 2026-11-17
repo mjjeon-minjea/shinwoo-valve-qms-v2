@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, CheckCircle2, XCircle, Printer, Undo2, Stamp, FlaskConical, Users, ClipboardCheck, Ban, Coins, Plus, Trash2, File as FileIcon } from 'lucide-react';
 import { api, supabase } from '../lib/api';
-import { activeReviewDepartments, concessionTypeLabel, dispositionLabel, isLegacyFlow, isNewFlow, recallReviews, reopenLatestDispositionRequests, reviewDepartmentOptions, startNextReviewRound, statusLabel } from '../lib/ncrFlow';
+import { activeReviewDepartments, concessionTypeLabel, costRowsForEdit, costTotals, dispositionLabel, isLegacyFlow, isNewFlow, recallReviews, reopenLatestDispositionRequests, reviewDepartmentOptions, reviewedDispLabel, startNextReviewRound, statusLabel } from '../lib/ncrFlow';
 import { roleOf, canApprove, techApprovalDecision, myTurnV101, filterNcrCandidates } from '../lib/ncrRoles';
 import { notifyNcrTurn } from '../lib/ncrNotify';
 /* v10.2 H-③ 처리확인 증빙 첨부 — 작성화면과 「같은 규칙」(1280px 축소 · 비이미지 5MB)을 쓰려고
@@ -167,7 +167,18 @@ const validateCosts = (arr) => {
     }
     return null;
 };
-const sumCosts = (arr) => cleanCosts(arr).reduce((a, c) => a + numOf(c.amount), 0);
+const costSum = (arr) => costTotals(cleanCosts(arr).map(c => ({ ...c, amount: numOf(c.amount) })));   // { cost, recovery }
+const sumCosts = (arr) => costSum(arr).cost;                                                           // 비용만(회수 제외)
+const recFlag = (c) => (c?.recovery ? { recovery: true } : {});
+/* 회수(업체 감액·청구) 표시 — 0이면 아무것도 안 그려 회수 없는 문서는 종전 화면 그대로 */
+const RecoveryTag = ({ n }) => (Number(n) > 0
+    ? <span className="inline-block ml-1 px-1.5 py-0.5 rounded bg-cyan-50 border border-cyan-200 text-[10px] font-bold text-cyan-700">회수 {fmtWon(n)}</span> : null);
+const RecMark = ({ c }) => (c?.recovery ? <span className="text-[10px] font-bold text-cyan-700 mr-0.5">[회수]</span> : null);
+const RecoveryCheck = ({ checked, onChange }) => (
+    <label className="flex items-center gap-0.5 text-[11px] text-slate-500 shrink-0 whitespace-nowrap" title="업체 감액·청구 등 돌려받는 금액 — 비용 합계에서 빠지고 회수로 따로 집계">
+        <input type="checkbox" checked={!!checked} onChange={e => onChange(e.target.checked)} />회수
+    </label>
+);
 
 /* 비용 항목 입력 줄 (회람 검토 회신 · 종합검토 1차 공용) — Panel과 같은 이유로 모듈 스코프 */
 const CostRows = ({ rows, setRows, addLabel, placeholder, showDept, inputCls }) => (<>
@@ -182,13 +193,14 @@ const CostRows = ({ rows, setRows, addLabel, placeholder, showDept, inputCls }) 
                     const { digits, note } = sanitizeAmount(e.target.value);
                     return { ...x, amount: digits, note };
                 }))} />
+            <RecoveryCheck checked={c.recovery} onChange={v => setRows(p => p.map((x, j) => j === i ? { ...x, recovery: v } : x))} />
             <button type="button" onClick={() => setRows(p => p.filter((_, j) => j !== i))} className="text-slate-400 hover:text-red-500 px-1">✕</button>
         </div>
     ))}
     {rows.some(c => c.note) && <div className="text-[11px] text-amber-600">⚠ {rows.find(c => c.note).note}</div>}
     <div className="flex items-center justify-between">
         <button type="button" onClick={() => setRows(p => [...p, { label: '', amount: '', dept: '' }])} className="text-xs font-semibold text-blue-600">{addLabel}</button>
-        <div className="text-sm font-bold text-slate-700">합계 {fmtWon(sumCosts(rows))}</div>
+        <div className="text-sm font-bold text-slate-700">합계 {fmtWon(sumCosts(rows))}<RecoveryTag n={costSum(rows).recovery} /></div>
     </div>
     <div className="text-[11px] text-slate-400">숫자만 입력됩니다 · 항목당 최대 {MAX_AMOUNT_LABEL}원</div>
 </>);
@@ -368,17 +380,18 @@ const NCRDetail = ({ report, user, onClose, onChanged, readOnly = false, canProc
     const dispRemandOn = pendingDispReqs.some(({ dept }) => dispDecisions[dept] === '반송');
     const dispConcOn = pendingDispReqs.some(({ dept, req }) => dispDecisions[dept] === '수락' && req.to === CONCESSION);
     const collectDeptCosts = () => Object.entries(reviews)                     // 부서가 회람에서 올린 비용 항목 → 1차 미리채움
-        .flatMap(([dept, rv]) => (rv?.cost_items || []).map(c => ({ label: c.label || '', amount: String(c.amount ?? ''), dept })));
+        .flatMap(([dept, rv]) => (rv?.cost_items || []).map(c => ({ label: c.label || '', amount: String(c.amount ?? ''), dept, ...recFlag(c) })));
     const seedStage1 = () => {
         const saved = report.cost_stage1?.items;                               // 최종반려로 되돌아온 경우 직전 1차 입력을 되살린다
         /* 「0원으로 확정」한 판단도 저장된 판단이다 — 빈 배열이 falsy라 부서 입력이 되살아나던 것을 막는다 */
-        if (Array.isArray(saved)) return saved.map(c => ({ label: c.label || '', amount: String(c.amount ?? ''), dept: c.dept || '' }));
+        if (Array.isArray(saved)) return saved.map(c => ({ label: c.label || '', amount: String(c.amount ?? ''), dept: c.dept || '', ...recFlag(c) }));
         return collectDeptCosts();
     };
     const hasStage1 = !!report.cost_stage1;                                    // 없으면(기존 문서) 완료확인은 종전 검증 그대로
-    const stage1Locked = (report.cost_stage1?.items || []).map(c => ({ label: c.label || '', amount: Number(c.amount || 0), dept: c.dept || '' }));
+    const stage1Locked = (report.cost_stage1?.items || []).map(c => ({ label: c.label || '', amount: Number(c.amount || 0), dept: c.dept || '', ...recFlag(c) }));
     const s1Amount = (i) => (s1Edits[i]?.on ? numOf(s1Edits[i].amount) : Number(stage1Locked[i]?.amount || 0));
-    const s1Sum = stage1Locked.reduce((a, _c, i) => a + s1Amount(i), 0);
+    const s1Totals = costTotals(stage1Locked.map((c, i) => ({ ...c, amount: s1Amount(i) })));
+    const s1Sum = s1Totals.cost;                                               // 비용만 — 회수는 s1Totals.recovery
     const addSum = sumCosts(costItems);
 
     /* ── v10.1 게이트 핸들러 (v9.3 이식) ── */
@@ -458,7 +471,7 @@ const NCRDetail = ({ report, user, onClose, onChanged, readOnly = false, canProc
            구 버전에서 상신되어 conc가 없는 문서는 승인 패널에서 보정 선택을 받는다. */
         const conc = p.conc || okConc;
         if (String(p.disp || '').startsWith('특채') && !conc) return setErr('특채 유형을 선택하세요 — 유형 없이는 특채를 확정할 수 없습니다.');
-        const rv = startNextReviewRound(reviews, p.depts, allDepts);
+        const rv = startNextReviewRound(reviews, p.depts, allDepts, { disp: p.disp, conc });   // 새 차수가 검토할 안 = 이번 patch의 처리방안
         const base = comment || `특채 판단 승인 — 본회람 발사 (${p.depts.join('·')})`;
         act('특채승인', { status: '회람중', reviews: rv, disposition: p.disp, concession_type: conc }, `${base}${dTag(g.deputy)}`);
     };
@@ -474,7 +487,7 @@ const NCRDetail = ({ report, user, onClose, onChanged, readOnly = false, canProc
         if (dispReqOn && !dispTargets.includes(dispReqTo)) return setErr('변경할 처분방안을 선택하세요.');
         /* B-21 품질비용 (선택) — 금액 검증은 완료확인과 동일 규칙 */
         if (deptCostOn) { const e = validateCosts(deptCosts); if (e) return setErr(e); }
-        const items = deptCostOn ? cleanCosts(deptCosts).map(c => ({ label: String(c.label).trim(), amount: numOf(c.amount) })) : null;
+        const items = deptCostOn ? cleanCosts(deptCosts).map(c => ({ label: String(c.label).trim(), amount: numOf(c.amount), ...recFlag(c) })) : null;
         /* 재질의·부서 내 재검토로 다시 회신할 때: 아직 판단 전인 요청은 이번 회신으로 갈아끼우되,
            이미 종합검토에서 수락/거절된 요청 기록은 절대 지우지 않는다(감사 근거 보존). */
         const prevReq = reviews[ro.company]?.disp_req;
@@ -598,8 +611,8 @@ const NCRDetail = ({ report, user, onClose, onChanged, readOnly = false, canProc
 
         /* B-21 1차 — 일반 처리방안 비용 확정 (합계 0원이면 사유 필수) */
         const cerr = validateCosts(stage1Items); if (cerr) return setErr(cerr);
-        const items = cleanCosts(stage1Items).map(c => ({ label: String(c.label).trim(), amount: numOf(c.amount), dept: c.dept || '' }));
-        const total = items.reduce((a, c) => a + c.amount, 0);
+        const items = cleanCosts(stage1Items).map(c => ({ label: String(c.label).trim(), amount: numOf(c.amount), dept: c.dept || '', ...recFlag(c) }));
+        const total = costTotals(items).cost;   // cost_stage1.total = 비용만(회수 제외)
         if (total === 0 && !zeroWhy.trim()) return setErr('처리방안 비용 합계 0원은 사유를 기입해야 합니다.');
         if (total > MAX_AMOUNT_TOTAL) return setErr(`처리방안 비용 합계가 ${MAX_AMOUNT_LABEL}원을 넘을 수 없습니다 (현재 ${fmtWon(total)}). 금액을 확인해 주십시오.`);
 
@@ -663,7 +676,7 @@ const NCRDetail = ({ report, user, onClose, onChanged, readOnly = false, canProc
             const active = Object.entries(reviews)
                 .filter(([dept, row]) => dept !== '응용기술팀' && row?.state !== 'skip')
                 .map(([dept]) => dept);
-            const nextRound = startNextReviewRound(rv, active, allDepts);
+            const nextRound = startNextReviewRound(rv, active, allDepts, { disp: CONCESSION, conc: type });
             act('특채요청 채택·품질판단', {
                 status: '회람중', reviews: nextRound, disposition: CONCESSION, disposition_prev: previous,
                 concession_type: type, expectedStatus: '특채요청 결재 대기'
@@ -771,11 +784,12 @@ const NCRDetail = ({ report, user, onClose, onChanged, readOnly = false, canProc
             if (!String(e.why ?? '').trim()) return setErr('처리방안 비용을 수정하려면 수정 사유가 필요합니다.');
         }
         const s1Rows = stage1Locked.map((c, i) => s1Edits[i]?.on
-            ? { label: c.label, amount: numOf(s1Edits[i].amount), dept: c.dept, stage: '수정', edit_why: String(s1Edits[i].why).trim() }
-            : { label: c.label, amount: Number(c.amount || 0), dept: c.dept, stage: '처리방안' });
-        const addRows = items.map(c => ({ label: String(c.label).trim(), amount: numOf(c.amount), stage: '완료확인' }));
-        const s1Total = s1Rows.reduce((a, c) => a + c.amount, 0);
-        const total = s1Total + addRows.reduce((a, c) => a + c.amount, 0);
+            ? { label: c.label, amount: numOf(s1Edits[i].amount), dept: c.dept, stage: '수정', edit_why: String(s1Edits[i].why).trim(), ...recFlag(c) }
+            : { label: c.label, amount: Number(c.amount || 0), dept: c.dept, stage: '처리방안', ...recFlag(c) });
+        const addRows = items.map(c => ({ label: String(c.label).trim(), amount: numOf(c.amount), stage: '완료확인', ...recFlag(c) }));
+        const s1Total = costTotals(s1Rows).cost;                          // 비용만 — 회수는 recovery_total로 따로
+        const allTotals = costTotals([...s1Rows, ...addRows]);
+        const total = allTotals.cost;
         /* 2차(추가 발생분)는 0원이어도 사유가 필요 없다 — 0원 사유는 1차 없는 기존 문서에서만 유지 */
         if (!hasStage1 && total === 0 && !zeroWhy.trim()) return setErr('품질비용 0원은 사유를 기입해야 합니다.');
         if (total > MAX_AMOUNT_TOTAL) return setErr(`품질비용 합계가 ${MAX_AMOUNT_LABEL}원을 넘을 수 없습니다 (현재 ${fmtWon(total)}). 금액을 확인해 주십시오.`);
@@ -787,6 +801,7 @@ const NCRDetail = ({ report, user, onClose, onChanged, readOnly = false, canProc
             car, car_no: car === '유' ? carNo.trim() : '', at: nowIso(), by: user?.name
         };
         if (hasStage1) closed.cost_stage1_total = s1Total;
+        if (allTotals.recovery > 0) closed.recovery_total = allTotals.recovery;
         /* H-③ 처리확인 증빙 — 기존 첨부와 같은 저장소(ncr_attachments), category 4로 구분해 건별 INSERT.
            작성화면 첨부(1·2·3)와 겹치지 않으므로 기존 화면·인쇄 로직이 영향받지 않는다.
            by(올린 사람)는 여기서만 남긴다 — 1~3은 작성자가 올린 것이라 인쇄 목록에서 author_name으로 대신한다. */
@@ -910,6 +925,18 @@ const NCRDetail = ({ report, user, onClose, onChanged, readOnly = false, canProc
     const closedEvid = atts.filter(a => Number(a.category) === ATT_CAT.CLOSED);   // H-③ 첨부#4 처리확인 증빙
     const reqDocs = atts.filter(a => Number(a.category) === ATT_CAT.REQUEST);     // 09-02 첨부#5 특채 요청서(933-16)
     const techDocs = atts.filter(a => Number(a.category) === ATT_CAT.TECH);       // 10-07(080) 첨부#6 기술 검토 증거자료
+    /* 11-17 상세 QA — 표시 전용 파생값 */
+    const isClosedDone = newFlow && report.status === '종결' && !!report.closed;
+    const hasClosed = newFlow && !!report.closed;                                            // 완료확인 상신됨(종결반려 땐 closed=null)
+    const costTotal = hasClosed ? report.closed.cost_total : report.cost_stage1?.total;      // ③ 상신·종결=최종 합계, 그 전=처리방안 1차
+    const costRecovery = hasClosed ? report.closed.recovery_total : costTotals(report.cost_stage1?.items).recovery;
+    const techSummary = newFlow ? (report.tech_reply?.summary || '') : '';                    // ② 전문은 보라 상자 한 곳에만
+    const TECH_REF = '(위 기술 회신 참조)';
+    const shortTech = (s) => (techSummary && String(s || '').includes(techSummary) ? String(s).replace(techSummary, TECH_REF) : s);
+    const noDeptCosts = (report.cost_stage1?.items || []).filter(c => !c.dept);               // ③ 회람 표에 안 잡히는 비용
+    const keyEvid = [...pairs.map(p => p.bad).filter(Boolean).map(a => ['불량 사진', a]), ...reqDocs.map(a => ['특채 요청서', a]),
+        ...techDocs.map(a => ['기술 증거', a]), ...closedEvid.map(a => ['처리확인 증빙', a])];   // ⑤ 머리 근처 바로가기
+    const closedAt = (history || []).filter(h => h.action === '종결승인').pop()?.at || report.closed?.at;
 
     /* ── H-③ 처리확인 증빙 담기 (완료확인 패널 전용) ──
        사진·파일 둘 다 받는다. 작성화면과 같은 processAnyFile을 통과시켜
@@ -985,7 +1012,7 @@ const NCRDetail = ({ report, user, onClose, onChanged, readOnly = false, canProc
             const mineRv = reviews[ro.company] || {};
             const prevItems = Array.isArray(mineRv.cost_items) ? mineRv.cost_items : [];
             setDeptCostOn(prevItems.length > 0);
-            setDeptCosts(prevItems.length > 0 ? prevItems.map(c => ({ label: c.label || '', amount: String(c.amount ?? '') })) : [{ label: '', amount: '' }]);
+            setDeptCosts(prevItems.length > 0 ? costRowsForEdit(prevItems) : [{ label: '', amount: '' }]);
             const openReq = (mineRv.disp_req && !mineRv.disp_req.resolved) ? mineRv.disp_req : null;   // 미해결분만
             setDispReqOn(!!openReq && dispTargets.length > 0);
             setDispReqTo(openReq && dispTargets.includes(openReq.to) ? openReq.to : (dispTargets[0] || ''));
@@ -1175,17 +1202,17 @@ const NCRDetail = ({ report, user, onClose, onChanged, readOnly = false, canProc
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={onClose}>
             <div className="bg-white rounded-xl shadow-xl border border-slate-200 w-full max-w-3xl max-h-[88vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 sticky top-0 bg-white z-10">
-                    <div className="flex items-center gap-2">
-                        <span className="font-mono font-bold text-blue-700">{report.ncr_no}</span>
+                <div className="flex items-center justify-between gap-2 px-4 sm:px-6 py-4 border-b border-slate-100 sticky top-0 bg-white z-10">
+                    <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+                        <span className="whitespace-nowrap font-mono font-bold text-blue-700">{report.ncr_no}</span>
                         <span className={`inline-block px-2.5 py-1 text-xs font-semibold rounded-full border ${STATUS_BADGE[report.status] || STATUS_BADGE['작성중']}`}>{statusLabel(report.status)}</span>
-                        {report.tech_flag && <span className="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full bg-violet-50 text-violet-700 border border-violet-200">기술문의</span>}
-                        {report.status === '무효승인 대기' && report.void_req && <span className="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full bg-slate-100 text-slate-700 border border-slate-400">무효 상신 · {report.void_req.kind}</span>}
-                        {(report.disposition || '').startsWith('특채') && <span className="inline-block px-2 py-0.5 text-[10px] font-bold rounded-full bg-amber-50 text-amber-700 border border-amber-200">특채</span>}
-                        {!newFlow && <span className="inline-block px-2 py-0.5 text-[10px] rounded-full bg-slate-100 text-slate-500 border border-slate-200">구 흐름 문서</span>}
+                        {report.tech_flag && <span className="whitespace-nowrap inline-block px-2 py-0.5 text-[10px] font-bold rounded-full bg-violet-50 text-violet-700 border border-violet-200">기술문의</span>}
+                        {report.status === '무효승인 대기' && report.void_req && <span className="whitespace-nowrap inline-block px-2 py-0.5 text-[10px] font-bold rounded-full bg-slate-100 text-slate-700 border border-slate-400">무효 상신 · {report.void_req.kind}</span>}
+                        {(report.disposition || '').startsWith('특채') && <span className="whitespace-nowrap inline-block px-2 py-0.5 text-[10px] font-bold rounded-full bg-amber-50 text-amber-700 border border-amber-200">특채</span>}
+                        {!newFlow && <span className="whitespace-nowrap inline-block px-2 py-0.5 text-[10px] rounded-full bg-slate-100 text-slate-500 border border-slate-200">구 흐름 문서</span>}
                     </div>
-                    <div className="flex items-center gap-2">
-                        <button onClick={() => setShowPrint(true)} disabled={history === null} className="flex items-center px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-wait">
+                    <div className="flex items-center gap-2 shrink-0">
+                        <button onClick={() => setShowPrint(true)} disabled={history === null} className="flex items-center whitespace-nowrap px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-wait">
                             <Printer className="w-3.5 h-3.5 mr-1.5" /> 인쇄
                         </button>
                         <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400"><X className="w-5 h-5" /></button>
@@ -1216,7 +1243,38 @@ const NCRDetail = ({ report, user, onClose, onChanged, readOnly = false, canProc
                         {/* 933-07 Recommended by — 회람 부서가 처리방안을 문의할 상대 */}
                         <div><div className="text-xs text-slate-400 mb-0.5">처리방안 마련자</div><div className="font-medium text-slate-700">{report.disposition_by || '— 미지정 —'}<span className="ml-1 text-[11px] font-normal text-slate-400">(품질보증부)</span></div></div>
                         <div><div className="text-xs text-slate-400 mb-0.5">작성자</div><div className="font-medium text-slate-700">{report.author_name} ({report.author_company})</div></div>
+                        {/* 11-17 ⑦ 종이 보고서 칸 — 작성 화면과 같은 이름(found_place · finder · customer_project) */}
+                        <div><div className="text-xs text-slate-400 mb-0.5">발견장소</div><div className="font-medium text-slate-700">{report.found_place || '—'}</div></div>
+                        <div><div className="text-xs text-slate-400 mb-0.5">발견자</div><div className="font-medium text-slate-700">{report.finder || '—'}</div></div>
+                        <div><div className="text-xs text-slate-400 mb-0.5">고객/공사</div><div className="font-medium text-slate-700">{report.customer_project || '—'}</div></div>
+                        {/* 11-17 ③ 품질비용 한 칸 — 종결이면 최종 합계, 그 전이면 처리방안(1차) 합계 */}
+                        <div><div className="text-xs text-slate-400 mb-0.5">품질비용 합계</div><div className="font-medium text-slate-700">{costTotal != null ? <b>{fmtWon(costTotal)}</b> : '—'}{costTotal != null && <span className="ml-1 text-[11px] font-normal text-slate-400">({isClosedDone ? '종결 확정' : hasClosed ? '완료확인 상신' : '처리방안 1차'})</span>}<RecoveryTag n={costRecovery} /></div></div>
                     </div>
+
+                    {/* 11-17 ⑥ 결론 요약 — 종결 건은 결론을 머리 바로 아래에 */}
+                    {isClosedDone && (
+                        <div className="text-sm px-4 py-3 rounded-lg bg-emerald-50 border border-emerald-300">
+                            <div className="text-xs font-bold text-emerald-800 mb-1 flex items-center"><CheckCircle2 className="w-3.5 h-3.5 mr-1" /> 결론 요약</div>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-4 gap-y-1 text-[13px] mb-1.5">
+                                <div><span className="text-slate-500">최종 처리 </span><b className="text-slate-800">{dispositionLabel(report.disposition) || '—'}{report.concession_type ? ` (${report.concession_type})` : ''}</b></div>
+                                <div><span className="text-slate-500">시정조치 </span><b className="text-slate-800">{report.closed.car === '유' ? (report.closed.car_no || '유') : (report.closed.car || '—')}</b></div>
+                                <div><span className="text-slate-500">종결일 </span><b className="text-slate-800">{closedAt ? fmtDT(closedAt) : '—'}</b></div>
+                            </div>
+                            <div className="text-slate-700 whitespace-pre-wrap">{report.closed.note || '—'}</div>
+                        </div>
+                    )}
+                    {/* 11-17 ⑤ 핵심 증거 — 맨 아래 첨부까지 내려가지 않고 바로 열어 본다 */}
+                    {keyEvid.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-2 text-[11px]">
+                            <span className="font-bold text-slate-500">핵심 증거</span>
+                            {keyEvid.map(([lbl, a], i) => (
+                                <a key={a.id ?? i} href={attUrl(a)} target="_blank" rel="noreferrer" className="flex items-center gap-1 max-w-full px-2 py-1 rounded border border-slate-200 bg-white hover:bg-slate-50 text-blue-600">
+                                    {isImageAtt(a) && attUrl(a) ? <img src={attUrl(a)} alt="" className="w-8 h-6 object-cover rounded" /> : <FileIcon className="w-3.5 h-3.5 shrink-0" />}
+                                    <span className="text-slate-500">{lbl}</span><span className="font-mono truncate">{a.name}</span>
+                                </a>
+                            ))}
+                        </div>
+                    )}
                     <div>
                         <div className="text-xs text-slate-400 mb-1">부적합 내용</div>
                         <div className="text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 whitespace-pre-wrap">{report.defect_desc || '—'}</div>
@@ -1240,23 +1298,20 @@ const NCRDetail = ({ report, user, onClose, onChanged, readOnly = false, canProc
                     {newFlow && Object.keys(reviews).length > 0 && (
                         <div>
                             <div className="text-xs font-bold text-slate-500 mb-2 flex items-center"><Users className="w-3.5 h-3.5 mr-1" /> 부서 회람 현황</div>
-                            <div className="border border-slate-200 rounded-lg overflow-hidden">
-                                <table className="w-full text-xs">
-                                    <thead><tr className="bg-slate-50 text-slate-500">
-                                        <th className="px-3 py-2 text-left font-semibold">회차</th>
-                                        <th className="px-3 py-2 text-left font-semibold">부서</th>
-                                        <th className="px-3 py-2 text-left font-semibold">담당 검토</th>
-                                        <th className="px-3 py-2 text-left font-semibold">부서장 결재</th>
-                                    </tr></thead>
-                                    <tbody>
-                                        {reviewDisplayRows.map(({ dept: d, row: rv, round, archived }, rowIndex) => (
-                                            <tr key={`${d}-${round}-${archived ? 'old' : 'now'}-${rowIndex}`} className={`border-t border-slate-100 ${archived ? 'bg-slate-50/60' : ''}`}>
-                                                <td className="px-3 py-2 whitespace-nowrap"><span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold ${archived ? 'bg-slate-200 text-slate-600' : 'bg-blue-50 text-blue-700'}`}>{round}차</span></td>
-                                                <td className="px-3 py-2 font-semibold text-slate-700">{d}</td>
-                                                <td className="px-3 py-2">
-                                                    {rv.state === 'skip' ? <span className="text-slate-300 tracking-widest">회 람 제 외</span>
-                                                        : rv.staff_at ? (<span>
-                                                            <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold mr-1 ${rv.opinion === 'reject' ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'}`}>{rv.opinion === 'reject' ? '반려 의견' : '승인 의견'}</span>
+                            {/* 11-17 16:22 차장 지적 — 4칸 표로 「부서장 결재」를 오른쪽 끝에 몰아넣어 글이 끝없이 꺾였다.
+                                회차·부서는 왼쪽, 오른쪽에 의견 배지 → 담당 → 부서장을 위아래로 쌓아 글이 넓게 흐르게 한다(좁은 화면은 위아래로). */}
+                            <div className="border border-slate-200 rounded-lg divide-y divide-slate-100 text-xs">
+                                {reviewDisplayRows.map(({ dept: d, row: rv, round, archived }, rowIndex) => (
+                                    <div key={`${d}-${round}-${archived ? 'old' : 'now'}-${rowIndex}`} className={`flex flex-col sm:flex-row gap-2 sm:gap-4 px-3 py-3 ${archived ? 'bg-slate-50/60' : ''}`}>
+                                        <div className="flex sm:flex-col items-center sm:items-start gap-1.5 sm:w-28 shrink-0">
+                                            <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold ${archived ? 'bg-slate-200 text-slate-600' : 'bg-blue-50 text-blue-700'}`}>{round}차</span>
+                                            <span className="font-semibold text-slate-700 whitespace-nowrap">{d}</span>
+                                        </div>
+                                        <div className="flex-1 min-w-0 space-y-1.5">
+                                            {rv.state === 'skip' ? <span className="text-slate-300 tracking-widest">회 람 제 외</span> : (<>
+                                                {rv.staff_at && (
+                                                    <div className="flex flex-wrap gap-y-1">
+                                                        <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold mr-1 ${rv.opinion === 'reject' ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'}`}>{rv.opinion === 'reject' ? '반려 의견' : '승인 의견'}</span>
                                                             {/* B-20 — 처분방안 변경 요청 배지 (수락·거절 결과까지 표시) */}
                                                             {rv.disp_req && (
                                                                 <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold mr-1 border ${rv.disp_req.resolved === '수락' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : rv.disp_req.resolved === '거절' ? 'bg-slate-100 text-slate-500 border-slate-300' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
@@ -1268,7 +1323,27 @@ const NCRDetail = ({ report, user, onClose, onChanged, readOnly = false, canProc
                                                                     특채 유형 {concessionTypeLabel(rv.disp_req.qa_review.concession_type)}{report.concession_type ? '' : ' (잠정)'}
                                                                 </span>
                                                             )}
-                                                            {rv.staff_name} · {rv.staff_cmt}
+                                                            {/* 11-17 ④ 몇 차 회람이 어느 처리방안 안에 대한 의견인지 — 지난 차수는 차수 시작 때 찍은 disp, 없으면(1차·옛 문서) 첫 처리방안 폴백.
+                                                                현 차수도 차수 시작 때 찍은 disp/conc 가 있으면 그것(최종반려 뒤 2차 특채 의견에 「현 안 폐기」가 붙던 것), 없으면 report.disposition */}
+                                                            {(archived || rv.review_rounds?.length > 0) && (
+                                                                <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold mr-1 border ${archived ? 'bg-slate-100 text-slate-600 border-slate-300' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>
+                                                                    {archived ? `이전 안 「${reviewedDispLabel(rv, report)}」에 대한 의견`
+                                                                        : `현 안 「${rv.disp != null ? reviewedDispLabel(rv, report) : `${dispositionLabel(report.disposition) || '미정'}${report.concession_type ? ` · ${report.concession_type}` : ''}`}」에 대한 의견`}
+                                                                </span>
+                                                            )}
+                                                    </div>
+                                                )}
+                                                <div className="flex gap-2">
+                                                    <span className="w-20 shrink-0 font-semibold text-slate-500 whitespace-nowrap">{rv.staff_name || '담당'}</span>
+                                                    <div className="flex-1 min-w-0 text-slate-700 leading-relaxed">
+                                                        {rv.staff_at ? (<>
+                                                            {techSummary && rv.staff_cmt === techSummary ? <span className="text-violet-700">{TECH_REF}</span> : rv.staff_cmt}
+                                                            {/* 11-17 ⑤ 「특채 요청서 첨부」 글에 실제 첨부 링크 — 올린 담당이 맞는 것 우선, 없으면 전부 */}
+                                                            {rv.disp_req?.to === CONCESSION && reqDocs.length > 0 && (
+                                                                <span className="block mt-1">{(reqDocs.some(a => a.by === rv.staff_name) ? reqDocs.filter(a => a.by === rv.staff_name) : reqDocs).map((a, i) => (
+                                                                    <a key={a.id ?? i} href={attUrl(a)} target="_blank" rel="noreferrer" className="inline-flex items-center mr-2 text-[11px] text-blue-600 hover:underline font-mono"><FileIcon className="w-3 h-3 mr-0.5" />{a.name}</a>
+                                                                ))}</span>
+                                                            )}
                                                             {rv.remand_note ? <span className="text-orange-500 ml-1">({remandLabel(rv.remand_note)}: {remandBody(rv.remand_note)})</span> : null}
                                                             {/* 09-04 059 B-12 — 이전 처분방안 변경 요청(disp_req_prev)도 보이게 한다. 08-22부터 데이터는 보존돼 있었고 표시만 없었다(057 B-12) */}
                                                             {Array.isArray(rv.disp_req_prev) && rv.disp_req_prev.length > 0 && (
@@ -1281,24 +1356,34 @@ const NCRDetail = ({ report, user, onClose, onChanged, readOnly = false, canProc
                                                             {Array.isArray(rv.cost_items) && rv.cost_items.length > 0 && (
                                                                 <span className="block mt-1 text-[11px] text-teal-700">
                                                                     <span className="inline-block px-1.5 py-0.5 rounded bg-teal-50 border border-teal-200 font-bold mr-1">품질비용</span>
-                                                                    {rv.cost_items.map((c, i) => <span key={i} className="mr-2">{c.label} {fmtWon(numOf(c.amount))}</span>)}
-                                                                    <b className="text-teal-800">소계 {fmtWon(sumCosts(rv.cost_items))}</b>
+                                                                    {rv.cost_items.map((c, i) => <span key={i} className="mr-2"><RecMark c={c} />{c.label} {fmtWon(numOf(c.amount))}</span>)}
+                                                                    <b className="text-teal-800">소계 {fmtWon(sumCosts(rv.cost_items))}</b><RecoveryTag n={costSum(rv.cost_items).recovery} />
                                                                 </span>
                                                             )}
-                                                        </span>)
-                                                            : rv.remand_note ? <span className="text-orange-500">{remandLabel(rv.remand_note)} — {remandBody(rv.remand_note)}</span>
+                                                        </>) : rv.remand_note ? <span className="text-orange-500">{remandLabel(rv.remand_note)} — {remandBody(rv.remand_note)}</span>
                                                                 : <span className="text-slate-400">미회신</span>}
-                                                </td>
-                                                <td className="px-3 py-2">
-                                                    {rv.state === 'skip' ? <span className="text-slate-300">—</span>
-                                                        : rv.state === 'done' ? <span className="text-blue-700 font-semibold">{rv.head_name}{rv.deputy ? ' (대결)' : ''} · {rv.head_cmt}</span>
+                                                    </div>
+                                                </div>
+                                                <div className="flex gap-2">
+                                                    <span className="w-20 shrink-0 font-semibold text-slate-500 whitespace-nowrap">부서장</span>
+                                                    <div className="flex-1 min-w-0 leading-relaxed">
+                                                        {rv.state === 'done' ? <span className="text-blue-700 font-semibold">{rv.head_name}{rv.deputy ? ' (대결)' : ''} · {rv.head_cmt}</span>
                                                             : <span className="text-slate-400">대기</span>}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+                                                    </div>
+                                                </div>
+                                            </>)}
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
+                            {/* 11-17 ③ 부서 칸이 빈 비용(종합검토에서 품질이 넣은 항목)은 위 표에 안 잡히므로 따로 보인다 */}
+                            {noDeptCosts.length > 0 && (
+                                <div className="mt-1 text-[11px] text-teal-700">
+                                    <span className="inline-block px-1.5 py-0.5 rounded bg-teal-50 border border-teal-200 font-bold mr-1">부서 미지정 비용</span>
+                                    {noDeptCosts.map((c, i) => <span key={i} className="mr-2"><RecMark c={c} />{c.label} {fmtWon(c.amount)}</span>)}
+                                    <span className="text-slate-400">(종합검토에서 입력)</span>
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -1310,8 +1395,8 @@ const NCRDetail = ({ report, user, onClose, onChanged, readOnly = false, canProc
                             {report.cost_stage1 && (
                                 <div className="mt-1.5 text-[11px] text-slate-600">
                                     <span className="font-bold text-indigo-700">처리방안 비용</span>{' '}
-                                    {(report.cost_stage1.items || []).map((c, i) => <span key={i} className="mr-2">{c.dept ? `${c.dept} · ` : ''}{c.label} {fmtWon(c.amount)}</span>)}
-                                    <b className="text-slate-700">소계 {fmtWon(report.cost_stage1.total)}</b>
+                                    {(report.cost_stage1.items || []).map((c, i) => <span key={i} className="mr-2"><RecMark c={c} />{c.dept ? `${c.dept} · ` : '부서 미지정 · '}{c.label} {fmtWon(c.amount)}</span>)}
+                                    <b className="text-slate-700">소계 {fmtWon(report.cost_stage1.total)}</b><RecoveryTag n={costTotals(report.cost_stage1.items).recovery} />
                                     {Number(report.cost_stage1.total || 0) === 0 && report.cost_stage1.zero_why ? ` (0원 사유: ${report.cost_stage1.zero_why})` : ''}
                                 </div>
                             )}
@@ -1320,16 +1405,16 @@ const NCRDetail = ({ report, user, onClose, onChanged, readOnly = false, canProc
                     {newFlow && report.closed && (
                         <div className="text-sm px-4 py-3 rounded-lg bg-teal-50 border border-teal-200">
                             <div className="text-xs font-bold text-teal-700 mb-1 flex items-center"><Coins className="w-3.5 h-3.5 mr-1" /> 처리 완료확인 · 품질비용</div>
-                            <div className="text-slate-700">{report.closed.note}</div>
+                            <div className="text-slate-700">{isClosedDone ? <span className="text-slate-400">종결 내용은 위 「결론 요약」 참조</span> : report.closed.note}</div>
                             <div className="mt-1 text-slate-600">
                                 {(report.closed.cost_items || []).map((c, i) => (
                                     <span key={i} className="mr-3">
                                         {report.closed.cost_stage1_total != null && c.stage ? <span className="text-[10px] font-bold text-slate-400 mr-0.5">[{c.stage}]</span> : null}
-                                        {c.label} {fmtWon(c.amount)}
+                                        <RecMark c={c} />{c.label} {fmtWon(c.amount)}
                                         {c.edit_why ? <span className="text-[10px] text-slate-400"> (수정 사유: {c.edit_why})</span> : null}
                                     </span>
                                 ))}
-                                <b className="text-slate-800">합계 {fmtWon(report.closed.cost_total)}</b>{/* 2단 문서는 closed.zero_why가 비어 있으므로 1차 사유로 폴백(인쇄물과 동일) */}{Number(report.closed.cost_total || 0) === 0 && (report.closed.zero_why || report.cost_stage1?.zero_why) ? ` (0원 사유: ${report.closed.zero_why || report.cost_stage1?.zero_why})` : ''}
+                                <b className="text-slate-800">합계 {fmtWon(report.closed.cost_total)}</b><RecoveryTag n={report.closed.recovery_total} />{/* 2단 문서는 closed.zero_why가 비어 있으므로 1차 사유로 폴백(인쇄물과 동일) */}{Number(report.closed.cost_total || 0) === 0 && (report.closed.zero_why || report.cost_stage1?.zero_why) ? ` (0원 사유: ${report.closed.zero_why || report.cost_stage1?.zero_why})` : ''}
                             </div>
                             {report.closed.cost_stage1_total != null && (
                                 <div className="mt-0.5 text-[11px] text-slate-500">
@@ -1376,7 +1461,7 @@ const NCRDetail = ({ report, user, onClose, onChanged, readOnly = false, canProc
                                     <li key={i} className="ml-4">
                                         <span className={`absolute -left-[5px] mt-1.5 w-2.5 h-2.5 rounded-full ${ACTION_DOT[h.action] || 'bg-slate-400'}`} />
                                         <div className="text-sm"><b className="text-slate-700">{h.action}</b> <span className="text-slate-500">{h.actor_name} ({h.actor_company})</span></div>
-                                        {h.comment && <div className="text-xs text-slate-600 mt-0.5">“{h.comment}”</div>}
+                                        {h.comment && <div className="text-xs text-slate-600 mt-0.5">“{shortTech(h.comment)}”</div>}
                                         <div className="text-xs text-slate-400 mt-0.5">{fmtDT(h.at)}</div>
                                     </li>
                                 ))}
@@ -1503,7 +1588,7 @@ const NCRDetail = ({ report, user, onClose, onChanged, readOnly = false, canProc
                                             <div key={i} className="space-y-1">
                                                 <div className="flex gap-2 items-center text-sm">
                                                     <span className="text-[11px] text-slate-400 w-16 shrink-0 truncate" title={c.dept}>{c.dept || '—'}</span>
-                                                    <span className="flex-1 text-slate-700 truncate">{c.label}</span>
+                                                    <span className="flex-1 text-slate-700 truncate"><RecMark c={c} />{c.label}</span>
                                                     {s1Edits[i]?.on
                                                         ? <input className={inputCls + ' max-w-[140px] text-right'} placeholder="금액" inputMode="numeric" value={fmtAmt(s1Edits[i].amount)}
                                                             onChange={e => setS1Edits(p => ({ ...p, [i]: { ...p[i], ...(({ digits, note }) => ({ amount: digits, note }))(sanitizeAmount(e.target.value)) } }))} />
@@ -1519,7 +1604,7 @@ const NCRDetail = ({ report, user, onClose, onChanged, readOnly = false, canProc
                                                 )}
                                             </div>
                                         ))}
-                                        <div className="text-right text-sm font-bold text-slate-700">처리방안 소계 {fmtWon(s1Sum)}</div>
+                                        <div className="text-right text-sm font-bold text-slate-700">처리방안 소계 {fmtWon(s1Sum)}<RecoveryTag n={s1Totals.recovery} /></div>
                                     </div>
                                 )}
                                 <div className="text-xs font-semibold text-slate-600">{hasStage1 ? '추가 발생 비용 (실제 처리 중 발생분 — 없으면 비워두셔도 됩니다)' : '품질비용 (항목별 입력 — 자동 합산)'}</div>
@@ -1531,6 +1616,7 @@ const NCRDetail = ({ report, user, onClose, onChanged, readOnly = false, canProc
                                             const { digits, note } = sanitizeAmount(e.target.value);
                                             return { ...x, amount: digits, note };
                                         }))} />
+                                        <RecoveryCheck checked={c.recovery} onChange={v => setCostItems(p => p.map((x, j) => j === i ? { ...x, recovery: v } : x))} />
                                         {costItems.length > 1 && <button type="button" onClick={() => setCostItems(p => p.filter((_, j) => j !== i))} className="text-slate-400 hover:text-red-500 px-1">✕</button>}
                                     </div>
                                 ))}
@@ -1538,7 +1624,7 @@ const NCRDetail = ({ report, user, onClose, onChanged, readOnly = false, canProc
                                     <div className="text-[11px] text-amber-600">⚠ {(costItems.find(c => c.note) || Object.values(s1Edits).find(e => e?.note)).note}</div>}
                                 <div className="flex items-center justify-between">
                                     <button type="button" onClick={() => setCostItems(p => [...p, { label: '', amount: '' }])} className="text-xs font-semibold text-blue-600">＋ 비용 항목 추가</button>
-                                    <div className="text-sm font-bold text-slate-700">{hasStage1 ? '추가 소계 ' : '합계 '}{fmtWon(addSum)}</div>
+                                    <div className="text-sm font-bold text-slate-700">{hasStage1 ? '추가 소계 ' : '합계 '}{fmtWon(addSum)}<RecoveryTag n={costSum(costItems).recovery} /></div>
                                 </div>
                                 <div className="text-[11px] text-slate-400">숫자만 입력됩니다 · 항목당 최대 {MAX_AMOUNT_LABEL}원</div>
                                 {/* 2차(추가 발생분)는 0원이어도 사유 불필요 — 0원 사유는 1차가 없는 기존 문서에서만 요구 */}

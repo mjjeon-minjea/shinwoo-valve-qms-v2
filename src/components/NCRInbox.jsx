@@ -97,14 +97,14 @@ const NCRInbox = ({ user, targetReportId, onTargetConsumed }) => {
                         className={`px-4 py-2 text-sm font-semibold rounded-lg border transition-all ${tab === t.k ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-300 hover:border-blue-400'}`}>
                         {t.label}
                         {t.sub && (
-                            <span className={`ml-1.5 px-1.5 py-0.5 text-[10px] font-bold rounded align-middle ${tab === t.k ? 'bg-white/25 text-white' : 'bg-slate-100 text-slate-500 border border-slate-300'}`}>{t.sub}</span>
+                            <span className={`ml-1.5 whitespace-nowrap px-1.5 py-0.5 text-[10px] font-bold rounded align-middle ${tab === t.k ? 'bg-white/25 text-white' : 'bg-slate-100 text-slate-500 border border-slate-300'}`}>{t.sub}</span>
                         )}
                     </button>
                 ))}
             </div>
 
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full text-sm whitespace-nowrap">
                     <thead>
                         <tr className="bg-slate-50 border-b border-slate-200 text-xs text-slate-500">
                             <th className="px-4 py-3 text-left font-semibold">NCR 번호</th>

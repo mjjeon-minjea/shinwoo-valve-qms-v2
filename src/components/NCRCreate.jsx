@@ -5,6 +5,7 @@ import { isNcrRouteStaff, filterNcrCandidates } from '../lib/ncrRoles';
 import { dispositionLabel } from '../lib/ncrFlow';
 import { isNcrAttachmentRestoreReady } from '../lib/ncrAttachmentRestore';
 import { notifyNcrTurn } from '../lib/ncrNotify';
+import { nextNcrNo, normNcrNo, ncrKey } from '../lib/ncrNo';
 /* v10.2 H-① 캡처 붙여넣기 복원 — 축소·용량제한·붙여넣기 규칙은 lib/attach.jsx 한 곳에만 둔다(중복 정의 금지).
    결재화면(NCRDetail 처리확인 증빙)이 같은 함수를 쓰므로 이 파일에 다시 정의하지 않는다. */
 import { ATT_CAT, shrinkImage, processAnyFile, isImageAtt, useCapturePaste, PasteZone, attUrl, uploadAtt, withAttUrls } from '../lib/attach.jsx';
@@ -171,6 +172,8 @@ const QTY_RE = /^\d{1,9}$/;
 const blankForm = () => ({
     occur_date: new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' }),   // 070 ④ 서울 날짜(UTC로 자르면 00~09시에 전날)
     supplier: '', supplier_code: '', item_name: '', item_code: '', item_cls: '', drawing_no: '',
+    /* 종이 부적합보고서(933-07) 머리 칸 — 발견장소 · 발견자 · 고객/공사 */
+    found_place: '', finder: '', customer_project: '',
     qty_total: '', qty_unknown: false, qty_defect: '',
     defect_desc: '', disposition: '', dept: '',
     code: '', tech_flag: false, routing_depts: [], concession_type: '',
@@ -182,6 +185,12 @@ const NCRCreate = ({ user }) => {
     const [form, setForm] = useState(blankForm);
     const [depts, setDepts] = useState([]);
     const [nextNo, setNextNo] = useState('...');
+    /* 병행 기간(테스트웹) — ncr_settings numbering.mode 'manual'이면 종이 대장 번호를 직접 입력. 행이 없으면 자동(메인웹).
+       null = 설정을 아직 못 받음·조회 실패 — 번호 방식을 모르므로 신규 저장을 막는다(자동번호로 잘못 저장 방지). */
+    const [manualNo, setManualNo] = useState(null);
+    const [noInput, setNoInput] = useState('');
+    const [legacyKeys, setLegacyKeys] = useState(new Set());
+    const [reportKeys, setReportKeys] = useState(new Set());   // 입력 중 QMS 중복을 바로 빨갛게(저장 직전 재조회는 checkManualNo가 그대로 함)
     const [saving, setSaving] = useState(false);
     const [msg, setMsg] = useState(null);
     const [confirmOn, setConfirmOn] = useState(false);   // H-② 발행승인 요청 확인창(화면 안 모달)
@@ -261,18 +270,27 @@ const NCRCreate = ({ user }) => {
 
     const loadNextNo = async () => {
         try {
-            const res = await api.fetch('/ncr_reports');
-            const rows = await res.json();
-            const seqs = (rows || [])
-                .map(r => /^NCR (\d{2})-(\d+)$/.exec(r.ncr_no || ''))
-                .filter(m => m && m[1] === yy)
-                .map(m => parseInt(m[2], 10));
-            const next = (seqs.length ? Math.max(...seqs) : 0) + 1;
-            const no = `NCR ${yy}-${String(next).padStart(3, '0')}`;
+            /* 종이 대장(ncr_legacy) 번호도 함께 본다 — 새 보고서만 세면 첫 건이 종이 26-001과 겹친다. 어느 쪽이든 조회 실패면 저장 차단(아래 catch) */
+            const [res, leg] = await Promise.all([api.fetch('/ncr_reports'), api.fetch('/ncr_legacy')]);
+            const legRows = (await leg.json()) || [];
+            const repRows = (await res.json()) || [];
+            setLegacyKeys(new Set(legRows.map(r => ncrKey(r.ncr_no))));   // 직접 입력 모드 경고용
+            setReportKeys(new Set(repRows.map(r => ncrKey(r.ncr_no))));
+            const no = nextNcrNo(yy, [...repRows, ...legRows].map(r => r.ncr_no));
             setNextNo(no);
             return no;   // 070 ② 저장 직전 재계산(submit)도 이 값을 쓴다 — 조회 실패면 undefined
         } catch { setNextNo(`NCR ${yy}-001`); }
     };
+
+    /* 직접 입력 번호 — 형식 검사 후 저장 직전 ncr_reports 를 다시 조회해 같은 번호면 막는다(종이 대장 중복은 경고만 — 같은 건을 옮겨 적는 게 정상). */
+    const checkManualNo = async () => {
+        const no = normNcrNo(noInput);
+        if (!no) throw new Error('NCR 번호 형식이 아닙니다 — 종이 부적합 대장 번호를 「26-075」처럼 입력해 주세요.');
+        const rows = (await (await api.fetch('/ncr_reports')).json()) || [];
+        if (rows.some(r => ncrKey(r.ncr_no) === ncrKey(no))) throw new Error(`${no} 은(는) QMS에 이미 있는 번호입니다 — 번호를 확인해 주세요.`);
+        return no;
+    };
+    const manualNorm = normNcrNo(noInput);
 
     /* Phase 4: 내(author_email) 문서 중 작성중·반려 — 이어쓰기 후보 */
     const loadDrafts = async () => {
@@ -292,6 +310,7 @@ const NCRCreate = ({ user }) => {
             const res = await api.fetch('/ncr_settings');
             const rows = (await res.json()) || [];
             const pick = (id) => rows.find(s => s.id === id) || {};
+            setManualNo(pick('numbering').mode === 'manual');
             setCodeMap(pick('codes').map || {});
             const dispositions = Array.isArray(pick('dispositions').list) ? pick('dispositions').list : [];
             setDispList([...new Set(dispositions.map(dispositionLabel))]);
@@ -301,7 +320,7 @@ const NCRCreate = ({ user }) => {
                 default_depts: Array.isArray(rt.default_depts) ? rt.default_depts : [],
                 reply_hours: rt.reply_hours || 24
             });
-        } catch { /* 설정 로드 실패 — 코드·처리방안 미선택 상태로 진행(발행 필수값 아님) */ }
+        } catch { /* 설정 로드 실패 — 코드·처리방안 미선택 상태로 진행(발행 필수값 아님). manualNo 는 null 로 남아 신규 저장이 막힌다 */ }
         finally { setSettingsReady(true); }
     };
 
@@ -382,6 +401,7 @@ const NCRCreate = ({ user }) => {
         setPairs([]); setDrawings([]); setRefDocs([]);
         setAttOpen({ 1: false, 2: false, 3: false });
         setMsg(null);
+        setNoInput('');
         loadNextNo();
     };
 
@@ -414,6 +434,7 @@ const NCRCreate = ({ user }) => {
             setForm({
                 occur_date: r.occur_date || new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' }),
                 supplier: r.supplier || '', supplier_code: r.supplier_code || '', item_name: r.item_name || '', item_code: r.item_code || '', item_cls: r.item_cls || '', drawing_no: r.drawing_no || '',
+                found_place: r.found_place || '', finder: r.finder || '', customer_project: r.customer_project || '',
                 qty_total: r.qty_total == null ? '' : String(r.qty_total),
                 qty_unknown: !!r.qty_unknown,
                 qty_defect: r.qty_defect == null ? '' : String(r.qty_defect),
@@ -483,7 +504,9 @@ const NCRCreate = ({ user }) => {
     const buildReviews = () => {
         if (form.tech_flag) return {};
         const rv = {};
-        routeDepts.forEach(d => { rv[d] = makeReview(isRouted(d) ? 'wait' : 'skip', routeOf(d)); });
+        /* 1차가 검토하는 처리방안을 찍어 둔다(ncrFlow blankReview의 disp·conc와 같은 키) */
+        const plan = { disp: form.disposition || '', ...(form.concession_type ? { conc: form.concession_type } : {}) };
+        routeDepts.forEach(d => { rv[d] = { ...makeReview(isRouted(d) ? 'wait' : 'skip', routeOf(d)), ...plan }; });
         return rv;
     };
 
@@ -493,6 +516,8 @@ const NCRCreate = ({ user }) => {
        실패 사유 문자열 반환 / 통과면 null — 규칙은 여기 한 곳에만 둔다(검증 중복 금지). */
     const validationError = (status) => {
         const issuing = status !== '작성중';
+        if (manualNo === null && !editDoc) return '번호 방식 설정을 불러오지 못했습니다 — 새로고침(F5) 후 다시 저장해 주세요.';
+        if (manualNo && !editDoc && !manualNorm) return 'NCR 번호를 입력하세요 — 종이 부적합 대장 번호 그대로(예: 26-075).';
         if (!form.supplier.trim() || !form.item_name.trim()) return '업체와 품명은 필수입니다.';
         /* 071 — 발생일은 달력에 있는 YYYY-MM-DD · 2000-01-01 ~ 오늘(서울)만. 비었거나 미래·아주 옛 날짜(2027·1900)·5자리 연도·없는 날(02-31)이 그대로 저장되던 것(069 극단값 시험) */
         const todayKst = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' });
@@ -535,7 +560,7 @@ const NCRCreate = ({ user }) => {
         setSaving(true);
         try {
             /* 070 ② 새 문서 번호는 폼을 연 때가 아니라 저장 직전에 다시 센다. 조회 실패면 저장하지 않는다(대체값 NCR yy-001 저장 차단) */
-            const docNo = editDoc ? editDoc.ncr_no : await loadNextNo();
+            const docNo = editDoc ? editDoc.ncr_no : manualNo ? await checkManualNo() : await loadNextNo();
             if (!editDoc && !docNo) throw new Error('NCR 번호를 받지 못했습니다 — 잠시 후 다시 저장해 주세요.');
             /* ── 첨부 업로드는 문서 저장보다 먼저 한다 ──────────────────────────
                실측 결함(예림 050 V-4 · 2026-08-30): 종전 순서는 「문서 저장 → 첨부 업로드」였다.
@@ -699,11 +724,12 @@ const NCRCreate = ({ user }) => {
             setForm(emptyForm());
             setOrigDisp('');
             setPairs([]); setDrawings([]); setRefDocs([]); setAttOpen({ 1: false, 2: false, 3: false });
+            setNoInput('');
             loadNextNo();
             loadDrafts();
         } catch (e) {
             /* 070 ② 같은 번호가 먼저 저장돼 DB 유일 인덱스가 막은 경우 — 다시 누르면 저장 직전에 새 번호를 센다 */
-            if (e?.code === '23505' && /ncr_no/.test(e.message || '')) setMsg({ t: 'err', s: '번호가 겹쳤습니다. [저장]을 다시 누르면 새 번호로 저장됩니다.' });
+            if (e?.code === '23505' && /ncr_no/.test(e.message || '')) setMsg({ t: 'err', s: manualNo ? '같은 NCR 번호가 이미 저장돼 있습니다 — 번호를 확인해 주세요.' : '번호가 겹쳤습니다. [저장]을 다시 누르면 새 번호로 저장됩니다.' });
             else setMsg({ t: 'err', s: '저장 실패: ' + (e.message || e) });
         } finally { setSaving(false); }
     };
@@ -730,7 +756,7 @@ const NCRCreate = ({ user }) => {
     return (
         <div className="max-w-4xl">
             <div className="flex items-center justify-between mb-6">
-                <h1 className="text-2xl font-bold text-slate-800 flex items-center">
+                <h1 className="text-xl sm:text-2xl font-bold text-slate-800 flex items-center whitespace-nowrap">
                     <FileText className="mr-2 h-6 w-6 text-blue-600" /> 부적합보고서 작성
                 </h1>
                 <div className="flex items-center gap-2">
@@ -745,11 +771,29 @@ const NCRCreate = ({ user }) => {
                             </button>
                         </>
                     )}
-                    {!editDoc && (
+                    {!editDoc && manualNo === false && (
                         <span className="text-sm font-mono font-bold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-200">{nextNo}</span>
+                    )}
+                    {/* 번호 방식 설정을 못 읽었으면 자동번호를 보이지 않고 바로 알린다(저장도 validationError 에서 막힘) */}
+                    {!editDoc && manualNo === null && settingsReady && (
+                        <span className="text-xs font-semibold text-red-600 bg-red-50 px-3 py-1.5 rounded-lg border border-red-200 whitespace-nowrap">설정 불러오기 실패 — 새로고침(F5)</span>
+                    )}
+                    {!editDoc && manualNo && (
+                        <input value={noInput} onChange={e => setNoInput(e.target.value)} placeholder="예) 26-075" aria-label="NCR 번호(종이 대장 번호)" required
+                            title="종이 부적합 대장 번호를 그대로 입력"
+                            className={`w-36 text-sm font-mono font-bold px-3 py-1.5 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500 ${noInput && !manualNorm ? 'border-red-400 bg-red-50' : 'border-blue-300 bg-white'}`} />
                     )}
                 </div>
             </div>
+
+            {!editDoc && manualNo && (
+                <div className="-mt-4 mb-4 text-xs text-right space-y-0.5">
+                    <div className="text-slate-500">NCR 번호(필수) — <b>종이 부적합 대장 번호를 그대로 입력</b>{manualNorm && <> · 저장 번호 <span className="font-mono font-semibold text-slate-700">{manualNorm}</span></>}</div>
+                    {noInput && !manualNorm && <div className="text-red-600">번호 형식이 아닙니다 — 「26-075」처럼 입력</div>}
+                    {manualNorm && reportKeys.has(ncrKey(manualNorm)) && <div className="text-red-600">QMS에 이미 있는 번호 — 저장할 수 없습니다</div>}
+                    {manualNorm && !reportKeys.has(ncrKey(manualNorm)) && legacyKeys.has(ncrKey(manualNorm)) && <div className="text-amber-700">⚠ 종이 대장(과거 부적합)에 이미 있는 번호 — 같은 건이 맞는지 확인</div>}
+                </div>
+            )}
 
             {/* ── Phase 4: 이어쓰기 — 내 작성중·반려 문서 (접이식) ── */}
             {drafts.length > 0 && (
@@ -805,6 +849,25 @@ const NCRCreate = ({ user }) => {
                         placeholder="띄엄띄엄 검색 — 예: SFP NP22 SCPH2 80A (%불필요)" badge={form.item_code}
                         onText={v => setForm(f => ({ ...f, item_name: v, item_code: '', item_cls: '' }))}
                         onPick={row => setForm(f => ({ ...f, item_name: row.name, item_code: row.id, item_cls: row.cls || '' }))} />
+                </div>
+
+                {/* 종이 양식(933-07) 머리 칸 — 발견장소 목록은 종이 743건에서 많이 쓰인 값, 직접 입력도 된다 */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1.5">발견장소</label>
+                        <input type="text" list="ncr-found-places" className={inputCls} placeholder="골라서 또는 직접 입력" value={form.found_place} onChange={e => set('found_place', e.target.value)} />
+                        <datalist id="ncr-found-places">
+                            {['조립반', '인수검사', '출하반', '검사반', '가공반'].map(v => <option key={v} value={v} />)}
+                        </datalist>
+                    </div>
+                    <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1.5">발견자</label>
+                        <input type="text" className={inputCls} placeholder="예: 홍길동" value={form.finder} onChange={e => set('finder', e.target.value)} />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1.5">고객/공사</label>
+                        <input type="text" className={inputCls} placeholder="예: 삼성엔지니어링 / ○○현장" value={form.customer_project} onChange={e => set('customer_project', e.target.value)} />
+                    </div>
                 </div>
 
                 {/* 수량 블록 — v9.3 로직 이관 */}
@@ -1061,7 +1124,7 @@ const NCRCreate = ({ user }) => {
                                 </div>
                                 <div className="rounded-lg border border-slate-200 bg-white divide-y divide-slate-100 text-sm">
                                     {[
-                                        ['NCR 번호', <span key="no" className="font-mono font-semibold text-slate-700">{editDoc ? editDoc.ncr_no : nextNo}</span>],
+                                        ['NCR 번호', <span key="no" className="font-mono font-semibold text-slate-700">{editDoc ? editDoc.ncr_no : manualNo ? (manualNorm || '—') : nextNo}</span>],
                                         ['업체', form.supplier || '—'],
                                         ['품명', form.item_name || '—'],
                                         ['부적합수량 / 전체', `${form.qty_defect || '—'} / ${form.qty_unknown ? '파악중' : (form.qty_total || '—')}`],

@@ -1,5 +1,5 @@
 // 087 — 부서별 메뉴 노출 실행 검사(Dashboard.jsx).
-// 비품질 부서는 home/notices/resources/suggestions/ncr_inbox/ncr_ledger 6개 화면만 쓴다.
+// 비품질 부서는 home/notices/resources/suggestions/ncr_inbox/ncr_ledger/ncr_legacy 7개 화면만 쓴다.
 // 사이드바·본문·주소창(#해시) 직접 진입이 같은 판정을 쓰고, 관리자 메뉴는 기존 isAdmin AND 품질보증부일 때만 보인다.
 // 실제 Dashboard.jsx 를 esbuild 로 묶고 하위 화면은 표식만 그리는 가짜로 바꾼다(DB·Auth 접속 없음).
 import test from 'node:test';
@@ -33,7 +33,7 @@ export function useEffect(fn) { const h = globalThis.__h; if (h) h.effects.push(
 const COMPONENTS = ['Chatbot', 'UserManagement', 'ProgressModal', 'NoticeBoard', 'DevNotes', 'Suggestions', 'PostApproval', 'ResourceRoom',
     'WeeklyReport', 'WeeklyStatus', 'CalendarView', 'ProcessInspectionDashboard', 'ProcessHistory', 'ProcessAnalysis', 'WorkplaceAnalysis',
     'EquipmentAnalysis', 'ModelCategoryAnalysis', 'InboundOverview', 'InboundSuppliers', 'InboundItems', 'InboundRecords',
-    'NCRCreate', 'NCRInbox', 'NCRLedger'];
+    'NCRCreate', 'NCRInbox', 'NCRLedger', 'NCRLegacy'];
 const stubSource = (name) => {
     if (name === 'api') return 'export const api = { fetch: async () => ({ ok: true, json: async () => [] }) };';
     if (name === 'resourceFiles') return 'export const listCurrentResources = async () => [];';
@@ -95,14 +95,14 @@ const USERS = {
     prodAdmin: { id: 'a3', email: 'prod.admin@example.test', name: '생산관리자', company: '생산부', role: 'director', status: 'Active', is_admin: true, isAdmin: true },
     prodStaff: { id: 'a4', email: 'prod.staff@example.test', name: '생산담당', company: '생산부', role: 'employee', status: 'Active', is_admin: false, isAdmin: false }
 };
-const NON_QA_TABS = ['home', 'notices', 'resources', 'suggestions', 'ncr_inbox', 'ncr_ledger'];
+const NON_QA_TABS = ['home', 'notices', 'resources', 'suggestions', 'ncr_inbox', 'ncr_ledger', 'ncr_legacy'];   // ncr_legacy = 과거 부적합 조회(보기 전용, 전 부서 · 2026-11-17)
 const ADMIN_TABS = ['post_approval', 'members', 'settings_home'];
 const QA_TABS = ['home', 'notices', 'dev_notes', 'resources', 'suggestions', 'inbound_overview', 'inbound_suppliers', 'inbound_items', 'inbound_records',
     'process_dashboard', 'process_by_process', 'process_by_workplace', 'process_by_equipment', 'process_by_model_category', 'process_history',
-    'final', 'ncr_create', 'ncr_inbox', 'ncr_ledger', 'weekly_report', 'weekly_status', 'schedule'];
+    'final', 'ncr_create', 'ncr_inbox', 'ncr_ledger', 'ncr_legacy', 'weekly_report', 'weekly_status', 'schedule'];
 const CONTENT_MARK = {
     home: '등록된 공지가 없습니다.', notices: 'STUB:NoticeBoard', resources: 'STUB:ResourceRoom', suggestions: 'STUB:Suggestions',
-    ncr_inbox: 'STUB:NCRInbox', ncr_ledger: 'STUB:NCRLedger', ncr_create: 'STUB:NCRCreate', dev_notes: 'STUB:DevNotes',
+    ncr_inbox: 'STUB:NCRInbox', ncr_ledger: 'STUB:NCRLedger', ncr_legacy: 'STUB:NCRLegacy', ncr_create: 'STUB:NCRCreate', dev_notes: 'STUB:DevNotes',
     inbound_overview: 'STUB:InboundOverview', inbound_suppliers: 'STUB:InboundSuppliers', inbound_items: 'STUB:InboundItems', inbound_status: 'STUB:InboundItems',
     inbound_records: 'STUB:InboundRecords', process: 'STUB:ProcessInspectionDashboard', process_dashboard: 'STUB:ProcessInspectionDashboard',
     process_by_process: 'STUB:ProcessAnalysis', process_by_workplace: 'STUB:WorkplaceAnalysis', process_by_equipment: 'STUB:EquipmentAnalysis',
@@ -154,7 +154,7 @@ function runGuard(userKey, hash) {
 
 const sorted = a => [...a].sort();
 
-test('사이드바: 비품질 직원·비품질 관리자는 6개 화면만 고를 수 있다', () => {
+test('사이드바: 비품질 직원·비품질 관리자는 7개 화면만 고를 수 있다', () => {
     for (const key of ['prodStaff', 'prodAdmin']) {
         const { tabs, html } = sidebarTabs(key);
         assert.deepEqual(tabs, sorted(NON_QA_TABS), key);
