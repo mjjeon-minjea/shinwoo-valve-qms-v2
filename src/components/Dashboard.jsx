@@ -613,6 +613,7 @@ const Dashboard = ({ user, isAdmin, members, onDeleteMember, onEditMember, onAdd
     const navigate = useNavigate();
     const getInitialTab = () => {
         const hash = window.location.hash.replace('#', '');
+        if (hash === 'resources-video') return 'resources'; // 자료실 「동영상」 탭 바로가기(탭 고르기는 ResourceRoom)
         return hash ? hash : 'home';
     };
     const [activeTab, setActiveTab] = useState(getInitialTab); // Default to home (or current hash)

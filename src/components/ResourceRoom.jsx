@@ -25,6 +25,8 @@ import {
 const ITEMS_PER_PAGE = 10;
 const VIDEOS_PER_PAGE = 12; // 영상 격자는 1·2·3·4열 어디서나 줄이 꽉 차게
 const VIDEO_TAB = '__video__'; // 「동영상」 탭의 tab 값 — 구분 이름과 겹치지 않게
+// 메일 링크 #resources-video 로 앱을 열면 처음 한 번만 「동영상」 탭으로 연다(앱을 띄운 순간의 주소 — Dashboard 가 곧 #resources 로 바꾼다)
+let openVideoFromLink = typeof window !== 'undefined' && window.location.hash === '#resources-video';
 const EMPTY_FORM = {
     base: null, category: '', categoryNew: '', module: '', moduleNew: '',
     title: '', description: '', sourceRef: '', revisionNote: '', file: null,
@@ -118,7 +120,8 @@ const ResourceRoom = ({ isAdmin = false }) => {
     const [error, setError] = useState('');
     const [historyError, setHistoryError] = useState('');
     const [search, setSearch] = useState('');
-    const [tab, setTab] = useState(''); // 고른 구분 탭(이름). 비어 있으면 자료가 있는 첫 탭
+    const [tab, setTab] = useState(openVideoFromLink ? VIDEO_TAB : ''); // 고른 구분 탭(이름). 비어 있으면 자료가 있는 첫 탭
+    useEffect(() => { openVideoFromLink = false; }, []); // 링크는 한 번만 — 다른 메뉴 갔다 오면 평소처럼 첫 탭
     const [adminOpen, setAdminOpen] = useState(false); // 「관리」 탭(관리자만)
     const [adminSearch, setAdminSearch] = useState('');
     const [hiddenOnly, setHiddenOnly] = useState(false);
